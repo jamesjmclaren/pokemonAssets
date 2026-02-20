@@ -9,6 +9,7 @@ import {
   PlusCircle,
   ArrowUpRight,
   ArrowDownRight,
+  RefreshCw,
 } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import PortfolioChart from "@/components/PortfolioChart";
@@ -19,29 +20,14 @@ import type { PortfolioAsset } from "@/types";
 export default function DashboardPage() {
   const [assets, setAssets] = useState<PortfolioAsset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     async function fetchAssets() {
       try {
         const res = await fetch("/api/assets");
         if (!res.ok) throw new Error("Failed to fetch");
-        const data = await res.json();
-        setAssets(data);
-
-        // Refresh market prices in the background
-        if (data.length > 0) {
-          fetch("/api/assets/refresh-prices", { method: "POST" })
-            .then((r) => r.json())
-            .then(async (result) => {
-              if (result.updated > 0) {
-                const refreshed = await fetch("/api/assets");
-                if (refreshed.ok) {
-                  setAssets(await refreshed.json());
-                }
-              }
-            })
-            .catch(() => {});
-        }
+        setAssets(await res.json());
       } catch (error) {
         console.error("Error fetching assets:", error);
       } finally {
@@ -50,6 +36,23 @@ export default function DashboardPage() {
     }
     fetchAssets();
   }, []);
+
+  async function handleRefreshPrices() {
+    if (refreshing || assets.length === 0) return;
+    setRefreshing(true);
+    try {
+      const r = await fetch("/api/assets/refresh-prices", { method: "POST" });
+      const result = await r.json();
+      if (result.updated > 0) {
+        const refreshed = await fetch("/api/assets");
+        if (refreshed.ok) setAssets(await refreshed.json());
+      }
+    } catch {
+      // silent
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   const totalInvested = assets.reduce((sum, a) => sum + a.purchase_price, 0);
   const currentValue = assets.reduce(
@@ -117,13 +120,25 @@ export default function DashboardPage() {
             Track your Pokemon investment portfolio
           </p>
         </div>
-        <Link
-          href="/dashboard/add"
-          className="flex items-center gap-2 px-5 py-3 bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl"
-        >
-          <PlusCircle className="w-5 h-5" />
-          Add Asset
-        </Link>
+        <div className="flex items-center gap-3">
+          {assets.length > 0 && (
+            <button
+              onClick={handleRefreshPrices}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-4 py-3 bg-surface border border-border hover:border-border-hover text-text-secondary hover:text-text-primary font-medium rounded-xl text-sm disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "Updating..." : "Refresh Prices"}
+            </button>
+          )}
+          <Link
+            href="/dashboard/add"
+            className="flex items-center gap-2 px-5 py-3 bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl"
+          >
+            <PlusCircle className="w-5 h-5" />
+            Add Asset
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
