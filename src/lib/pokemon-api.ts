@@ -16,9 +16,10 @@ async function apiFetch(path: string, params?: Record<string, string>) {
     });
   }
 
+  const apiKey = getApiKey();
   const res = await fetch(url.toString(), {
     headers: {
-      Authorization: `Bearer ${getApiKey()}`,
+      "x-api-key": apiKey,
       "Content-Type": "application/json",
     },
     next: { revalidate: 3600 },
