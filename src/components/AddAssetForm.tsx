@@ -1,0 +1,459 @@
+"use client";
+
+import { useState, useRef } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import {
+  Upload,
+  Camera,
+  X,
+  Loader2,
+  CheckCircle2,
+  Search,
+} from "lucide-react";
+import { formatCurrency } from "@/lib/format";
+import { supabase } from "@/lib/supabase";
+import SearchModal from "./SearchModal";
+
+interface SelectedCard {
+  id: string;
+  name: string;
+  number?: string;
+  rarity?: string;
+  setName?: string;
+  set?: string;
+  imageUrl?: string;
+  image?: string;
+  prices?: {
+    tcgplayer?: { market?: number; low?: number };
+  };
+  tcgplayerPrice?: number;
+  marketPrice?: number;
+}
+
+export default function AddAssetForm() {
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null);
+  const [customImage, setCustomImage] = useState<File | null>(null);
+  const [customImagePreview, setCustomImagePreview] = useState<string | null>(
+    null
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const [form, setForm] = useState({
+    purchasePrice: "",
+    purchaseDate: new Date().toISOString().split("T")[0],
+    purchaseLocation: "",
+    condition: "Near Mint",
+    assetType: "card" as "card" | "sealed",
+    notes: "",
+  });
+
+  const handleCardSelect = (card: SelectedCard) => {
+    setSelectedCard(card);
+    setSearchOpen(false);
+    const price =
+      card.prices?.tcgplayer?.market ||
+      card.prices?.tcgplayer?.low ||
+      card.tcgplayerPrice ||
+      card.marketPrice;
+    if (price && !form.purchasePrice) {
+      setForm((f) => ({ ...f, purchasePrice: price.toFixed(2) }));
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be under 5MB");
+      return;
+    }
+
+    setCustomImage(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCustomImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCard) return;
+
+    setSubmitting(true);
+    try {
+      let customImageUrl: string | null = null;
+
+      if (customImage) {
+        const ext = customImage.name.split(".").pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("asset-images")
+          .upload(fileName, customImage);
+
+        if (!uploadError) {
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("asset-images").getPublicUrl(fileName);
+          customImageUrl = publicUrl;
+        }
+      }
+
+      const currentPrice =
+        selectedCard.prices?.tcgplayer?.market ||
+        selectedCard.prices?.tcgplayer?.low ||
+        selectedCard.tcgplayerPrice ||
+        selectedCard.marketPrice ||
+        null;
+
+      const res = await fetch("/api/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          external_id: selectedCard.id,
+          name: selectedCard.name,
+          set_name: selectedCard.setName || selectedCard.set || "",
+          asset_type: form.assetType,
+          image_url: selectedCard.imageUrl || selectedCard.image || null,
+          custom_image_url: customImageUrl,
+          purchase_price: form.purchasePrice,
+          purchase_date: form.purchaseDate,
+          purchase_location: form.purchaseLocation,
+          condition: form.condition,
+          notes: form.notes || null,
+          current_price: currentPrice,
+          rarity: selectedCard.rarity || null,
+          card_number: selectedCard.number || null,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to add asset");
+
+      setSuccess(true);
+      setTimeout(() => {
+        router.push("/collection");
+      }, 1500);
+    } catch (error) {
+      console.error("Submit error:", error);
+      alert("Failed to add asset. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const cardImage =
+    customImagePreview ||
+    selectedCard?.imageUrl ||
+    selectedCard?.image ||
+    "";
+
+  if (success) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-surface border border-success/30 rounded-2xl p-12 text-center">
+          <CheckCircle2 className="w-16 h-16 text-success mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-text-primary">
+            Asset Added Successfully!
+          </h2>
+          <p className="text-text-secondary mt-2">
+            Redirecting to your collection...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <SearchModal
+        isOpen={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onSelect={handleCardSelect}
+      />
+
+      <div className="max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          {/* Left: Preview */}
+          <div className="lg:col-span-2">
+            <div className="bg-surface border border-border rounded-2xl p-6 sticky top-6">
+              {/* Card preview */}
+              <div className="aspect-[3/4] bg-background rounded-xl overflow-hidden relative mb-4">
+                {cardImage ? (
+                  <Image
+                    src={cardImage}
+                    alt={selectedCard?.name || "Card preview"}
+                    fill
+                    className="object-contain p-4"
+                    sizes="300px"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-text-muted">
+                    <Search className="w-10 h-10 mb-2" />
+                    <p className="text-sm">Search for a card</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload custom photo */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-surface-hover border border-border rounded-xl text-sm text-text-secondary hover:text-text-primary hover:border-border-hover"
+              >
+                {customImagePreview ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-success" />
+                    Photo Uploaded
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-4 h-4" />
+                    Upload Your Photo
+                  </>
+                )}
+              </button>
+              {customImagePreview && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomImage(null);
+                    setCustomImagePreview(null);
+                  }}
+                  className="w-full mt-2 text-xs text-text-muted hover:text-danger"
+                >
+                  Remove custom photo
+                </button>
+              )}
+
+              {/* Selected info */}
+              {selectedCard && (
+                <div className="mt-4 pt-4 border-t border-border space-y-2">
+                  <h3 className="text-sm font-semibold text-text-primary">
+                    {selectedCard.name}
+                  </h3>
+                  <p className="text-xs text-text-muted">
+                    {selectedCard.setName || selectedCard.set}
+                    {selectedCard.number ? ` #${selectedCard.number}` : ""}
+                  </p>
+                  {selectedCard.rarity && (
+                    <p className="text-xs text-accent">{selectedCard.rarity}</p>
+                  )}
+                  {(() => {
+                    const p =
+                      selectedCard.prices?.tcgplayer?.market ||
+                      selectedCard.prices?.tcgplayer?.low ||
+                      selectedCard.tcgplayerPrice ||
+                      selectedCard.marketPrice;
+                    return p ? (
+                      <p className="text-sm font-bold text-text-primary">
+                        Market: {formatCurrency(p)}
+                      </p>
+                    ) : null;
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Form */}
+          <div className="lg:col-span-3">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Search button */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Select Asset *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(true)}
+                  className="w-full flex items-center gap-3 px-4 py-4 bg-surface border border-border rounded-xl text-left hover:border-border-hover hover:bg-surface-hover"
+                >
+                  <Search className="w-5 h-5 text-text-muted" />
+                  <span
+                    className={
+                      selectedCard ? "text-text-primary" : "text-text-muted"
+                    }
+                  >
+                    {selectedCard
+                      ? selectedCard.name
+                      : "Search for a Pokemon card or product..."}
+                  </span>
+                  {selectedCard && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCard(null);
+                      }}
+                      className="ml-auto p-1 hover:bg-surface rounded-lg"
+                    >
+                      <X className="w-4 h-4 text-text-muted" />
+                    </button>
+                  )}
+                </button>
+              </div>
+
+              {/* Asset type */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Asset Type
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {["card", "sealed"].map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          assetType: type as "card" | "sealed",
+                        }))
+                      }
+                      className={`px-4 py-3 rounded-xl border text-sm font-medium capitalize ${
+                        form.assetType === type
+                          ? "bg-accent-muted border-accent text-accent-hover"
+                          : "bg-surface border-border text-text-secondary hover:border-border-hover"
+                      }`}
+                    >
+                      {type === "card" ? "Trading Card" : "Sealed Product"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Purchase details */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Purchase Price *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      value={form.purchasePrice}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          purchasePrice: e.target.value,
+                        }))
+                      }
+                      className="w-full pl-8 pr-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Purchase Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={form.purchaseDate}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, purchaseDate: e.target.value }))
+                    }
+                    className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Where Did You Buy It?
+                </label>
+                <input
+                  type="text"
+                  value={form.purchaseLocation}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      purchaseLocation: e.target.value,
+                    }))
+                  }
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                  placeholder="e.g. eBay, LCS, Pokemon Center, TCGPlayer..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Condition
+                </label>
+                <select
+                  value={form.condition}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, condition: e.target.value }))
+                  }
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
+                >
+                  <option value="Gem Mint (PSA 10)">Gem Mint (PSA 10)</option>
+                  <option value="Mint (PSA 9)">Mint (PSA 9)</option>
+                  <option value="Near Mint">Near Mint</option>
+                  <option value="Lightly Played">Lightly Played</option>
+                  <option value="Moderately Played">Moderately Played</option>
+                  <option value="Heavily Played">Heavily Played</option>
+                  <option value="Damaged">Damaged</option>
+                  <option value="Sealed">Sealed</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Notes
+                </label>
+                <textarea
+                  value={form.notes}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, notes: e.target.value }))
+                  }
+                  rows={3}
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm resize-none"
+                  placeholder="Any additional notes about this asset..."
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={!selectedCard || !form.purchasePrice || submitting}
+                className="w-full py-4 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Adding Asset...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-5 h-5" />
+                    Add to Collection
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

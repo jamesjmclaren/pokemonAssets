@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0a0a0f;
+  --color-surface: #12121a;
+  --color-surface-hover: #1a1a25;
+  --color-surface-elevated: #1e1e2a;
+  --color-border: #2a2a3a;
+  --color-border-hover: #3a3a4f;
+  --color-text-primary: #f0f0f5;
+  --color-text-secondary: #9090a8;
+  --color-text-muted: #606078;
+  --color-accent: #6366f1;
+  --color-accent-hover: #818cf8;
+  --color-accent-muted: rgba(99, 102, 241, 0.15);
+  --color-success: #22c55e;
+  --color-success-muted: rgba(34, 197, 94, 0.15);
+  --color-danger: #ef4444;
+  --color-danger-muted: rgba(239, 68, 68, 0.15);
+  --color-warning: #f59e0b;
+  --color-warning-muted: rgba(245, 158, 11, 0.15);
+  --color-gold: #fbbf24;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Card shimmer effect */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 25%,
+    var(--color-surface-hover) 50%,
+    var(--color-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Price change animations */
+@keyframes priceUp {
+  0% { color: var(--color-text-primary); }
+  50% { color: var(--color-success); }
+  100% { color: var(--color-success); }
+}
+
+@keyframes priceDown {
+  0% { color: var(--color-text-primary); }
+  50% { color: var(--color-danger); }
+  100% { color: var(--color-danger); }
+}
