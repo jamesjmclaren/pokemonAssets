@@ -5,10 +5,10 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q");
   const setId = searchParams.get("setId");
-  const type = searchParams.get("type") || "sets";
+  const type = searchParams.get("type");
 
   try {
-    if (type === "sets") {
+    if (type === "sets" || (!query && !type)) {
       const data = await getSets();
       return NextResponse.json(data);
     }
