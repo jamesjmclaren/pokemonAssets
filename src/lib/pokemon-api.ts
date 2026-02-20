@@ -56,7 +56,7 @@ export async function getPriceHistory(
   const params: Record<string, string> = {};
   if (startDate) params.startDate = startDate;
   if (endDate) params.endDate = endDate;
-  return apiFetch(`/api/cards/${cardId}/history`, params);
+  return apiFetch(`/api/v2/cards/${cardId}/history`, params);
 }
 
 export async function getSets(sortBy = "releaseDate", sortOrder = "desc") {
