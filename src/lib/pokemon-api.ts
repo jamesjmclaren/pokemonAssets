@@ -1,7 +1,7 @@
 const API_BASE = "https://www.pokemonpricetracker.com";
 
 function getApiKey(): string {
-  const key = process.env.POKEMON_PRICE_API_KEY;
+  const key = process.env.POKEMON_PRICE_API_KEY?.trim();
   if (!key) {
     throw new Error("POKEMON_PRICE_API_KEY is not configured");
   }
@@ -17,9 +17,11 @@ async function apiFetch(path: string, params?: Record<string, string>) {
   }
 
   const apiKey = getApiKey();
+  console.log(`[API] Calling: ${url.toString()}`);
+  console.log(`[API] Key prefix: ${apiKey.substring(0, 20)}...`);
   const res = await fetch(url.toString(), {
     headers: {
-      "x-api-key": apiKey,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     next: { revalidate: 3600 },
