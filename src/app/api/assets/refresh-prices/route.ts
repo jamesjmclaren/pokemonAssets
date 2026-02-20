@@ -1,19 +1,9 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { searchCards } from "@/lib/pokemon-api";
+import { extractCardPrice } from "@/lib/format";
 
 const STALE_HOURS = 24;
-
-function extractPrice(card: Record<string, unknown>): number | null {
-  const prices = card.prices as Record<string, Record<string, unknown>> | undefined;
-  return (
-    (prices?.tcgplayer?.market as number) ??
-    (prices?.tcgplayer?.low as number) ??
-    (card.tcgplayerPrice as number) ??
-    (card.marketPrice as number) ??
-    null
-  );
-}
 
 export async function POST() {
   try {
@@ -51,6 +41,11 @@ export async function POST() {
           ? results
           : results.data || results.cards || [];
 
+        if (cards.length === 0) {
+          console.warn(`[refresh-prices] No API results for "${asset.name}"`);
+          continue;
+        }
+
         // Prefer exact ID match, then first result
         const match =
           cards.find(
@@ -59,8 +54,16 @@ export async function POST() {
 
         if (!match) continue;
 
-        const marketPrice = extractPrice(match);
-        if (marketPrice == null) continue;
+        const marketPrice = extractCardPrice(match as Record<string, unknown>);
+        if (marketPrice == null) {
+          console.warn(
+            `[refresh-prices] No price found for "${asset.name}". API card keys:`,
+            Object.keys(match),
+            "prices field:",
+            JSON.stringify((match as Record<string, unknown>).prices ?? "missing")
+          );
+          continue;
+        }
 
         const { error: updateError } = await supabase
           .from("assets")

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Image from "next/image";
 import { Search, X, Loader2 } from "lucide-react";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, extractCardPrice } from "@/lib/format";
 
 interface SearchResult {
   id: string;
@@ -135,11 +135,7 @@ export default function SearchModal({
           {results.map((card) => {
             const imgUrl = card.imageUrl || card.image || "";
             const setName = card.setName || card.set || "";
-            const price =
-              card.prices?.tcgplayer?.market ||
-              card.prices?.tcgplayer?.low ||
-              card.tcgplayerPrice ||
-              card.marketPrice;
+            const price = extractCardPrice(card as unknown as Record<string, unknown>);
 
             return (
               <button

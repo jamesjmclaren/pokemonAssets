@@ -11,7 +11,7 @@ import {
   CheckCircle2,
   Search,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, extractCardPrice } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import SearchModal from "./SearchModal";
 
@@ -56,11 +56,7 @@ export default function AddAssetForm() {
   const handleCardSelect = (card: SelectedCard) => {
     setSelectedCard(card);
     setSearchOpen(false);
-    const price =
-      card.prices?.tcgplayer?.market ||
-      card.prices?.tcgplayer?.low ||
-      card.tcgplayerPrice ||
-      card.marketPrice;
+    const price = extractCardPrice(card as unknown as Record<string, unknown>);
     if (price && !form.purchasePrice) {
       setForm((f) => ({ ...f, purchasePrice: price.toFixed(2) }));
     }
@@ -106,12 +102,7 @@ export default function AddAssetForm() {
         }
       }
 
-      const currentPrice =
-        selectedCard.prices?.tcgplayer?.market ||
-        selectedCard.prices?.tcgplayer?.low ||
-        selectedCard.tcgplayerPrice ||
-        selectedCard.marketPrice ||
-        null;
+      const currentPrice = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
 
       const res = await fetch("/api/assets", {
         method: "POST",
@@ -253,11 +244,7 @@ export default function AddAssetForm() {
                     <p className="text-xs text-accent">{selectedCard.rarity}</p>
                   )}
                   {(() => {
-                    const p =
-                      selectedCard.prices?.tcgplayer?.market ||
-                      selectedCard.prices?.tcgplayer?.low ||
-                      selectedCard.tcgplayerPrice ||
-                      selectedCard.marketPrice;
+                    const p = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
                     return p ? (
                       <p className="text-sm font-bold text-text-primary">
                         Market: {formatCurrency(p)}
