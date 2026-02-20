@@ -170,23 +170,23 @@ export default function AddAssetForm() {
       />
 
       <div className="max-w-4xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 sm:gap-8">
           {/* Left: Preview */}
           <div className="lg:col-span-2">
-            <div className="bg-surface border border-border rounded-2xl p-6 sticky top-6">
+            <div className="bg-surface border border-border rounded-2xl p-4 sm:p-6 sticky top-18 lg:top-6">
               {/* Card preview */}
-              <div className="aspect-[3/4] bg-background rounded-xl overflow-hidden relative mb-4">
+              <div className="aspect-[3/4] max-h-[40vh] sm:max-h-none bg-background rounded-xl overflow-hidden relative mb-4 mx-auto max-w-[220px] sm:max-w-none">
                 {cardImage ? (
                   <Image
                     src={cardImage}
                     alt={selectedCard?.name || "Card preview"}
                     fill
-                    className="object-contain p-4"
-                    sizes="300px"
+                    className="object-contain p-3 sm:p-4"
+                    sizes="(max-width: 640px) 220px, 300px"
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-text-muted">
-                    <Search className="w-10 h-10 mb-2" />
+                    <Search className="w-8 h-8 sm:w-10 sm:h-10 mb-2" />
                     <p className="text-sm">Search for a card</p>
                   </div>
                 )}

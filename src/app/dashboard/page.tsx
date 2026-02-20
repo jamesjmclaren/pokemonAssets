@@ -95,54 +95,56 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
-          <p className="text-text-muted mt-1">Loading your portfolio...</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Dashboard</h1>
+          <p className="text-text-muted mt-1 text-sm">Loading your portfolio...</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="skeleton h-32 rounded-2xl" />
+            <div key={i} className="skeleton h-28 sm:h-32 rounded-2xl" />
           ))}
         </div>
-        <div className="skeleton h-80 rounded-2xl" />
+        <div className="skeleton h-60 sm:h-80 rounded-2xl" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
-          <p className="text-text-muted mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Dashboard</h1>
+          <p className="text-text-muted mt-1 text-sm">
             Track your investment portfolio
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {assets.length > 0 && (
             <button
               onClick={handleRefreshPrices}
               disabled={refreshing}
-              className="flex items-center gap-2 px-4 py-3 bg-surface border border-border hover:border-border-hover text-text-secondary hover:text-text-primary font-medium rounded-xl text-sm disabled:opacity-50"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-surface border border-border hover:border-border-hover text-text-secondary hover:text-text-primary font-medium rounded-xl text-xs sm:text-sm disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-              {refreshing ? "Updating..." : "Refresh Prices"}
+              <span className="hidden sm:inline">{refreshing ? "Updating..." : "Refresh Prices"}</span>
+              <span className="sm:hidden">{refreshing ? "..." : "Refresh"}</span>
             </button>
           )}
           <Link
             href="/dashboard/add"
-            className="flex items-center gap-2 px-5 py-3 bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl"
+            className="flex items-center gap-2 px-3 sm:px-5 py-2.5 sm:py-3 bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl text-sm"
           >
-            <PlusCircle className="w-5 h-5" />
-            Add Asset
+            <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Add Asset</span>
+            <span className="sm:hidden">Add</span>
           </Link>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           label="Total Value"
           value={formatCurrency(currentValue)}
@@ -191,8 +193,8 @@ export default function DashboardPage() {
       {/* Top Gainers */}
       {topGainers.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-text-primary">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h2 className="text-base sm:text-lg font-semibold text-text-primary">
               Top Performers
             </h2>
             <Link
@@ -202,7 +204,7 @@ export default function DashboardPage() {
               View All
             </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {topGainers.map((asset) => (
               <AssetCard key={asset.id} asset={asset} />
             ))}
@@ -213,8 +215,8 @@ export default function DashboardPage() {
       {/* Recently Added */}
       {recentlyAdded.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-text-primary">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h2 className="text-base sm:text-lg font-semibold text-text-primary">
               Recently Added
             </h2>
             <Link
@@ -224,7 +226,7 @@ export default function DashboardPage() {
               View All
             </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {recentlyAdded.map((asset) => (
               <AssetCard key={asset.id} asset={asset} />
             ))}
@@ -234,12 +236,12 @@ export default function DashboardPage() {
 
       {/* Empty state */}
       {assets.length === 0 && (
-        <div className="bg-surface border border-border rounded-2xl p-16 text-center">
-          <Package className="w-16 h-16 text-text-muted mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-text-primary">
+        <div className="bg-surface border border-border rounded-2xl p-10 sm:p-16 text-center">
+          <Package className="w-12 h-12 sm:w-16 sm:h-16 text-text-muted mx-auto mb-4" />
+          <h2 className="text-lg sm:text-xl font-bold text-text-primary">
             Your collection is empty
           </h2>
-          <p className="text-text-secondary mt-2 max-w-md mx-auto">
+          <p className="text-text-secondary mt-2 max-w-md mx-auto text-sm">
             Start building your portfolio by adding your first card or
             sealed product.
           </p>

@@ -70,11 +70,11 @@ export default function AssetDetailPage({
 
   if (loading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         <div className="skeleton h-8 w-32 rounded-xl" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="skeleton h-96 rounded-2xl" />
-          <div className="lg:col-span-2 skeleton h-96 rounded-2xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+          <div className="skeleton h-64 sm:h-96 rounded-2xl" />
+          <div className="lg:col-span-2 skeleton h-64 sm:h-96 rounded-2xl" />
         </div>
       </div>
     );
@@ -101,7 +101,7 @@ export default function AssetDetailPage({
   const imageUrl = asset.custom_image_url || asset.image_url;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Back navigation */}
       <div className="flex items-center justify-between">
         <Link
@@ -114,26 +114,26 @@ export default function AssetDetailPage({
         <button
           onClick={handleDelete}
           disabled={deleting}
-          className="flex items-center gap-2 px-4 py-2 text-danger hover:bg-danger-muted rounded-xl text-sm font-medium"
+          className="flex items-center gap-2 px-3 sm:px-4 py-2 text-danger hover:bg-danger-muted rounded-xl text-sm font-medium"
         >
           <Trash2 className="w-4 h-4" />
           {deleting ? "Removing..." : "Remove"}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
         {/* Left: Image and Details */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Card Image */}
-          <div className="bg-surface border border-border rounded-2xl p-6">
-            <div className="aspect-[3/4] bg-background rounded-xl overflow-hidden relative">
+          <div className="bg-surface border border-border rounded-2xl p-4 sm:p-6">
+            <div className="aspect-[3/4] max-h-[50vh] sm:max-h-none bg-background rounded-xl overflow-hidden relative mx-auto max-w-[280px] sm:max-w-none">
               {imageUrl ? (
                 <Image
                   src={imageUrl}
                   alt={asset.name}
                   fill
-                  className="object-contain p-4"
-                  sizes="400px"
+                  className="object-contain p-3 sm:p-4"
+                  sizes="(max-width: 640px) 280px, 400px"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-text-muted">
@@ -144,7 +144,7 @@ export default function AssetDetailPage({
           </div>
 
           {/* Details */}
-          <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
+          <div className="bg-surface border border-border rounded-2xl p-4 sm:p-6 space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">
               Purchase Details
             </h3>
@@ -196,9 +196,9 @@ export default function AssetDetailPage({
         </div>
 
         {/* Right: Pricing and Chart */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           {/* Header */}
-          <div className="bg-surface border border-border rounded-2xl p-6">
+          <div className="bg-surface border border-border rounded-2xl p-4 sm:p-6">
             <div className="flex items-start justify-between">
               <div>
                 <span
@@ -211,10 +211,10 @@ export default function AssetDetailPage({
                 >
                   {asset.asset_type === "card" ? "Card" : "Sealed"}
                 </span>
-                <h1 className="text-2xl font-bold text-text-primary mt-3">
+                <h1 className="text-xl sm:text-2xl font-bold text-text-primary mt-3">
                   {asset.name}
                 </h1>
-                <p className="text-text-muted mt-1">
+                <p className="text-text-muted mt-1 text-sm">
                   {asset.set_name}
                   {asset.card_number ? ` #${asset.card_number}` : ""}
                 </p>
@@ -222,50 +222,52 @@ export default function AssetDetailPage({
             </div>
 
             {/* Price summary */}
-            <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border">
+            <div className="grid grid-cols-3 gap-3 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border">
               <div>
-                <p className="text-xs text-text-muted">Current Value</p>
-                <p className="text-xl font-bold text-text-primary mt-1">
+                <p className="text-[10px] sm:text-xs text-text-muted">Current Value</p>
+                <p className="text-base sm:text-xl font-bold text-text-primary mt-1">
                   {formatCurrency(currentPrice)}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-text-muted">Purchase Price</p>
-                <p className="text-xl font-bold text-text-secondary mt-1">
+                <p className="text-[10px] sm:text-xs text-text-muted">Purchase Price</p>
+                <p className="text-base sm:text-xl font-bold text-text-secondary mt-1">
                   {formatCurrency(asset.purchase_price)}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-text-muted">Profit / Loss</p>
-                <div className="flex items-center gap-2 mt-1">
+                <p className="text-[10px] sm:text-xs text-text-muted">Profit / Loss</p>
+                <div className="flex items-center gap-1 sm:gap-2 mt-1">
                   {profit > 0 ? (
-                    <TrendingUp className="w-5 h-5 text-success" />
+                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-success flex-shrink-0" />
                   ) : profit < 0 ? (
-                    <TrendingDown className="w-5 h-5 text-danger" />
+                    <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-danger flex-shrink-0" />
                   ) : (
-                    <Minus className="w-5 h-5 text-text-secondary" />
+                    <Minus className="w-4 h-4 sm:w-5 sm:h-5 text-text-secondary flex-shrink-0" />
                   )}
-                  <span
-                    className={clsx(
-                      "text-xl font-bold",
-                      profit > 0 && "text-success",
-                      profit < 0 && "text-danger",
-                      profit === 0 && "text-text-secondary"
-                    )}
-                  >
-                    {profit >= 0 ? "+" : ""}
-                    {formatCurrency(profit)}
-                  </span>
-                  <span
-                    className={clsx(
-                      "text-sm",
-                      profit > 0 && "text-success",
-                      profit < 0 && "text-danger",
-                      profit === 0 && "text-text-secondary"
-                    )}
-                  >
-                    ({formatPercentage(profitPercent)})
-                  </span>
+                  <div>
+                    <span
+                      className={clsx(
+                        "text-base sm:text-xl font-bold",
+                        profit > 0 && "text-success",
+                        profit < 0 && "text-danger",
+                        profit === 0 && "text-text-secondary"
+                      )}
+                    >
+                      {profit >= 0 ? "+" : ""}
+                      {formatCurrency(profit)}
+                    </span>
+                    <span
+                      className={clsx(
+                        "text-xs sm:text-sm ml-1",
+                        profit > 0 && "text-success",
+                        profit < 0 && "text-danger",
+                        profit === 0 && "text-text-secondary"
+                      )}
+                    >
+                      ({formatPercentage(profitPercent)})
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -279,8 +281,8 @@ export default function AssetDetailPage({
           />
 
           {/* Price source link */}
-          <div className="bg-surface border border-border rounded-2xl p-4">
-            <div className="flex items-center justify-between">
+          <div className="bg-surface border border-border rounded-2xl p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <p className="text-xs text-text-muted">
                 Price data from PokemonPriceTracker
                 {asset.price_updated_at &&
