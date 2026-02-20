@@ -27,6 +27,21 @@ export default function DashboardPage() {
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
         setAssets(data);
+
+        // Refresh market prices in the background
+        if (data.length > 0) {
+          fetch("/api/assets/refresh-prices", { method: "POST" })
+            .then((r) => r.json())
+            .then(async (result) => {
+              if (result.updated > 0) {
+                const refreshed = await fetch("/api/assets");
+                if (refreshed.ok) {
+                  setAssets(await refreshed.json());
+                }
+              }
+            })
+            .catch(() => {});
+        }
       } catch (error) {
         console.error("Error fetching assets:", error);
       } finally {
