@@ -274,6 +274,7 @@ export default function AssetDetailPage({
           {/* Price Chart */}
           <PriceChart
             externalId={asset.external_id}
+            cardName={asset.name}
             purchasePrice={asset.purchase_price}
           />
 

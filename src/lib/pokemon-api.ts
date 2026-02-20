@@ -51,18 +51,24 @@ export async function getCardById(cardId: string) {
 export async function getPriceHistory(
   cardId: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  cardName?: string
 ) {
   // Price history is embedded in the card response from /api/v2/cards
+  // Search by name (text search) since the API doesn't support lookup by MongoDB ObjectId
+  const searchTerm = cardName || cardId;
   const results = await apiFetch("/api/v2/cards", {
-    search: cardId,
-    limit: "1",
+    search: searchTerm,
+    limit: "5",
   });
 
   const cards = Array.isArray(results)
     ? results
     : results.data || results.cards || [];
-  const card = cards.find((c: { id?: string }) => c.id === cardId) || cards[0];
+  // Prefer exact ID match, fall back to first result
+  const card =
+    (cardId && cards.find((c: { id?: string }) => c.id === cardId)) ||
+    cards[0];
   if (!card) return [];
 
   const history = card.priceHistory || card.price_history || {};

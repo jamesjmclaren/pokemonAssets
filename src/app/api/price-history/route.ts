@@ -4,21 +4,23 @@ import { getPriceHistory } from "@/lib/pokemon-api";
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const cardId = searchParams.get("cardId");
+  const name = searchParams.get("name");
   const startDate = searchParams.get("startDate");
   const endDate = searchParams.get("endDate");
 
-  if (!cardId) {
+  if (!cardId && !name) {
     return NextResponse.json(
-      { error: "cardId parameter is required" },
+      { error: "cardId or name parameter is required" },
       { status: 400 }
     );
   }
 
   try {
     const data = await getPriceHistory(
-      cardId,
+      cardId || "",
       startDate || undefined,
-      endDate || undefined
+      endDate || undefined,
+      name || undefined
     );
     return NextResponse.json(data);
   } catch (error) {
