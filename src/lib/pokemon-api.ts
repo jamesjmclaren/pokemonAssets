@@ -17,8 +17,6 @@ async function apiFetch(path: string, params?: Record<string, string>) {
   }
 
   const apiKey = getApiKey();
-  console.log(`[API] Calling: ${url.toString()}`);
-  console.log(`[API] Key prefix: ${apiKey.substring(0, 20)}...`);
   const res = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${apiKey}`,
