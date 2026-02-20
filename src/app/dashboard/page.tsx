@@ -117,7 +117,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
           <p className="text-text-muted mt-1">
-            Track your Pokemon investment portfolio
+            Track your investment portfolio
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -240,7 +240,7 @@ export default function DashboardPage() {
             Your collection is empty
           </h2>
           <p className="text-text-secondary mt-2 max-w-md mx-auto">
-            Start building your portfolio by adding your first Pokemon card or
+            Start building your portfolio by adding your first card or
             sealed product.
           </p>
           <Link

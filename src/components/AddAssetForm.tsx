@@ -277,7 +277,7 @@ export default function AddAssetForm() {
                   >
                     {selectedCard
                       ? selectedCard.name
-                      : "Search for a Pokemon card or product..."}
+                      : "Search for a card or product..."}
                   </span>
                   {selectedCard && (
                     <button
@@ -379,7 +379,7 @@ export default function AddAssetForm() {
                     }))
                   }
                   className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
-                  placeholder="e.g. eBay, LCS, Pokemon Center, TCGPlayer..."
+                  placeholder="e.g. eBay, LCS, TCGPlayer..."
                 />
               </div>
 

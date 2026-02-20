@@ -3,8 +3,8 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 
 export const metadata: Metadata = {
-  title: "PokeVault - Pokemon Asset Manager",
-  description: "Professional Pokemon card and sealed product portfolio tracker",
+  title: "N&C Assets",
+  description: "Professional card and sealed product portfolio tracker",
 };
 
 export default function RootLayout({

@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Search,
   FolderOpen,
-  TrendingUp,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -24,14 +23,10 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="p-6 border-b border-border">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-white" />
-          </div>
           <div>
             <h1 className="text-lg font-bold text-text-primary tracking-tight">
-              PokeVault
+              N&C Assets
             </h1>
-            <p className="text-xs text-text-muted">Asset Manager</p>
           </div>
         </Link>
       </div>

@@ -99,7 +99,7 @@ export default function SearchModal({
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search Pokemon cards or sealed products..."
+            placeholder="Search cards or sealed products..."
             value={query}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -119,7 +119,7 @@ export default function SearchModal({
           {!searched && (
             <div className="flex items-center justify-center py-16">
               <p className="text-text-muted text-sm">
-                Start typing to search for Pokemon cards and products
+                Start typing to search for cards and products
               </p>
             </div>
           )}
