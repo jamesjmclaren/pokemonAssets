@@ -46,19 +46,29 @@ export function getProfitBgColor(profit: number): string {
  * Checks multiple field name conventions since the API response format varies.
  */
 export function extractCardPrice(card: Record<string, unknown>): number | null {
-  const prices = card.prices as Record<string, Record<string, unknown>> | undefined;
+  const prices = card.prices as Record<string, unknown> | undefined;
 
-  // Nested price structures
-  const nested =
-    (prices?.tcgplayer?.market as number) ??
-    (prices?.tcgplayer?.low as number) ??
-    (prices?.cardmarket?.average as number) ??
-    (prices?.cardmarket?.trend as number) ??
-    (prices?.ebay?.average as number) ??
-    null;
-  if (nested != null) return nested;
+  // Direct prices.market / prices.low (pokemonpricetracker.com format)
+  if (prices) {
+    const direct =
+      (prices.market as number) ?? (prices.low as number) ?? null;
+    if (direct != null) return direct;
 
-  // Flat price fields
+    // Nested under tcgplayer/cardmarket/ebay
+    const tcg = prices.tcgplayer as Record<string, unknown> | undefined;
+    const cm = prices.cardmarket as Record<string, unknown> | undefined;
+    const ebay = prices.ebay as Record<string, unknown> | undefined;
+    const nested =
+      (tcg?.market as number) ??
+      (tcg?.low as number) ??
+      (cm?.average as number) ??
+      (cm?.trend as number) ??
+      (ebay?.average as number) ??
+      null;
+    if (nested != null) return nested;
+  }
+
+  // Flat price fields on the card object itself
   const flat =
     (card.tcgplayerPrice as number) ??
     (card.marketPrice as number) ??
