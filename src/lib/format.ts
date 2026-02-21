@@ -43,16 +43,23 @@ export function getProfitBgColor(profit: number): string {
 
 /**
  * Extract a market price from a card object.
- * Handles JustTCG normalized format (prices.tcgplayer.market / marketPrice)
- * as well as raw variant arrays.
+ * Handles multiple API formats including Pokemon TCG API (RapidAPI).
  */
 export function extractCardPrice(card: Record<string, unknown>): number | null {
-  // Flat price field set by normalizeCard (JustTCG)
+  // Flat price field
   if (typeof card.marketPrice === "number") return card.marketPrice;
 
-  // Nested prices object (normalized format)
+  // Nested prices object (Pokemon TCG API format)
   const prices = card.prices as Record<string, unknown> | undefined;
   if (prices) {
+    // New format: prices.raw or prices.market
+    const raw = prices.raw as number | undefined;
+    if (raw != null) return raw;
+    
+    const market = prices.market as number | undefined;
+    if (market != null) return market;
+
+    // Legacy format
     const direct =
       (prices.market as number) ?? (prices.low as number) ?? null;
     if (direct != null) return direct;
@@ -60,20 +67,6 @@ export function extractCardPrice(card: Record<string, unknown>): number | null {
     const tcg = prices.tcgplayer as Record<string, unknown> | undefined;
     const nested = (tcg?.market as number) ?? (tcg?.low as number) ?? null;
     if (nested != null) return nested;
-  }
-
-  // JustTCG raw variant array (pick best Near Mint variant)
-  const variants = card._variants as
-    | Array<{ condition: string; printing: string; price: number }>
-    | undefined;
-  if (variants && variants.length > 0) {
-    const nm = variants.find(
-      (v) =>
-        v.condition?.toLowerCase().includes("near mint") && v.price != null
-    );
-    if (nm) return nm.price;
-    const withPrice = variants.find((v) => v.price != null);
-    if (withPrice) return withPrice.price;
   }
 
   // Other flat fields

@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Image from "next/image";
-import { Search, X, Loader2 } from "lucide-react";
-import { formatCurrency, extractCardPrice } from "@/lib/format";
+import { Search, X, Loader2, Package, CreditCard } from "lucide-react";
+import { formatCurrency } from "@/lib/format";
 
 interface SearchResult {
   id: string;
@@ -11,14 +11,18 @@ interface SearchResult {
   number?: string;
   rarity?: string;
   setName?: string;
-  set?: string;
   imageUrl?: string;
-  image?: string;
+  type: "card" | "sealed";
   prices?: {
-    tcgplayer?: { market?: number; low?: number };
+    raw?: number;
+    market?: number;
+    psa10?: number;
+    psa9?: number;
+    cgc10?: number;
+    bgs10?: number;
   };
-  tcgplayerPrice?: number;
   marketPrice?: number;
+  currency?: string;
 }
 
 interface SearchModalProps {
@@ -60,10 +64,10 @@ export default function SearchModal({
       );
       if (!res.ok) throw new Error("Search failed");
       const json = await res.json();
-      const cards: SearchResult[] = Array.isArray(json)
+      const items: SearchResult[] = Array.isArray(json)
         ? json
         : json.data || json.cards || json.results || [];
-      setResults(cards);
+      setResults(items);
     } catch {
       setResults([]);
     } finally {
@@ -132,47 +136,86 @@ export default function SearchModal({
             </div>
           )}
 
-          {results.map((card) => {
-            const imgUrl = card.imageUrl || card.image || "";
-            const setName = card.setName || card.set || "";
-            const price = extractCardPrice(card as unknown as Record<string, unknown>);
+          {results.map((item) => {
+            const isCard = item.type === "card";
+            const rawPrice = item.prices?.raw || item.prices?.market || item.marketPrice;
+            const psa10 = item.prices?.psa10;
+            const psa9 = item.prices?.psa9;
 
             return (
               <button
-                key={card.id}
-                onClick={() => onSelect(card)}
+                key={item.id}
+                onClick={() => onSelect(item)}
                 className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-surface-hover text-left"
               >
+                {/* Image */}
                 <div className="w-14 h-20 bg-background rounded-lg overflow-hidden flex-shrink-0 relative">
-                  {imgUrl ? (
+                  {item.imageUrl ? (
                     <Image
-                      src={imgUrl}
-                      alt={card.name}
+                      src={item.imageUrl}
+                      alt={item.name}
                       fill
                       className="object-contain p-1"
                       sizes="56px"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-text-muted text-xs">
-                      N/A
+                    <div className="w-full h-full flex items-center justify-center text-text-muted">
+                      {isCard ? (
+                        <CreditCard className="w-6 h-6" />
+                      ) : (
+                        <Package className="w-6 h-6" />
+                      )}
                     </div>
                   )}
                 </div>
+
+                {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-text-primary truncate">
-                    {card.name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-text-primary truncate">
+                      {item.name}
+                    </p>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                      isCard 
+                        ? "bg-blue-500/10 text-blue-400" 
+                        : "bg-purple-500/10 text-purple-400"
+                    }`}>
+                      {isCard ? "Card" : "Sealed"}
+                    </span>
+                  </div>
                   <p className="text-xs text-text-muted mt-0.5">
-                    {setName}
-                    {card.number ? ` #${card.number}` : ""}
-                    {card.rarity ? ` - ${card.rarity}` : ""}
+                    {item.setName}
+                    {item.number ? ` #${item.number}` : ""}
+                    {item.rarity ? ` · ${item.rarity}` : ""}
                   </p>
+                  
+                  {/* Graded prices for cards */}
+                  {isCard && (psa10 || psa9) && (
+                    <div className="flex gap-3 mt-1.5">
+                      {psa10 && (
+                        <span className="text-xs text-text-muted">
+                          <span className="text-amber-400">PSA 10:</span>{" "}
+                          {formatCurrency(psa10)}
+                        </span>
+                      )}
+                      {psa9 && (
+                        <span className="text-xs text-text-muted">
+                          <span className="text-amber-400/70">PSA 9:</span>{" "}
+                          {formatCurrency(psa9)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {/* Raw/Market Price */}
                 <div className="text-right flex-shrink-0">
                   <p className="text-sm font-bold text-text-primary">
-                    {price ? formatCurrency(price) : "N/A"}
+                    {rawPrice ? formatCurrency(rawPrice) : "N/A"}
                   </p>
-                  <p className="text-xs text-text-muted">Market</p>
+                  <p className="text-xs text-text-muted">
+                    {isCard ? "Raw" : "Market"}
+                  </p>
                 </div>
               </button>
             );

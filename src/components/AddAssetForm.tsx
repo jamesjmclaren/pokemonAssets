@@ -22,13 +22,16 @@ interface SelectedCard {
   number?: string;
   rarity?: string;
   setName?: string;
-  set?: string;
   imageUrl?: string;
-  image?: string;
+  type: "card" | "sealed";
   prices?: {
-    tcgplayer?: { market?: number; low?: number };
+    raw?: number;
+    market?: number;
+    psa10?: number;
+    psa9?: number;
+    cgc10?: number;
+    bgs10?: number;
   };
-  tcgplayerPrice?: number;
   marketPrice?: number;
 }
 
@@ -113,9 +116,9 @@ export default function AddAssetForm() {
           portfolio_id: currentPortfolio.id,
           external_id: selectedCard.id,
           name: selectedCard.name,
-          set_name: selectedCard.setName || selectedCard.set || "",
-          asset_type: form.assetType,
-          image_url: selectedCard.imageUrl || selectedCard.image || null,
+          set_name: selectedCard.setName || "",
+          asset_type: selectedCard.type === "sealed" ? "sealed" : form.assetType,
+          image_url: selectedCard.imageUrl || null,
           custom_image_url: customImageUrl,
           purchase_price: form.purchasePrice,
           purchase_date: form.purchaseDate,
@@ -148,7 +151,6 @@ export default function AddAssetForm() {
   const cardImage =
     customImagePreview ||
     selectedCard?.imageUrl ||
-    selectedCard?.image ||
     "";
 
   if (isReadOnly) {
@@ -259,7 +261,7 @@ export default function AddAssetForm() {
                     {selectedCard.name}
                   </h3>
                   <p className="text-xs text-text-muted">
-                    {selectedCard.setName || selectedCard.set}
+                    {selectedCard.setName}
                     {selectedCard.number ? ` #${selectedCard.number}` : ""}
                   </p>
                   {selectedCard.rarity && (
@@ -269,10 +271,21 @@ export default function AddAssetForm() {
                     const p = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
                     return p ? (
                       <p className="text-sm font-bold text-text-primary">
-                        Market: {formatCurrency(p)}
+                        {selectedCard.type === "card" ? "Raw" : "Market"}: {formatCurrency(p)}
                       </p>
                     ) : null;
                   })()}
+                  {/* Graded prices */}
+                  {selectedCard.type === "card" && selectedCard.prices?.psa10 && (
+                    <div className="text-xs text-text-muted space-y-0.5">
+                      {selectedCard.prices.psa10 && (
+                        <p><span className="text-amber-400">PSA 10:</span> {formatCurrency(selectedCard.prices.psa10)}</p>
+                      )}
+                      {selectedCard.prices.psa9 && (
+                        <p><span className="text-amber-400/70">PSA 9:</span> {formatCurrency(selectedCard.prices.psa9)}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
