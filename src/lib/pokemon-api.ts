@@ -1,9 +1,9 @@
-const API_BASE = "https://www.pokemonpricetracker.com";
+const API_BASE = "https://api.justtcg.com/v1";
 
 function getApiKey(): string {
-  const key = process.env.POKEMON_PRICE_API_KEY?.trim();
+  const key = process.env.JUSTTCG_API_KEY?.trim();
   if (!key) {
-    throw new Error("POKEMON_PRICE_API_KEY is not configured");
+    throw new Error("JUSTTCG_API_KEY is not configured");
   }
   return key;
 }
@@ -19,7 +19,7 @@ async function apiFetch(path: string, params?: Record<string, string>) {
   const apiKey = getApiKey();
   const res = await fetch(url.toString(), {
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      "x-api-key": apiKey,
       "Content-Type": "application/json",
     },
     next: { revalidate: 3600 },
@@ -33,19 +33,147 @@ async function apiFetch(path: string, params?: Record<string, string>) {
   return res.json();
 }
 
+// --- JustTCG response types ---
+
+interface JustTCGVariant {
+  id: string;
+  condition: string;
+  printing: string;
+  language?: string | null;
+  tcgplayerSkuId?: string;
+  price: number;
+  lastUpdated: number;
+  priceChange24hr?: number | null;
+  priceChange7d?: number | null;
+  priceChange30d?: number | null;
+  priceChange90d?: number | null;
+  priceHistory?: Array<{ date: string; price: number }> | null;
+}
+
+interface JustTCGCard {
+  id: string;
+  name: string;
+  game: string;
+  set: string;
+  set_name?: string;
+  number: string | null;
+  rarity: string | null;
+  tcgplayerId: string | null;
+  variants: JustTCGVariant[];
+}
+
+interface JustTCGSet {
+  id: string;
+  name: string;
+  gameId: string;
+  game: string;
+  count: number;
+  variants_count?: number;
+  sealed_count?: number;
+  release_date: string;
+  set_value_usd?: number;
+}
+
+// --- Normalization helpers ---
+
+/**
+ * Pick the most representative variant for pricing.
+ * Prefers Near Mint + Normal/Holofoil, falls back to the highest-priced variant.
+ */
+function pickBestVariant(variants: JustTCGVariant[]): JustTCGVariant | null {
+  if (!variants || variants.length === 0) return null;
+
+  // Try Near Mint first
+  const nm = variants.filter(
+    (v) => v.condition?.toLowerCase().includes("near mint") && v.price != null
+  );
+  if (nm.length > 0) {
+    // Among NM variants, prefer Normal/Holofoil printing
+    const normal = nm.find(
+      (v) =>
+        v.printing?.toLowerCase() === "normal" ||
+        v.printing?.toLowerCase() === "holofoil"
+    );
+    return normal || nm[0];
+  }
+
+  // Fall back to any variant with a price
+  const withPrice = variants.filter((v) => v.price != null);
+  if (withPrice.length === 0) return variants[0];
+
+  return withPrice.sort((a, b) => (b.price ?? 0) - (a.price ?? 0))[0];
+}
+
+/**
+ * Transform a JustTCG card into the normalized format the app expects.
+ */
+function normalizeCard(card: JustTCGCard) {
+  const bestVariant = pickBestVariant(card.variants);
+  const price = bestVariant?.price ?? null;
+
+  // Construct image URL from tcgplayerId if available
+  const imageUrl = card.tcgplayerId
+    ? `https://tcgplayer-cdn.tcgplayer.com/product/${card.tcgplayerId}_200w.jpg`
+    : undefined;
+
+  return {
+    id: card.id,
+    name: card.name,
+    number: card.number || undefined,
+    rarity: card.rarity || undefined,
+    setName: card.set_name || card.set || "",
+    set: card.set || "",
+    imageUrl,
+    tcgplayerId: card.tcgplayerId,
+    prices: price != null ? { tcgplayer: { market: price } } : undefined,
+    marketPrice: price,
+    // Attach raw variants for detailed usage
+    _variants: card.variants,
+  };
+}
+
+// --- Query helpers ---
+
+/**
+ * Sanitize a user search query for the JustTCG API.
+ * - Replaces smart quotes / curly apostrophes with straight ones
+ * - Strips trailing card-number suffixes like " - 280" or " #280"
+ */
+function sanitizeQuery(raw: string): string {
+  return raw
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'") // smart single quotes → '
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"') // smart double quotes → "
+    .replace(/\s+[-#]\s*\d+\s*$/, "") // strip trailing " - 280" / " #280"
+    .trim();
+}
+
+// --- Public API functions ---
+
 export async function searchCards(query: string, setId?: string, limit = 20) {
+  const cleaned = sanitizeQuery(query);
   const params: Record<string, string> = {
-    search: query,
+    q: cleaned,
+    game: "pokemon",
     limit: String(limit),
+    include_null_prices: "true",
   };
   if (setId) {
-    params.setId = setId;
+    params.set = setId;
   }
-  return apiFetch("/api/v2/cards", params);
+
+  const response = await apiFetch("/v1/cards", params);
+  const cards: JustTCGCard[] = response.data || [];
+  return cards.map(normalizeCard);
 }
 
 export async function getCardById(cardId: string) {
-  return apiFetch(`/api/v2/cards`, { search: cardId, limit: "1" });
+  const response = await apiFetch("/v1/cards", {
+    q: sanitizeQuery(cardId),
+    game: "pokemon",
+    limit: "5",
+  });
+  const cards: JustTCGCard[] = response.data || [];
+  return cards.map(normalizeCard);
 }
 
 export async function getPriceHistory(
@@ -54,36 +182,46 @@ export async function getPriceHistory(
   endDate?: string,
   cardName?: string
 ) {
-  // Price history is embedded in the card response from /api/v2/cards
-  // Search by name (text search) since the API doesn't support lookup by MongoDB ObjectId
-  const searchTerm = cardName || cardId;
-  const results = await apiFetch("/api/v2/cards", {
-    search: searchTerm,
+  // Determine the duration parameter based on date range
+  let duration = "90d";
+  if (startDate) {
+    const start = new Date(startDate);
+    const end = endDate ? new Date(endDate) : new Date();
+    const days = Math.ceil(
+      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    if (days <= 7) duration = "7d";
+    else if (days <= 30) duration = "30d";
+    else if (days <= 90) duration = "90d";
+    else duration = "180d";
+  }
+
+  const searchTerm = sanitizeQuery(cardName || cardId);
+  const response = await apiFetch("/v1/cards", {
+    q: searchTerm,
+    game: "pokemon",
     limit: "5",
+    include_price_history: "true",
+    priceHistoryDuration: duration,
   });
 
-  const cards = Array.isArray(results)
-    ? results
-    : results.data || results.cards || [];
-  // Prefer exact ID match, fall back to first result
+  const cards: JustTCGCard[] = response.data || [];
+
+  // Find the best matching card
   const card =
-    (cardId && cards.find((c: { id?: string }) => c.id === cardId)) ||
-    cards[0];
+    (cardId && cards.find((c) => c.id === cardId)) || cards[0];
+
   if (!card) return [];
 
-  const history = card.priceHistory || card.price_history || {};
+  // Extract price history from the best variant
+  const bestVariant = pickBestVariant(card.variants);
+  if (!bestVariant?.priceHistory) return [];
 
-  // Convert priceHistory object (date->price map or array) into PriceHistoryPoint[]
-  let points: { date: string; price: number; source?: string }[] = [];
-  if (Array.isArray(history)) {
-    points = history;
-  } else if (typeof history === "object") {
-    points = Object.entries(history).map(([date, price]) => ({
-      date,
-      price: typeof price === "number" ? price : Number(price) || 0,
-      source: "tcgplayer",
-    }));
-  }
+  let points = bestVariant.priceHistory.map((entry) => ({
+    date: entry.date,
+    price: entry.price,
+    source: "tcgplayer" as const,
+  }));
 
   // Filter by date range if provided
   if (startDate) {
@@ -97,12 +235,37 @@ export async function getPriceHistory(
 }
 
 export async function getSets(sortBy = "releaseDate", sortOrder = "desc") {
-  return apiFetch("/api/v2/sets", { sortBy, sortOrder });
+  const response = await apiFetch("/v1/sets", { game: "pokemon" });
+  const sets: JustTCGSet[] = response.data || [];
+
+  // Normalize to the format the app expects
+  const normalized = sets.map((s) => ({
+    id: s.id,
+    name: s.name,
+    series: s.game || "pokemon",
+    releaseDate: s.release_date || "",
+    totalCards: s.count || 0,
+  }));
+
+  // Sort by the requested field
+  const sortKey = sortBy === "releaseDate" ? "releaseDate" : "name";
+  normalized.sort((a, b) => {
+    const aVal = a[sortKey] || "";
+    const bVal = b[sortKey] || "";
+    return sortOrder === "desc"
+      ? bVal.localeCompare(aVal)
+      : aVal.localeCompare(bVal);
+  });
+
+  return normalized;
 }
 
 export async function getCardsInSet(setId: string) {
-  return apiFetch("/api/v2/cards", {
+  const response = await apiFetch("/v1/cards", {
+    game: "pokemon",
     set: setId,
-    fetchAllInSet: "true",
+    limit: "100",
   });
+  const cards: JustTCGCard[] = response.data || [];
+  return cards.map(normalizeCard);
 }

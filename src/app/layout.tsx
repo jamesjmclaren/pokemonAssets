@@ -22,7 +22,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         <Sidebar />
-        <main className="ml-64 min-h-screen p-8">{children}</main>
+        <main className="lg:ml-64 min-h-screen p-4 pt-18 lg:p-8 lg:pt-8">{children}</main>
       </body>
     </html>
   );
