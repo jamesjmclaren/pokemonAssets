@@ -155,6 +155,7 @@ export async function searchCards(query: string, setId?: string, limit = 20) {
     q: cleaned,
     game: "pokemon",
     limit: String(limit),
+    include_null_prices: "true",
   };
   if (setId) {
     params.set = setId;
