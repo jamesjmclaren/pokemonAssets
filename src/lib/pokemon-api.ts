@@ -132,11 +132,27 @@ function normalizeCard(card: JustTCGCard) {
   };
 }
 
+// --- Query helpers ---
+
+/**
+ * Sanitize a user search query for the JustTCG API.
+ * - Replaces smart quotes / curly apostrophes with straight ones
+ * - Strips trailing card-number suffixes like " - 280" or " #280"
+ */
+function sanitizeQuery(raw: string): string {
+  return raw
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'") // smart single quotes → '
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"') // smart double quotes → "
+    .replace(/\s+[-#]\s*\d+\s*$/, "") // strip trailing " - 280" / " #280"
+    .trim();
+}
+
 // --- Public API functions ---
 
 export async function searchCards(query: string, setId?: string, limit = 20) {
+  const cleaned = sanitizeQuery(query);
   const params: Record<string, string> = {
-    q: query,
+    q: cleaned,
     game: "pokemon",
     limit: String(limit),
   };
@@ -150,9 +166,8 @@ export async function searchCards(query: string, setId?: string, limit = 20) {
 }
 
 export async function getCardById(cardId: string) {
-  // Try looking up by JustTCG card ID first
   const response = await apiFetch("/v1/cards", {
-    q: cardId,
+    q: sanitizeQuery(cardId),
     game: "pokemon",
     limit: "5",
   });
@@ -180,7 +195,7 @@ export async function getPriceHistory(
     else duration = "180d";
   }
 
-  const searchTerm = cardName || cardId;
+  const searchTerm = sanitizeQuery(cardName || cardId);
   const response = await apiFetch("/v1/cards", {
     q: searchTerm,
     game: "pokemon",
