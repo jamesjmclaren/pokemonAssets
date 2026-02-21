@@ -26,13 +26,18 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function fetchAssets() {
-      if (!currentPortfolio) return;
+      if (!currentPortfolio) {
+        setLoading(false);
+        return;
+      }
       try {
         const res = await fetch(`/api/assets?portfolioId=${currentPortfolio.id}`);
         if (!res.ok) throw new Error("Failed to fetch");
-        setAssets(await res.json());
+        const data = await res.json();
+        setAssets(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching assets:", error);
+        setAssets([]);
       } finally {
         setLoading(false);
       }
@@ -40,8 +45,11 @@ export default function DashboardPage() {
     if (currentPortfolio) {
       setLoading(true);
       fetchAssets();
+    } else if (!portfolioLoading) {
+      // No portfolio selected and not loading - stop the loading state
+      setLoading(false);
     }
-  }, [currentPortfolio]);
+  }, [currentPortfolio, portfolioLoading]);
 
   async function handleRefreshPrices() {
     if (refreshing || assets.length === 0) return;

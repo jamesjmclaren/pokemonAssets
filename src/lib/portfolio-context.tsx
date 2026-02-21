@@ -36,31 +36,42 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
 
   async function fetchPortfolios() {
+    setLoading(true);
     try {
       const res = await fetch("/api/portfolios");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setPortfolios(data);
-          
-          // Restore from localStorage or use first portfolio
-          const savedId = localStorage.getItem("currentPortfolioId");
-          const saved = data.find((p: Portfolio) => p.id === savedId);
-          if (saved) {
-            setCurrentPortfolioState(saved);
-          } else if (data.length > 0) {
-            setCurrentPortfolioState(data[0]);
+      const data = await res.json();
+      
+      if (!res.ok) {
+        console.error("Portfolio fetch error:", data.error);
+        setLoading(false);
+        return [];
+      }
+      
+      if (Array.isArray(data)) {
+        setPortfolios(data);
+        
+        // Restore from localStorage or use first portfolio
+        const savedId = typeof window !== "undefined" ? localStorage.getItem("currentPortfolioId") : null;
+        const saved = data.find((p: Portfolio) => p.id === savedId);
+        if (saved) {
+          setCurrentPortfolioState(saved);
+        } else if (data.length > 0) {
+          setCurrentPortfolioState(data[0]);
+          if (typeof window !== "undefined") {
             localStorage.setItem("currentPortfolioId", data[0].id);
           }
-          
-          return data;
         }
+        
+        setLoading(false);
+        return data;
       }
-      return [];
-    } catch {
-      return [];
-    } finally {
+      
       setLoading(false);
+      return [];
+    } catch (err) {
+      console.error("Portfolio fetch exception:", err);
+      setLoading(false);
+      return [];
     }
   }
 
