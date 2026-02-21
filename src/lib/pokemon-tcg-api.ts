@@ -25,6 +25,10 @@ async function apiFetch(path: string, params?: Record<string, string>) {
   });
 
   if (!res.ok) {
+    if (res.status === 429) {
+      console.warn("Pokemon TCG API rate limit hit");
+      throw new Error("Rate limit exceeded. Please try again in a moment.");
+    }
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
   }
@@ -203,46 +207,11 @@ export async function searchCards(query: string, limit = 20): Promise<Normalized
   return cards.map(normalizeCard);
 }
 
-export async function searchProducts(query: string, limit = 20): Promise<NormalizedProduct[]> {
-  // Products are fetched per episode, so we search cards first to find relevant episodes
-  // Then fetch products from those episodes
-  // For now, let's search all products by iterating popular sets
-  
-  // Get episodes first
-  const episodes = await getEpisodes();
-  const results: NormalizedProduct[] = [];
-  
-  // Search through recent episodes (last 10) for matching products
-  const recentEpisodes = episodes.slice(0, 10);
-  
-  for (const episode of recentEpisodes) {
-    if (results.length >= limit) break;
-    
-    try {
-      const products = await getProductsInEpisode(episode.id);
-      const matching = products.filter(p => 
-        p.name.toLowerCase().includes(query.toLowerCase())
-      );
-      results.push(...matching);
-    } catch {
-      // Skip episodes that fail
-    }
-  }
-  
-  return results.slice(0, limit);
-}
-
 export async function searchAll(query: string, limit = 20): Promise<NormalizedItem[]> {
-  const [cards, products] = await Promise.all([
-    searchCards(query, limit),
-    searchProducts(query, Math.min(limit, 5)), // Limit product searches
-  ]);
-
-  // Combine and sort by price
-  const all: NormalizedItem[] = [...cards, ...products];
-  all.sort((a, b) => (b.marketPrice || 0) - (a.marketPrice || 0));
-  
-  return all.slice(0, limit);
+  // Only search cards to avoid rate limits - products require too many API calls
+  // Users can search for sealed products by name and they'll appear in card results
+  const cards = await searchCards(query, limit);
+  return cards;
 }
 
 export async function getCardById(id: string): Promise<NormalizedCard | null> {
