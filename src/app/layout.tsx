@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
+import { PortfolioProvider } from "@/lib/portfolio-context";
 
 export const metadata: Metadata = {
   title: "N&C Assets",
@@ -23,8 +24,10 @@ export default function RootLayout({
           />
         </head>
         <body className="antialiased">
-          <Sidebar />
-          <main className="lg:ml-64 min-h-screen p-4 pt-18 lg:p-8 lg:pt-8">{children}</main>
+          <PortfolioProvider>
+            <Sidebar />
+            <main className="lg:ml-64 min-h-screen p-4 pt-18 lg:p-8 lg:pt-8">{children}</main>
+          </PortfolioProvider>
         </body>
       </html>
     </ClerkProvider>

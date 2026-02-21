@@ -4,11 +4,12 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Plus, Briefcase } from "lucide-react";
+import { usePortfolio } from "@/lib/portfolio-context";
 
 export default function OnboardingPage() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
-  const [portfolios, setPortfolios] = useState<{ id: string; name: string }[]>([]);
+  const { portfolios, refetch } = usePortfolio();
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [portfolioName, setPortfolioName] = useState("");
@@ -17,26 +18,14 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (isLoaded && user) {
-      fetchPortfolios();
-    }
-  }, [isLoaded, user]);
-
-  async function fetchPortfolios() {
-    try {
-      const res = await fetch("/api/portfolios");
-      if (res.ok) {
-        const data = await res.json();
-        setPortfolios(data);
-        if (data.length > 0) {
-          router.push("/dashboard");
-        }
+      // If user already has portfolios, redirect to dashboard
+      if (portfolios.length > 0) {
+        router.push("/dashboard");
+      } else {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Failed to fetch portfolios:", error);
-    } finally {
-      setLoading(false);
     }
-  }
+  }, [isLoaded, user, portfolios, router]);
 
   async function createPortfolio(e: React.FormEvent) {
     e.preventDefault();
@@ -54,6 +43,7 @@ export default function OnboardingPage() {
       });
 
       if (res.ok) {
+        await refetch();
         router.push("/dashboard");
       }
     } catch (error) {

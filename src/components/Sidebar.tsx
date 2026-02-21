@@ -10,32 +10,25 @@ import {
   FolderOpen,
   Menu,
   X,
-  Settings,
+  Users,
+  ChevronDown,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { usePortfolio, Portfolio } from "@/lib/portfolio-context";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/collection", label: "Collection", icon: FolderOpen },
   { href: "/dashboard/add", label: "Add Asset", icon: Search },
+  { href: "/team", label: "Team", icon: Users },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { isSignedIn } = useUser();
+  const { portfolios, currentPortfolio, setCurrentPortfolio } = usePortfolio();
   const [open, setOpen] = useState(false);
-  const [portfolios, setPortfolios] = useState<{ id: string; name: string; role: string }[]>([]);
-
-  useEffect(() => {
-    if (isSignedIn) {
-      fetch("/api/portfolios")
-        .then((res) => res.json())
-        .then((data) => {
-          if (Array.isArray(data)) setPortfolios(data);
-        })
-        .catch(() => {});
-    }
-  }, [isSignedIn]);
+  const [portfolioDropdownOpen, setPortfolioDropdownOpen] = useState(false);
 
   // Close sidebar on route change
   useEffect(() => {
@@ -132,23 +125,45 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* Portfolios */}
+        {/* Portfolio Switcher */}
         {isSignedIn && portfolios.length > 0 && (
-          <div className="px-4 pb-4 border-b border-border">
-            <p className="text-xs text-text-muted mb-2 px-4">Portfolios</p>
-            {portfolios.map((portfolio) => (
-              <Link
-                key={portfolio.id}
-                href={`/portfolio/${portfolio.id}/settings`}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+          <div className="px-4 pb-4">
+            <p className="text-xs text-text-muted mb-2 px-4">Portfolio</p>
+            <div className="relative">
+              <button
+                onClick={() => setPortfolioDropdownOpen(!portfolioDropdownOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-surface-hover text-sm text-text-primary hover:bg-border transition-colors"
               >
-                <Settings className="w-4 h-4" />
-                {portfolio.name}
-                {portfolio.role !== "owner" && (
-                  <span className="text-xs text-text-muted">({portfolio.role})</span>
-                )}
-              </Link>
-            ))}
+                <span className="truncate">
+                  {currentPortfolio?.name || "Select Portfolio"}
+                </span>
+                <ChevronDown className={clsx("w-4 h-4 transition-transform", portfolioDropdownOpen && "rotate-180")} />
+              </button>
+              {portfolioDropdownOpen && (
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-border rounded-xl shadow-lg overflow-hidden z-10">
+                  {portfolios.map((portfolio) => (
+                    <button
+                      key={portfolio.id}
+                      onClick={() => {
+                        setCurrentPortfolio(portfolio as Portfolio);
+                        setPortfolioDropdownOpen(false);
+                      }}
+                      className={clsx(
+                        "w-full px-4 py-2.5 text-left text-sm hover:bg-surface-hover transition-colors",
+                        currentPortfolio?.id === portfolio.id
+                          ? "text-accent bg-accent/5"
+                          : "text-text-secondary"
+                      )}
+                    >
+                      {portfolio.name}
+                      {portfolio.role !== "owner" && (
+                        <span className="ml-2 text-xs text-text-muted">({portfolio.role})</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
