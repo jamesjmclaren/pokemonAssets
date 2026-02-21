@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "tcgplayer-cdn.tcgplayer.com",
       },
+      {
+        protocol: "https",
+        hostname: "images.tcggo.com",
+      },
     ],
   },
 };
