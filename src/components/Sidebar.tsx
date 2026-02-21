@@ -3,24 +3,32 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UserButton, useUser } from "@clerk/nextjs";
 import {
   LayoutDashboard,
   Search,
   FolderOpen,
   Menu,
   X,
+  Users,
+  ChevronDown,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { usePortfolio, Portfolio } from "@/lib/portfolio-context";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/collection", label: "Collection", icon: FolderOpen },
   { href: "/dashboard/add", label: "Add Asset", icon: Search },
+  { href: "/team", label: "Team", icon: Users },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { isSignedIn } = useUser();
+  const { portfolios, currentPortfolio, setCurrentPortfolio } = usePortfolio();
   const [open, setOpen] = useState(false);
+  const [portfolioDropdownOpen, setPortfolioDropdownOpen] = useState(false);
 
   // Close sidebar on route change
   useEffect(() => {
@@ -117,14 +125,63 @@ export default function Sidebar() {
           })}
         </nav>
 
+        {/* Portfolio Switcher */}
+        {isSignedIn && portfolios.length > 0 && (
+          <div className="px-4 pb-4">
+            <p className="text-xs text-text-muted mb-2 px-4">Portfolio</p>
+            <div className="relative">
+              <button
+                onClick={() => setPortfolioDropdownOpen(!portfolioDropdownOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-surface-hover text-sm text-text-primary hover:bg-border transition-colors"
+              >
+                <span className="truncate">
+                  {currentPortfolio?.name || "Select Portfolio"}
+                </span>
+                <ChevronDown className={clsx("w-4 h-4 transition-transform", portfolioDropdownOpen && "rotate-180")} />
+              </button>
+              {portfolioDropdownOpen && (
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-border rounded-xl shadow-lg overflow-hidden z-10">
+                  {portfolios.map((portfolio) => (
+                    <button
+                      key={portfolio.id}
+                      onClick={() => {
+                        setCurrentPortfolio(portfolio as Portfolio);
+                        setPortfolioDropdownOpen(false);
+                      }}
+                      className={clsx(
+                        "w-full px-4 py-2.5 text-left text-sm hover:bg-surface-hover transition-colors",
+                        currentPortfolio?.id === portfolio.id
+                          ? "text-accent bg-accent/5"
+                          : "text-text-secondary"
+                      )}
+                    >
+                      {portfolio.name}
+                      {portfolio.role !== "owner" && (
+                        <span className="ml-2 text-xs text-text-muted">({portfolio.role})</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="p-4 border-t border-border">
-          <div className="px-4 py-3 rounded-xl bg-surface-hover">
-            <p className="text-xs text-text-muted">Powered by</p>
-            <p className="text-xs text-text-secondary font-medium">
-              PokemonPriceTracker
-            </p>
-          </div>
+          {isSignedIn ? (
+            <div className="flex items-center gap-3 px-4 py-3">
+              <UserButton afterSignOutUrl="/" />
+              <span className="text-sm text-text-secondary">Account</span>
+            </div>
+          ) : (
+            <Link
+              href="/sign-in"
+              className="block px-4 py-3 rounded-xl bg-accent text-white text-center text-sm font-medium hover:bg-accent-hover"
+            >
+              Sign In
+            </Link>
+          )}
         </div>
       </aside>
     </>

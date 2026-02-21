@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, extractCardPrice } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
+import { usePortfolio } from "@/lib/portfolio-context";
 import SearchModal from "./SearchModal";
 
 interface SelectedCard {
@@ -34,6 +35,7 @@ interface SelectedCard {
 export default function AddAssetForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { currentPortfolio, isReadOnly } = usePortfolio();
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null);
@@ -81,7 +83,7 @@ export default function AddAssetForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCard) return;
+    if (!selectedCard || !currentPortfolio) return;
 
     setSubmitting(true);
     try {
@@ -108,6 +110,7 @@ export default function AddAssetForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          portfolio_id: currentPortfolio.id,
           external_id: selectedCard.id,
           name: selectedCard.name,
           set_name: selectedCard.setName || selectedCard.set || "",
@@ -125,7 +128,10 @@ export default function AddAssetForm() {
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to add asset");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to add asset");
+      }
 
       setSuccess(true);
       setTimeout(() => {
@@ -133,7 +139,7 @@ export default function AddAssetForm() {
       }, 1500);
     } catch (error) {
       console.error("Submit error:", error);
-      alert("Failed to add asset. Please try again.");
+      alert(error instanceof Error ? error.message : "Failed to add asset. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -144,6 +150,22 @@ export default function AddAssetForm() {
     selectedCard?.imageUrl ||
     selectedCard?.image ||
     "";
+
+  if (isReadOnly) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-surface border border-border rounded-2xl p-12 text-center">
+          <Upload className="w-16 h-16 text-text-muted mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-text-primary">
+            Read-Only Access
+          </h2>
+          <p className="text-text-secondary mt-2">
+            You don&apos;t have permission to add assets to this portfolio.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (success) {
     return (
