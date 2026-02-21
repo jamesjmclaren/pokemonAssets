@@ -15,17 +15,20 @@ import StatCard from "@/components/StatCard";
 import PortfolioChart from "@/components/PortfolioChart";
 import AssetCard from "@/components/AssetCard";
 import { formatCurrency, formatPercentage } from "@/lib/format";
+import { usePortfolio } from "@/lib/portfolio-context";
 import type { PortfolioAsset } from "@/types";
 
 export default function DashboardPage() {
+  const { currentPortfolio, loading: portfolioLoading, isReadOnly } = usePortfolio();
   const [assets, setAssets] = useState<PortfolioAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     async function fetchAssets() {
+      if (!currentPortfolio) return;
       try {
-        const res = await fetch("/api/assets");
+        const res = await fetch(`/api/assets?portfolioId=${currentPortfolio.id}`);
         if (!res.ok) throw new Error("Failed to fetch");
         setAssets(await res.json());
       } catch (error) {
@@ -34,8 +37,11 @@ export default function DashboardPage() {
         setLoading(false);
       }
     }
-    fetchAssets();
-  }, []);
+    if (currentPortfolio) {
+      setLoading(true);
+      fetchAssets();
+    }
+  }, [currentPortfolio]);
 
   async function handleRefreshPrices() {
     if (refreshing || assets.length === 0) return;
@@ -93,7 +99,7 @@ export default function DashboardPage() {
 
   const recentlyAdded = [...assets].slice(0, 4);
 
-  if (loading) {
+  if (portfolioLoading || loading) {
     return (
       <div className="space-y-6 md:space-y-8">
         <div>
