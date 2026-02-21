@@ -55,15 +55,39 @@ export default function AddAssetForm() {
     purchaseLocation: "",
     condition: "Near Mint",
     assetType: "card" as "card" | "sealed",
+    grade: "raw" as "raw" | "psa10" | "psa9" | "psa8" | "cgc10" | "bgs10",
     notes: "",
   });
 
   const handleCardSelect = (card: SelectedCard) => {
     setSelectedCard(card);
     setSearchOpen(false);
-    const price = extractCardPrice(card as unknown as Record<string, unknown>);
+    // Set price based on current grade selection
+    const price = getGradedPrice(card, form.grade);
     if (price && !form.purchasePrice) {
       setForm((f) => ({ ...f, purchasePrice: price.toFixed(2) }));
+    }
+  };
+
+  const getGradedPrice = (card: SelectedCard | null, grade: string): number | null => {
+    if (!card?.prices) return card?.marketPrice || null;
+    
+    switch (grade) {
+      case "psa10": return card.prices.psa10 || null;
+      case "psa9": return card.prices.psa9 || null;
+      case "cgc10": return card.prices.cgc10 || null;
+      case "bgs10": return card.prices.bgs10 || null;
+      default: return card.prices.raw || card.prices.market || card.marketPrice || null;
+    }
+  };
+
+  const handleGradeChange = (grade: typeof form.grade) => {
+    setForm((f) => ({ ...f, grade }));
+    if (selectedCard) {
+      const price = getGradedPrice(selectedCard, grade);
+      if (price) {
+        setForm((f) => ({ ...f, grade, purchasePrice: price.toFixed(2) }));
+      }
     }
   };
 
@@ -299,34 +323,33 @@ export default function AddAssetForm() {
                 <label className="block text-sm font-medium text-text-secondary mb-2">
                   Select Asset *
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setSearchOpen(true)}
-                  className="w-full flex items-center gap-3 px-4 py-4 bg-surface border border-border rounded-xl text-left hover:border-border-hover hover:bg-surface-hover"
-                >
-                  <Search className="w-5 h-5 text-text-muted" />
-                  <span
-                    className={
-                      selectedCard ? "text-text-primary" : "text-text-muted"
-                    }
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSearchOpen(true)}
+                    className="flex-1 flex items-center gap-3 px-4 py-4 bg-surface border border-border rounded-xl text-left hover:border-border-hover hover:bg-surface-hover"
                   >
-                    {selectedCard
-                      ? selectedCard.name
-                      : "Search for a card or product..."}
-                  </span>
+                    <Search className="w-5 h-5 text-text-muted" />
+                    <span
+                      className={
+                        selectedCard ? "text-text-primary" : "text-text-muted"
+                      }
+                    >
+                      {selectedCard
+                        ? selectedCard.name
+                        : "Search for a card or product..."}
+                    </span>
+                  </button>
                   {selectedCard && (
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCard(null);
-                      }}
-                      className="ml-auto p-1 hover:bg-surface rounded-lg"
+                      onClick={() => setSelectedCard(null)}
+                      className="px-3 bg-surface border border-border rounded-xl hover:bg-surface-hover hover:border-border-hover"
                     >
                       <X className="w-4 h-4 text-text-muted" />
                     </button>
                   )}
-                </button>
+                </div>
               </div>
 
               {/* Asset type */}
@@ -356,6 +379,40 @@ export default function AddAssetForm() {
                   ))}
                 </div>
               </div>
+
+              {/* Grade selector - only show for cards */}
+              {form.assetType === "card" && selectedCard && (
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Condition / Grade
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: "raw", label: "Raw", price: selectedCard.prices?.raw },
+                      { value: "psa10", label: "PSA 10", price: selectedCard.prices?.psa10 },
+                      { value: "psa9", label: "PSA 9", price: selectedCard.prices?.psa9 },
+                      { value: "cgc10", label: "CGC 10", price: selectedCard.prices?.cgc10 },
+                      { value: "bgs10", label: "BGS 10", price: selectedCard.prices?.bgs10 },
+                    ].filter(g => g.price != null).map((grade) => (
+                      <button
+                        key={grade.value}
+                        type="button"
+                        onClick={() => handleGradeChange(grade.value as typeof form.grade)}
+                        className={`px-3 py-2.5 rounded-xl border text-sm font-medium ${
+                          form.grade === grade.value
+                            ? "bg-amber-500/10 border-amber-500 text-amber-400"
+                            : "bg-surface border-border text-text-secondary hover:border-border-hover"
+                        }`}
+                      >
+                        <div>{grade.label}</div>
+                        <div className="text-xs opacity-70">
+                          {grade.price ? `$${grade.price.toFixed(0)}` : "N/A"}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Purchase details */}
               <div className="grid grid-cols-2 gap-4">
