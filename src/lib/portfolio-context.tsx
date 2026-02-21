@@ -74,19 +74,16 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
 
     if (!isSignedIn) {
       setLoading(false);
-      if (!isPublicRoute) {
-        router.push("/sign-in");
-      }
       return;
     }
 
     fetchPortfolios().then((data) => {
-      // If no portfolios and not on onboarding, redirect to onboarding
+      // If no portfolios and not on onboarding/public route, redirect to onboarding
       if (data.length === 0 && !pathname.startsWith("/onboarding") && !isPublicRoute) {
-        router.push("/onboarding");
+        router.replace("/onboarding");
       }
     });
-  }, [isLoaded, isSignedIn, pathname]);
+  }, [isLoaded, isSignedIn, pathname, isPublicRoute, router]);
 
   const isReadOnly = currentPortfolio?.role === "read_only";
 
