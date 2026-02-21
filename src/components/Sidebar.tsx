@@ -3,12 +3,14 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UserButton, useUser } from "@clerk/nextjs";
 import {
   LayoutDashboard,
   Search,
   FolderOpen,
   Menu,
   X,
+  Settings,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -20,7 +22,20 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { isSignedIn } = useUser();
   const [open, setOpen] = useState(false);
+  const [portfolios, setPortfolios] = useState<{ id: string; name: string; role: string }[]>([]);
+
+  useEffect(() => {
+    if (isSignedIn) {
+      fetch("/api/portfolios")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) setPortfolios(data);
+        })
+        .catch(() => {});
+    }
+  }, [isSignedIn]);
 
   // Close sidebar on route change
   useEffect(() => {
@@ -117,14 +132,41 @@ export default function Sidebar() {
           })}
         </nav>
 
+        {/* Portfolios */}
+        {isSignedIn && portfolios.length > 0 && (
+          <div className="px-4 pb-4 border-b border-border">
+            <p className="text-xs text-text-muted mb-2 px-4">Portfolios</p>
+            {portfolios.map((portfolio) => (
+              <Link
+                key={portfolio.id}
+                href={`/portfolio/${portfolio.id}/settings`}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+              >
+                <Settings className="w-4 h-4" />
+                {portfolio.name}
+                {portfolio.role !== "owner" && (
+                  <span className="text-xs text-text-muted">({portfolio.role})</span>
+                )}
+              </Link>
+            ))}
+          </div>
+        )}
+
         {/* Footer */}
         <div className="p-4 border-t border-border">
-          <div className="px-4 py-3 rounded-xl bg-surface-hover">
-            <p className="text-xs text-text-muted">Powered by</p>
-            <p className="text-xs text-text-secondary font-medium">
-              PokemonPriceTracker
-            </p>
-          </div>
+          {isSignedIn ? (
+            <div className="flex items-center gap-3 px-4 py-3">
+              <UserButton afterSignOutUrl="/" />
+              <span className="text-sm text-text-secondary">Account</span>
+            </div>
+          ) : (
+            <Link
+              href="/sign-in"
+              className="block px-4 py-3 rounded-xl bg-accent text-white text-center text-sm font-medium hover:bg-accent-hover"
+            >
+              Sign In
+            </Link>
+          )}
         </div>
       </aside>
     </>
