@@ -36,10 +36,7 @@ export async function POST() {
 
       try {
         // Search by card name (not external_id which is a MongoDB ObjectId)
-        const results = await searchCards(asset.name, undefined, 5);
-        const cards = Array.isArray(results)
-          ? results
-          : results.data || results.cards || [];
+        const cards = await searchCards(asset.name, undefined, 5);
 
         if (cards.length === 0) {
           console.warn(`[refresh-prices] No API results for "${asset.name}"`);
