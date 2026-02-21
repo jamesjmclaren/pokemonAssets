@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchCards, getSets } from "@/lib/pokemon-api";
+import { searchAssets, searchCards, getSets } from "@/lib/pokemon-api";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -20,7 +20,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = await searchCards(query, setId || undefined);
+    // Route to the right provider based on asset type
+    const assetType =
+      type === "card" ? "card" : type === "sealed" ? "sealed" : "all";
+
+    const data = await searchAssets(query, assetType, setId || undefined);
     return NextResponse.json(data);
   } catch (error) {
     console.error("Search API error:", error);

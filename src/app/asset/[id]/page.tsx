@@ -278,23 +278,34 @@ export default function AssetDetailPage({
             externalId={asset.external_id}
             cardName={asset.name}
             purchasePrice={asset.purchase_price}
+            assetType={asset.asset_type}
           />
 
           {/* Price source link */}
           <div className="bg-surface border border-border rounded-2xl p-3 md:p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
               <p className="text-xs text-text-muted">
-                Price data from PokemonPriceTracker
+                Price data from{" "}
+                {asset.asset_type === "sealed"
+                  ? "PokemonPriceTracker"
+                  : "JustTCG"}
                 {asset.price_updated_at &&
                   ` · Updated ${formatDate(asset.price_updated_at)}`}
               </p>
               <a
-                href={`https://www.pokemonpricetracker.com`}
+                href={
+                  asset.asset_type === "sealed"
+                    ? "https://www.pokemonpricetracker.com"
+                    : "https://justtcg.com"
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
               >
-                View on PokemonPriceTracker
+                View on{" "}
+                {asset.asset_type === "sealed"
+                  ? "PokemonPriceTracker"
+                  : "JustTCG"}
                 <ExternalLink className="w-3 h-3" />
               </a>
             </div>

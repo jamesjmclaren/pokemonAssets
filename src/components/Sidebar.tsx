@@ -182,6 +182,11 @@ export default function Sidebar() {
               Sign In
             </Link>
           )}
+          <div className="px-4 py-2 mt-2">
+            <p className="text-xs text-text-muted">
+              Powered by JustTCG &amp; PokemonPriceTracker
+            </p>
+          </div>
         </div>
       </aside>
     </>
