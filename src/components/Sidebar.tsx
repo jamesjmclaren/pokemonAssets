@@ -122,7 +122,7 @@ export default function Sidebar() {
           <div className="px-4 py-3 rounded-xl bg-surface-hover">
             <p className="text-xs text-text-muted">Powered by</p>
             <p className="text-xs text-text-secondary font-medium">
-              PokemonPriceTracker
+              JustTCG &amp; PokemonPriceTracker
             </p>
           </div>
         </div>

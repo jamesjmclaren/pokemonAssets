@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { searchCards } from "@/lib/pokemon-api";
+import { searchCards, searchSealedProducts } from "@/lib/pokemon-api";
 import { extractCardPrice } from "@/lib/format";
 
 const STALE_HOURS = 24;
@@ -9,7 +9,7 @@ export async function POST() {
   try {
     const { data: assets, error } = await supabase
       .from("assets")
-      .select("id, external_id, name, price_updated_at");
+      .select("id, external_id, name, asset_type, price_updated_at");
 
     if (error) throw error;
     if (!assets || assets.length === 0) {
@@ -35,29 +35,53 @@ export async function POST() {
       if (!asset.name) continue;
 
       try {
-        // Search by card name (not external_id which is a MongoDB ObjectId)
-        const cards = await searchCards(asset.name, undefined, 5);
+        let results: Record<string, unknown>[];
 
-        if (cards.length === 0) {
+        if (asset.asset_type === "sealed") {
+          // Use PokemonPriceTracker for sealed products
+          try {
+            results = (await searchSealedProducts(
+              asset.name,
+              undefined,
+              5
+            )) as unknown as Record<string, unknown>[];
+          } catch {
+            // Fall back to JustTCG if PPT unavailable
+            results = (await searchCards(
+              asset.name,
+              undefined,
+              5
+            )) as unknown as Record<string, unknown>[];
+          }
+        } else {
+          // Use JustTCG for cards
+          results = (await searchCards(
+            asset.name,
+            undefined,
+            5
+          )) as unknown as Record<string, unknown>[];
+        }
+
+        if (results.length === 0) {
           console.warn(`[refresh-prices] No API results for "${asset.name}"`);
           continue;
         }
 
         // Prefer exact ID match, then first result
         const match =
-          cards.find(
-            (c: { id?: string }) => c.id === asset.external_id
-          ) || cards[0];
+          results.find(
+            (c: Record<string, unknown>) => c.id === asset.external_id
+          ) || results[0];
 
         if (!match) continue;
 
-        const marketPrice = extractCardPrice(match as Record<string, unknown>);
+        const marketPrice = extractCardPrice(match);
         if (marketPrice == null) {
           console.warn(
-            `[refresh-prices] No price found for "${asset.name}". API card keys:`,
+            `[refresh-prices] No price found for "${asset.name}". API keys:`,
             Object.keys(match),
             "prices field:",
-            JSON.stringify((match as Record<string, unknown>).prices ?? "missing")
+            JSON.stringify(match.prices ?? "missing")
           );
           continue;
         }

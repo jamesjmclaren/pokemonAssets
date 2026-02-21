@@ -17,6 +17,7 @@ interface PriceChartProps {
   externalId: string;
   cardName?: string;
   purchasePrice?: number;
+  assetType?: "card" | "sealed";
   className?: string;
 }
 
@@ -30,6 +31,7 @@ export default function PriceChart({
   externalId,
   cardName,
   purchasePrice,
+  assetType,
   className = "",
 }: PriceChartProps) {
   const [data, setData] = useState<PriceHistoryPoint[]>([]);
@@ -47,8 +49,9 @@ export default function PriceChart({
           .toISOString()
           .split("T")[0];
         const nameParam = cardName ? `&name=${encodeURIComponent(cardName)}` : "";
+        const typeParam = assetType ? `&assetType=${assetType}` : "";
         const res = await fetch(
-          `/api/price-history?cardId=${encodeURIComponent(externalId)}&startDate=${startDate}&endDate=${endDate}${nameParam}`
+          `/api/price-history?cardId=${encodeURIComponent(externalId)}&startDate=${startDate}&endDate=${endDate}${nameParam}${typeParam}`
         );
         if (!res.ok) throw new Error("Failed to fetch price history");
         const json = await res.json();
@@ -65,7 +68,7 @@ export default function PriceChart({
       }
     }
     fetchHistory();
-  }, [externalId, cardName, range]);
+  }, [externalId, cardName, assetType, range]);
 
   if (loading) {
     return (

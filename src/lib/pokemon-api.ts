@@ -1,3 +1,22 @@
+import {
+  searchSealedProducts,
+  searchCardsPPT,
+  getSealedPriceHistory,
+  getCardPriceHistoryPPT,
+} from "./pokemon-price-tracker";
+
+// Re-export PPT functions so consumers can import from one place
+export {
+  searchSealedProducts,
+  searchCardsPPT,
+  getSealedPriceHistory,
+  getCardPriceHistoryPPT,
+};
+
+// ---------------------------------------------------------------------------
+// JustTCG client (primary for cards)
+// ---------------------------------------------------------------------------
+
 const API_BASE = "https://api.justtcg.com/v1";
 
 function getApiKey(): string {
@@ -268,4 +287,110 @@ export async function getCardsInSet(setId: string) {
   });
   const cards: JustTCGCard[] = response.data || [];
   return cards.map(normalizeCard);
+}
+
+// ---------------------------------------------------------------------------
+// Unified search — routes to the right provider based on asset type
+// ---------------------------------------------------------------------------
+
+/**
+ * Search for assets across providers.
+ *
+ * - type "card"   → JustTCG
+ * - type "sealed" → PokemonPriceTracker
+ * - type "all"    → both in parallel, merged
+ *
+ * To swap cards over to PPT in the future, change the "card" branch
+ * to call searchCardsPPT instead of searchCards.
+ */
+export async function searchAssets(
+  query: string,
+  type: "card" | "sealed" | "all" = "all",
+  setId?: string,
+  limit = 20
+) {
+  if (type === "card") {
+    return searchCards(query, setId, limit);
+  }
+
+  if (type === "sealed") {
+    try {
+      return await searchSealedProducts(query, setId, limit);
+    } catch (error) {
+      // Fall back to JustTCG if PPT is unavailable / not configured
+      console.warn(
+        "[searchAssets] PokemonPriceTracker sealed search failed, falling back to JustTCG:",
+        error instanceof Error ? error.message : error
+      );
+      return searchCards(query, setId, limit);
+    }
+  }
+
+  // type === "all" — run both in parallel, merge results
+  const [cards, sealed] = await Promise.allSettled([
+    searchCards(query, setId, limit),
+    searchSealedProducts(query, setId, limit),
+  ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const results: any[] = [];
+
+  if (cards.status === "fulfilled") {
+    results.push(...cards.value);
+  }
+  if (sealed.status === "fulfilled") {
+    results.push(...sealed.value);
+  }
+
+  // If PPT failed but JustTCG succeeded, log but don't break
+  if (sealed.status === "rejected") {
+    console.warn(
+      "[searchAssets] PokemonPriceTracker sealed search failed:",
+      sealed.reason instanceof Error ? sealed.reason.message : sealed.reason
+    );
+  }
+
+  return results;
+}
+
+/**
+ * Fetch price history, routing to the right provider based on asset type.
+ */
+export async function getPriceHistoryByType(
+  assetType: "card" | "sealed",
+  cardId: string,
+  cardName?: string,
+  startDate?: string,
+  endDate?: string
+) {
+  if (assetType === "sealed") {
+    try {
+      // Calculate days from date range
+      let days = 90;
+      if (startDate) {
+        const start = new Date(startDate);
+        const end = endDate ? new Date(endDate) : new Date();
+        days = Math.ceil(
+          (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        if (days < 7) days = 7;
+      }
+      const points = await getSealedPriceHistory(cardName || cardId, days);
+
+      // Apply date filters
+      let filtered = points;
+      if (startDate) filtered = filtered.filter((p) => p.date >= startDate);
+      if (endDate) filtered = filtered.filter((p) => p.date <= endDate);
+      return filtered;
+    } catch (error) {
+      console.warn(
+        "[getPriceHistoryByType] PPT sealed history failed, falling back to JustTCG:",
+        error instanceof Error ? error.message : error
+      );
+      return getPriceHistory(cardId, startDate, endDate, cardName);
+    }
+  }
+
+  // Cards use JustTCG
+  return getPriceHistory(cardId, startDate, endDate, cardName);
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPriceHistory } from "@/lib/pokemon-api";
+import { getPriceHistoryByType, getPriceHistory } from "@/lib/pokemon-api";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -7,6 +7,10 @@ export async function GET(request: NextRequest) {
   const name = searchParams.get("name");
   const startDate = searchParams.get("startDate");
   const endDate = searchParams.get("endDate");
+  const assetType = searchParams.get("assetType") as
+    | "card"
+    | "sealed"
+    | null;
 
   if (!cardId && !name) {
     return NextResponse.json(
@@ -16,12 +20,27 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const data = await getPriceHistory(
-      cardId || "",
-      startDate || undefined,
-      endDate || undefined,
-      name || undefined
-    );
+    let data;
+
+    if (assetType) {
+      // New type-aware path — routes sealed to PPT, cards to JustTCG
+      data = await getPriceHistoryByType(
+        assetType,
+        cardId || "",
+        name || undefined,
+        startDate || undefined,
+        endDate || undefined
+      );
+    } else {
+      // Backwards-compatible path — uses JustTCG
+      data = await getPriceHistory(
+        cardId || "",
+        startDate || undefined,
+        endDate || undefined,
+        name || undefined
+      );
+    }
+
     return NextResponse.json(data);
   } catch (error) {
     console.error("Price history API error:", error);
