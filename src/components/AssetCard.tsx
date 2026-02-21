@@ -23,24 +23,24 @@ export default function AssetCard({ asset }: AssetCardProps) {
     <Link href={`/asset/${asset.id}`}>
       <div className="bg-surface border border-border rounded-2xl overflow-hidden hover:border-border-hover hover:bg-surface-hover group cursor-pointer">
         {/* Mobile: horizontal row layout / Desktop: vertical card layout */}
-        <div className="flex sm:block">
+        <div className="flex md:block">
           {/* Image */}
-          <div className="relative w-24 h-28 sm:w-full sm:h-auto sm:aspect-[4/3] bg-background overflow-hidden flex-shrink-0">
+          <div className="relative w-24 h-28 md:w-full md:h-auto md:aspect-[4/3] bg-background overflow-hidden flex-shrink-0">
             {imageUrl ? (
               <Image
                 src={imageUrl}
                 alt={asset.name}
                 fill
-                className="object-contain p-2 sm:p-3 group-hover:scale-105 transition-transform duration-300"
-                sizes="(max-width: 640px) 96px, (max-width: 1200px) 33vw, 25vw"
+                className="object-contain p-2 md:p-3 group-hover:scale-105 transition-transform duration-300"
+                sizes="(max-width: 768px) 96px, (max-width: 1200px) 33vw, 25vw"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <div className="text-text-muted text-xs sm:text-sm">No Image</div>
+                <div className="text-text-muted text-xs md:text-sm">No Image</div>
               </div>
             )}
             {/* Type badge - hidden on mobile row, shown on desktop */}
-            <div className="absolute top-2 left-2 hidden sm:block">
+            <div className="absolute top-2 left-2 hidden md:block">
               <span
                 className={clsx(
                   "px-2 py-1 rounded-lg text-xs font-semibold",
@@ -55,10 +55,10 @@ export default function AssetCard({ asset }: AssetCardProps) {
           </div>
 
           {/* Info */}
-          <div className="p-3 sm:p-4 flex-1 min-w-0">
-            <div className="flex items-start gap-2 sm:block">
+          <div className="p-3 md:p-4 flex-1 min-w-0">
+            <div className="flex items-start gap-2 md:block">
               <div className="flex-1 min-w-0">
-                <h3 className="text-xs sm:text-sm font-semibold text-text-primary truncate">
+                <h3 className="text-xs md:text-sm font-semibold text-text-primary truncate">
                   {asset.name}
                 </h3>
                 <p className="text-xs text-text-muted mt-0.5 truncate">
@@ -68,7 +68,7 @@ export default function AssetCard({ asset }: AssetCardProps) {
               {/* Mobile type badge */}
               <span
                 className={clsx(
-                  "sm:hidden px-1.5 py-0.5 rounded text-[10px] font-semibold flex-shrink-0",
+                  "md:hidden px-1.5 py-0.5 rounded text-[10px] font-semibold flex-shrink-0",
                   asset.asset_type === "card"
                     ? "bg-accent-muted text-accent-hover"
                     : "bg-warning-muted text-warning"
@@ -78,16 +78,16 @@ export default function AssetCard({ asset }: AssetCardProps) {
               </span>
             </div>
 
-            <div className="flex items-end justify-between mt-2 sm:mt-3">
+            <div className="flex items-end justify-between mt-2 md:mt-3">
               <div>
-                <p className="text-[10px] sm:text-xs text-text-muted">Current Value</p>
-                <p className="text-sm sm:text-lg font-bold text-text-primary">
+                <p className="text-[10px] md:text-xs text-text-muted">Current Value</p>
+                <p className="text-sm md:text-lg font-bold text-text-primary">
                   {formatCurrency(currentPrice)}
                 </p>
               </div>
               <div
                 className={clsx(
-                  "flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold",
+                  "flex items-center gap-1 px-1.5 md:px-2 py-0.5 md:py-1 rounded-lg text-[10px] md:text-xs font-semibold",
                   profit > 0 && "bg-success-muted text-success",
                   profit < 0 && "bg-danger-muted text-danger",
                   profit === 0 && "bg-surface-hover text-text-secondary"
@@ -104,13 +104,13 @@ export default function AssetCard({ asset }: AssetCardProps) {
               </div>
             </div>
 
-            <div className="flex items-center justify-between mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-border">
-              <span className="text-[10px] sm:text-xs text-text-muted">
+            <div className="flex items-center justify-between mt-1.5 md:mt-2 pt-1.5 md:pt-2 border-t border-border">
+              <span className="text-[10px] md:text-xs text-text-muted">
                 Paid {formatCurrency(asset.purchase_price)}
               </span>
               <span
                 className={clsx(
-                  "text-[10px] sm:text-xs font-medium",
+                  "text-[10px] md:text-xs font-medium",
                   profit > 0 && "text-success",
                   profit < 0 && "text-danger",
                   profit === 0 && "text-text-secondary"

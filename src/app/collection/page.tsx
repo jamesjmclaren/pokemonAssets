@@ -100,14 +100,14 @@ export default function CollectionPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 sm:space-y-8">
+      <div className="space-y-6 md:space-y-8">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Collection</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-text-primary">Collection</h1>
           <p className="text-text-muted mt-1 text-sm">Loading your assets...</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="skeleton h-28 sm:h-80 rounded-2xl" />
+            <div key={i} className="skeleton h-28 md:h-80 rounded-2xl" />
           ))}
         </div>
       </div>
@@ -115,31 +115,31 @@ export default function CollectionPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Collection</h1>
-          <p className="text-text-muted mt-1 text-xs sm:text-sm">
+          <h1 className="text-xl md:text-2xl font-bold text-text-primary">Collection</h1>
+          <p className="text-text-muted mt-1 text-xs md:text-sm">
             {filtered.length} asset{filtered.length !== 1 ? "s" : ""} &middot;{" "}
             {formatCurrency(totalValue)} total value
           </p>
         </div>
         <Link
           href="/dashboard/add"
-          className="flex items-center gap-2 px-3 sm:px-5 py-2.5 sm:py-3 bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl text-sm flex-shrink-0"
+          className="flex items-center gap-2 px-3 md:px-5 py-2.5 md:py-3 bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl text-sm flex-shrink-0"
         >
-          <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-          <span className="hidden sm:inline">Add Asset</span>
-          <span className="sm:hidden">Add</span>
+          <PlusCircle className="w-4 h-4 md:w-5 md:h-5" />
+          <span className="hidden md:inline">Add Asset</span>
+          <span className="md:hidden">Add</span>
         </Link>
       </div>
 
       {/* Filters */}
-      <div className="bg-surface border border-border rounded-2xl p-3 sm:p-4">
-        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+      <div className="bg-surface border border-border rounded-2xl p-3 md:p-4">
+        <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-3">
           {/* Search */}
-          <div className="flex-1 min-w-0 sm:min-w-[200px] relative">
+          <div className="flex-1 min-w-0 md:min-w-[200px] relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
             <input
               type="text"
@@ -150,7 +150,7 @@ export default function CollectionPage() {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
             {/* Type filter */}
             <div className="flex gap-1 bg-background rounded-xl p-1">
               {(["all", "card", "sealed"] as const).map((t) => (
@@ -170,7 +170,7 @@ export default function CollectionPage() {
 
             {/* Sort */}
             <div className="flex items-center gap-2">
-              <SlidersHorizontal className="w-4 h-4 text-text-muted hidden sm:block" />
+              <SlidersHorizontal className="w-4 h-4 text-text-muted hidden md:block" />
               <select
                 value={sortField}
                 onChange={(e) => setSortField(e.target.value as SortField)}
@@ -219,7 +219,7 @@ export default function CollectionPage() {
 
       {/* Grid View */}
       {view === "grid" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
           {filtered.map((asset) => (
             <AssetCard key={asset.id} asset={asset} />
           ))}
@@ -230,7 +230,7 @@ export default function CollectionPage() {
       {view === "list" && (
         <div className="bg-surface border border-border rounded-2xl overflow-hidden">
           {/* Desktop table */}
-          <table className="w-full hidden sm:table">
+          <table className="w-full hidden md:table">
             <thead>
               <tr className="border-b border-border">
                 <th className="text-left px-6 py-4 text-xs font-semibold text-text-muted uppercase tracking-wider">
@@ -319,7 +319,7 @@ export default function CollectionPage() {
           </table>
 
           {/* Mobile list */}
-          <div className="sm:hidden divide-y divide-border">
+          <div className="md:hidden divide-y divide-border">
             {filtered.map((asset) => {
               const curPrice = asset.current_price ?? asset.purchase_price;
               const profit = curPrice - asset.purchase_price;
@@ -376,9 +376,9 @@ export default function CollectionPage() {
 
       {/* Empty state */}
       {filtered.length === 0 && assets.length > 0 && (
-        <div className="bg-surface border border-border rounded-2xl p-8 sm:p-12 text-center">
-          <Search className="w-10 h-10 sm:w-12 sm:h-12 text-text-muted mx-auto mb-3" />
-          <p className="text-text-secondary text-sm sm:text-base">
+        <div className="bg-surface border border-border rounded-2xl p-8 md:p-12 text-center">
+          <Search className="w-10 h-10 md:w-12 md:h-12 text-text-muted mx-auto mb-3" />
+          <p className="text-text-secondary text-sm md:text-base">
             No assets match your current filters
           </p>
         </div>
