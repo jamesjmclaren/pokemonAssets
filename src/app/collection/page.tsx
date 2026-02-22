@@ -375,10 +375,9 @@ export default function CollectionPage() {
                             {formatCurrency(marketPrice)}
                           </span>
                           {stale && (
-                            <AlertTriangle
-                              className="w-3.5 h-3.5 text-warning flex-shrink-0"
-                              title="Price not updated in 30+ days"
-                            />
+                            <span title="Price not updated in 30+ days">
+                              <AlertTriangle className="w-3.5 h-3.5 text-warning flex-shrink-0" />
+                            </span>
                           )}
                         </div>
                       </td>
