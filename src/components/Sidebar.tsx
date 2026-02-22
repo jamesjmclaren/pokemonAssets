@@ -58,9 +58,10 @@ export default function Sidebar() {
         >
           <Menu className="w-5 h-5" />
         </button>
-        <Link href="/dashboard" className="ml-3">
-          <h1 className="text-base font-bold text-text-primary tracking-tight">
-            N&C Assets
+        <Link href="/dashboard" className="ml-3 flex items-center gap-2">
+          <img src="/logo.png" alt="West Investments Ltd" className="w-7 h-7 object-contain" />
+          <h1 className="text-base font-bold text-gold tracking-tight">
+            West Investments
           </h1>
         </Link>
       </div>
@@ -85,10 +86,18 @@ export default function Sidebar() {
         {/* Logo */}
         <div className="p-6 border-b border-border flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3">
+            <img
+              src="/logo.png"
+              alt="West Investments Ltd"
+              className="w-9 h-9 object-contain"
+            />
             <div>
-              <h1 className="text-lg font-bold text-text-primary tracking-tight">
-                N&C Assets
+              <h1 className="text-base font-bold text-gold tracking-tight leading-tight">
+                West Investments
               </h1>
+              <p className="text-[10px] text-text-muted tracking-widest uppercase">
+                Ltd
+              </p>
             </div>
           </Link>
           <button
@@ -177,7 +186,7 @@ export default function Sidebar() {
           ) : (
             <Link
               href="/sign-in"
-              className="block px-4 py-3 rounded-xl bg-accent text-white text-center text-sm font-medium hover:bg-accent-hover"
+              className="block px-4 py-3 rounded-xl bg-accent text-black text-center text-sm font-medium hover:bg-accent-hover"
             >
               Sign In
             </Link>

@@ -140,7 +140,7 @@ export default function OnboardingPage() {
               <button
                 type="submit"
                 disabled={creating || !portfolioName.trim()}
-                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg transition-colors"
+                className="flex-1 px-4 py-2 bg-accent hover:bg-accent-hover disabled:bg-zinc-700 disabled:text-zinc-500 text-black rounded-lg transition-colors"
               >
                 {creating ? "Creating..." : "Create"}
               </button>

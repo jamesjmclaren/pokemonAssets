@@ -5,7 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import { PortfolioProvider } from "@/lib/portfolio-context";
 
 export const metadata: Metadata = {
-  title: "N&C Assets",
+  title: "West Investments Ltd",
   description: "Professional card and sealed product portfolio tracker",
 };
 

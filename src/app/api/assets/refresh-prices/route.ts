@@ -9,7 +9,7 @@ export async function POST() {
   try {
     const { data: assets, error } = await supabase
       .from("assets")
-      .select("id, external_id, name, asset_type, price_updated_at");
+      .select("id, external_id, name, asset_type, price_updated_at, manual_price");
 
     if (error) throw error;
     if (!assets || assets.length === 0) {
@@ -19,8 +19,9 @@ export async function POST() {
     const now = Date.now();
     const staleMs = STALE_HOURS * 60 * 60 * 1000;
 
-    // Only refresh assets with stale or missing prices
+    // Only refresh assets with stale or missing prices (skip manual_price assets)
     const staleAssets = assets.filter((a) => {
+      if (a.manual_price) return false;
       if (!a.price_updated_at) return true;
       return now - new Date(a.price_updated_at).getTime() > staleMs;
     });

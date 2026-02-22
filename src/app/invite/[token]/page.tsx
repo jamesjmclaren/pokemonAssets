@@ -83,7 +83,7 @@ export default function AcceptInvitePage() {
             <p className="text-zinc-400">{errorMessage}</p>
             <button
               onClick={() => router.push("/dashboard")}
-              className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+              className="mt-4 px-6 py-2 bg-accent hover:bg-accent-hover text-black rounded-lg transition-colors"
             >
               Go to Dashboard
             </button>

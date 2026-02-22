@@ -68,9 +68,9 @@ export default function DashboardPage() {
     }
   }
 
-  const totalInvested = assets.reduce((sum, a) => sum + a.purchase_price, 0);
+  const totalInvested = assets.reduce((sum, a) => sum + a.purchase_price * (a.quantity || 1), 0);
   const currentValue = assets.reduce(
-    (sum, a) => sum + (a.current_price ?? a.purchase_price),
+    (sum, a) => sum + (a.current_price ?? a.purchase_price) * (a.quantity || 1),
     0
   );
   const totalProfit = currentValue - totalInvested;
@@ -148,7 +148,7 @@ export default function DashboardPage() {
           )}
           <Link
             href="/dashboard/add"
-            className="flex items-center gap-2 px-3 md:px-5 py-2.5 md:py-3 bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl text-sm"
+            className="flex items-center gap-2 px-3 md:px-5 py-2.5 md:py-3 bg-accent hover:bg-accent-hover text-black font-semibold rounded-xl text-sm"
           >
             <PlusCircle className="w-4 h-4 md:w-5 md:h-5" />
             <span className="hidden md:inline">Add Asset</span>
@@ -261,7 +261,7 @@ export default function DashboardPage() {
           </p>
           <Link
             href="/dashboard/add"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl mt-6"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-black font-semibold rounded-xl mt-6"
           >
             <PlusCircle className="w-5 h-5" />
             Add Your First Asset

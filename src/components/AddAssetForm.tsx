@@ -10,6 +10,7 @@ import {
   Loader2,
   CheckCircle2,
   Search,
+  AlertTriangle,
 } from "lucide-react";
 import { formatCurrency, extractCardPrice } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
@@ -35,6 +36,26 @@ interface SelectedCard {
   marketPrice?: number;
 }
 
+const PSA_GRADES = [
+  { value: "", label: "None (Raw)" },
+  { value: "PSA 10", label: "PSA 10 - Gem Mint" },
+  { value: "PSA 9", label: "PSA 9 - Mint" },
+  { value: "PSA 8", label: "PSA 8 - NM-MT" },
+  { value: "PSA 7", label: "PSA 7 - Near Mint" },
+  { value: "PSA 6", label: "PSA 6 - EX-MT" },
+  { value: "PSA 5", label: "PSA 5 - Excellent" },
+  { value: "PSA 4", label: "PSA 4 - VG-EX" },
+  { value: "PSA 3", label: "PSA 3 - Very Good" },
+  { value: "PSA 2", label: "PSA 2 - Good" },
+  { value: "PSA 1", label: "PSA 1 - Poor" },
+  { value: "CGC 10", label: "CGC 10 - Pristine" },
+  { value: "CGC 9.5", label: "CGC 9.5 - Gem Mint" },
+  { value: "CGC 9", label: "CGC 9 - Mint" },
+  { value: "BGS 10", label: "BGS 10 - Pristine" },
+  { value: "BGS 9.5", label: "BGS 9.5 - Gem Mint" },
+  { value: "BGS 9", label: "BGS 9 - Mint" },
+];
+
 export default function AddAssetForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,39 +76,19 @@ export default function AddAssetForm() {
     purchaseLocation: "",
     condition: "Near Mint",
     assetType: "card" as "card" | "sealed",
-    grade: "raw" as "raw" | "psa10" | "psa9" | "psa8" | "cgc10" | "bgs10",
+    psaGrade: "",
+    manualPrice: false,
+    manualPriceValue: "",
+    quantity: "1",
     notes: "",
   });
 
   const handleCardSelect = (card: SelectedCard) => {
     setSelectedCard(card);
     setSearchOpen(false);
-    // Set price based on current grade selection
-    const price = getGradedPrice(card, form.grade);
+    const price = card.marketPrice || extractCardPrice(card as unknown as Record<string, unknown>);
     if (price && !form.purchasePrice) {
       setForm((f) => ({ ...f, purchasePrice: price.toFixed(2) }));
-    }
-  };
-
-  const getGradedPrice = (card: SelectedCard | null, grade: string): number | null => {
-    if (!card?.prices) return card?.marketPrice || null;
-    
-    switch (grade) {
-      case "psa10": return card.prices.psa10 || null;
-      case "psa9": return card.prices.psa9 || null;
-      case "cgc10": return card.prices.cgc10 || null;
-      case "bgs10": return card.prices.bgs10 || null;
-      default: return card.prices.raw || card.prices.market || card.marketPrice || null;
-    }
-  };
-
-  const handleGradeChange = (grade: typeof form.grade) => {
-    setForm((f) => ({ ...f, grade }));
-    if (selectedCard) {
-      const price = getGradedPrice(selectedCard, grade);
-      if (price) {
-        setForm((f) => ({ ...f, grade, purchasePrice: price.toFixed(2) }));
-      }
     }
   };
 
@@ -131,7 +132,9 @@ export default function AddAssetForm() {
         }
       }
 
-      const currentPrice = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
+      const currentPrice = form.manualPrice && form.manualPriceValue
+        ? parseFloat(form.manualPriceValue)
+        : extractCardPrice(selectedCard as unknown as Record<string, unknown>);
 
       const res = await fetch("/api/assets", {
         method: "POST",
@@ -152,6 +155,9 @@ export default function AddAssetForm() {
           current_price: currentPrice,
           rarity: selectedCard.rarity || null,
           card_number: selectedCard.number || null,
+          psa_grade: form.psaGrade || null,
+          manual_price: form.manualPrice,
+          quantity: form.quantity,
         }),
       });
 
@@ -289,27 +295,16 @@ export default function AddAssetForm() {
                     {selectedCard.number ? ` #${selectedCard.number}` : ""}
                   </p>
                   {selectedCard.rarity && (
-                    <p className="text-xs text-accent">{selectedCard.rarity}</p>
+                    <p className="text-xs text-gold">{selectedCard.rarity}</p>
                   )}
                   {(() => {
                     const p = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
                     return p ? (
                       <p className="text-sm font-bold text-text-primary">
-                        {selectedCard.type === "card" ? "Raw" : "Market"}: {formatCurrency(p)}
+                        Market: {formatCurrency(p)}
                       </p>
                     ) : null;
                   })()}
-                  {/* Graded prices */}
-                  {selectedCard.type === "card" && selectedCard.prices?.psa10 && (
-                    <div className="text-xs text-text-muted space-y-0.5">
-                      {selectedCard.prices.psa10 && (
-                        <p><span className="text-amber-400">PSA 10:</span> {formatCurrency(selectedCard.prices.psa10)}</p>
-                      )}
-                      {selectedCard.prices.psa9 && (
-                        <p><span className="text-amber-400/70">PSA 9:</span> {formatCurrency(selectedCard.prices.psa9)}</p>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -380,45 +375,54 @@ export default function AddAssetForm() {
                 </div>
               </div>
 
-              {/* Grade selector - only show for cards */}
-              {form.assetType === "card" && selectedCard && (
+              {/* PSA Grade selector - always show for cards */}
+              {form.assetType === "card" && (
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Condition / Grade
+                    PSA / Grading
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: "raw", label: "Raw", price: selectedCard.prices?.raw },
-                      { value: "psa10", label: "PSA 10", price: selectedCard.prices?.psa10 },
-                      { value: "psa9", label: "PSA 9", price: selectedCard.prices?.psa9 },
-                      { value: "cgc10", label: "CGC 10", price: selectedCard.prices?.cgc10 },
-                      { value: "bgs10", label: "BGS 10", price: selectedCard.prices?.bgs10 },
-                    ].filter(g => g.price != null).map((grade) => (
-                      <button
-                        key={grade.value}
-                        type="button"
-                        onClick={() => handleGradeChange(grade.value as typeof form.grade)}
-                        className={`px-3 py-2.5 rounded-xl border text-sm font-medium ${
-                          form.grade === grade.value
-                            ? "bg-amber-500/10 border-amber-500 text-amber-400"
-                            : "bg-surface border-border text-text-secondary hover:border-border-hover"
-                        }`}
-                      >
-                        <div>{grade.label}</div>
-                        <div className="text-xs opacity-70">
-                          {grade.price ? `$${grade.price.toFixed(0)}` : "N/A"}
-                        </div>
-                      </button>
+                  <select
+                    value={form.psaGrade}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, psaGrade: e.target.value }))
+                    }
+                    className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
+                  >
+                    {PSA_GRADES.map((grade) => (
+                      <option key={grade.value} value={grade.value}>
+                        {grade.label}
+                      </option>
                     ))}
-                  </div>
+                  </select>
+                  {form.psaGrade && (
+                    <p className="text-xs text-gold mt-1.5">
+                      Graded: {form.psaGrade}
+                    </p>
+                  )}
                 </div>
               )}
+
+              {/* Quantity */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.quantity}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, quantity: e.target.value }))
+                  }
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
+                />
+              </div>
 
               {/* Purchase details */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Purchase Price *
+                    Purchase Price (per unit) *
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">
@@ -486,8 +490,8 @@ export default function AddAssetForm() {
                   }
                   className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
                 >
-                  <option value="Gem Mint (PSA 10)">Gem Mint (PSA 10)</option>
-                  <option value="Mint (PSA 9)">Mint (PSA 9)</option>
+                  <option value="Gem Mint">Gem Mint</option>
+                  <option value="Mint">Mint</option>
                   <option value="Near Mint">Near Mint</option>
                   <option value="Lightly Played">Lightly Played</option>
                   <option value="Moderately Played">Moderately Played</option>
@@ -495,6 +499,57 @@ export default function AddAssetForm() {
                   <option value="Damaged">Damaged</option>
                   <option value="Sealed">Sealed</option>
                 </select>
+              </div>
+
+              {/* Manual Price Toggle */}
+              <div className="bg-surface-hover border border-border rounded-xl p-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.manualPrice}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, manualPrice: e.target.checked }))
+                    }
+                    className="w-4 h-4 accent-gold rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-text-primary">
+                      Manually enter market price
+                    </span>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      Override the API price. You will manage this value yourself.
+                    </p>
+                  </div>
+                </label>
+                {form.manualPrice && (
+                  <div className="mt-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="w-4 h-4 text-warning" />
+                      <span className="text-xs text-warning">
+                        This price will not auto-refresh. You&apos;ll be warned if not updated in 30 days.
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.manualPriceValue}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            manualPriceValue: e.target.value,
+                          }))
+                        }
+                        className="w-full pl-8 pr-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                        placeholder="Enter current market value..."
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -515,7 +570,7 @@ export default function AddAssetForm() {
               <button
                 type="submit"
                 disabled={!selectedCard || !form.purchasePrice || submitting}
-                className="w-full py-4 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2"
+                className="w-full py-4 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-xl flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <>

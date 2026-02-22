@@ -120,7 +120,7 @@ export default function PriceChart({
               onClick={() => setRange(r.days)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
                 range === r.days
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-black"
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
@@ -148,7 +148,7 @@ export default function PriceChart({
           </defs>
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="#2a2a3a"
+            stroke="#2a2a2a"
             vertical={false}
           />
           <XAxis
@@ -170,8 +170,8 @@ export default function PriceChart({
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#1e1e2a",
-              border: "1px solid #2a2a3a",
+              backgroundColor: "#1e1e1e",
+              border: "1px solid #2a2a2a",
               borderRadius: "12px",
               padding: "12px",
             }}
@@ -182,7 +182,7 @@ export default function PriceChart({
           {purchasePrice && (
             <CartesianGrid
               horizontalPoints={[purchasePrice]}
-              stroke="#6366f1"
+              stroke="#D4AF37"
               strokeDasharray="8 4"
               strokeOpacity={0.5}
             />

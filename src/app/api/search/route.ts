@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchCards, searchAll, getEpisodes } from "@/lib/pokemon-tcg-api";
+import { searchAssets, getSets } from "@/lib/pokemon-api";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -7,10 +7,10 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type");
 
   try {
-    // Return sets/episodes list
+    // Return sets list
     if (type === "sets" || (!query && !type)) {
-      const episodes = await getEpisodes();
-      return NextResponse.json(episodes);
+      const sets = await getSets();
+      return NextResponse.json(sets);
     }
 
     if (!query) {
@@ -20,14 +20,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Search based on type
-    if (type === "card") {
-      const data = await searchCards(query, 20);
-      return NextResponse.json(data);
-    }
-
-    // For 'all' or 'sealed', search everything
-    const data = await searchAll(query, 20);
+    // Search using JustTCG (cards) + PokemonPriceTracker (sealed) via unified search
+    const data = await searchAssets(query, (type as "card" | "sealed" | "all") || "all");
     return NextResponse.json(data);
   } catch (error) {
     console.error("Search API error:", error);

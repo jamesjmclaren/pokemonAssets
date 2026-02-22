@@ -1,25 +1,25 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0a0a0f;
-  --color-surface: #12121a;
-  --color-surface-hover: #1a1a25;
-  --color-surface-elevated: #1e1e2a;
-  --color-border: #2a2a3a;
-  --color-border-hover: #3a3a4f;
-  --color-text-primary: #f0f0f5;
-  --color-text-secondary: #9090a8;
-  --color-text-muted: #606078;
-  --color-accent: #6366f1;
-  --color-accent-hover: #818cf8;
-  --color-accent-muted: rgba(99, 102, 241, 0.15);
+  --color-background: #080808;
+  --color-surface: #111111;
+  --color-surface-hover: #1a1a1a;
+  --color-surface-elevated: #1e1e1e;
+  --color-border: #2a2a2a;
+  --color-border-hover: #3a3a3a;
+  --color-text-primary: #f5f0e8;
+  --color-text-secondary: #a09882;
+  --color-text-muted: #6b6355;
+  --color-accent: #D4AF37;
+  --color-accent-hover: #E5C158;
+  --color-accent-muted: rgba(212, 175, 55, 0.15);
   --color-success: #22c55e;
   --color-success-muted: rgba(34, 197, 94, 0.15);
   --color-danger: #ef4444;
   --color-danger-muted: rgba(239, 68, 68, 0.15);
   --color-warning: #f59e0b;
   --color-warning-muted: rgba(245, 158, 11, 0.15);
-  --color-gold: #fbbf24;
+  --color-gold: #D4AF37;
 }
 
 body {
