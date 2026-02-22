@@ -59,7 +59,7 @@ const PSA_GRADES = [
 export default function AddAssetForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { currentPortfolio, isReadOnly } = usePortfolio();
+  const { currentPortfolio, portfolios, setCurrentPortfolio, loading: portfolioLoading, isReadOnly } = usePortfolio();
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null);
@@ -567,10 +567,31 @@ export default function AddAssetForm() {
                 />
               </div>
 
-              {!currentPortfolio && (
-                <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-xl text-warning text-sm">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                  No portfolio selected. Please select a portfolio from the sidebar.
+              {!currentPortfolio && !portfolioLoading && (
+                <div className="p-4 bg-warning/10 border border-warning/30 rounded-xl">
+                  <div className="flex items-center gap-2 text-warning text-sm mb-3">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    No portfolio selected.
+                  </div>
+                  {portfolios.length > 0 ? (
+                    <select
+                      onChange={(e) => {
+                        const p = portfolios.find((p) => p.id === e.target.value);
+                        if (p) setCurrentPortfolio(p);
+                      }}
+                      className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
+                      defaultValue=""
+                    >
+                      <option value="" disabled>Select a portfolio...</option>
+                      {portfolios.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-sm text-text-muted">
+                      No portfolios found. Please create one first.
+                    </p>
+                  )}
                 </div>
               )}
 
