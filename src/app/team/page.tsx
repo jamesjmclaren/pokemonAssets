@@ -181,7 +181,7 @@ export default function TeamPage() {
               <button
                 type="submit"
                 disabled={inviting || !inviteEmail.trim()}
-                className="px-6 py-2.5 bg-accent hover:bg-accent-hover disabled:bg-surface disabled:text-text-muted text-white rounded-xl font-medium transition-colors"
+                className="px-6 py-2.5 bg-accent hover:bg-accent-hover disabled:bg-surface disabled:text-text-muted text-black rounded-xl font-medium transition-colors"
               >
                 {inviting ? "Sending..." : "Send Invitation"}
               </button>

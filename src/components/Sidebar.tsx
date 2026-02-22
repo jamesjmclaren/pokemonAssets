@@ -58,11 +58,10 @@ export default function Sidebar() {
         >
           <Menu className="w-5 h-5" />
         </button>
-        <Link href="/dashboard" className="ml-3">
-          <h1 className="text-base font-bold text-text-primary tracking-tight">
-            N&C Assets
-          </h1>
+        <Link href="/dashboard" className="ml-3 flex items-center gap-2">
+          <img src="/logo.png" alt="West Investments Ltd" className="h-10 object-contain" />
         </Link>
+
       </div>
 
       {/* Overlay */}
@@ -85,11 +84,7 @@ export default function Sidebar() {
         {/* Logo */}
         <div className="p-6 border-b border-border flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div>
-              <h1 className="text-lg font-bold text-text-primary tracking-tight">
-                N&C Assets
-              </h1>
-            </div>
+            <img src="/logo.png" alt="West Investments Ltd" className="h-14 object-contain" />
           </Link>
           <button
             onClick={() => setOpen(false)}
@@ -126,44 +121,53 @@ export default function Sidebar() {
         </nav>
 
         {/* Portfolio Switcher */}
-        {isSignedIn && portfolios.length > 0 && (
+        {isSignedIn && (
           <div className="px-4 pb-4">
             <p className="text-xs text-text-muted mb-2 px-4">Portfolio</p>
-            <div className="relative">
-              <button
-                onClick={() => setPortfolioDropdownOpen(!portfolioDropdownOpen)}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-surface-hover text-sm text-text-primary hover:bg-border transition-colors"
+            {portfolios.length > 0 ? (
+              <div className="relative">
+                <button
+                  onClick={() => setPortfolioDropdownOpen(!portfolioDropdownOpen)}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-surface-hover text-sm text-text-primary hover:bg-border transition-colors"
+                >
+                  <span className="truncate">
+                    {currentPortfolio?.name || "Select Portfolio"}
+                  </span>
+                  <ChevronDown className={clsx("w-4 h-4 transition-transform", portfolioDropdownOpen && "rotate-180")} />
+                </button>
+                {portfolioDropdownOpen && (
+                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-border rounded-xl shadow-lg overflow-hidden z-10">
+                    {portfolios.map((portfolio) => (
+                      <button
+                        key={portfolio.id}
+                        onClick={() => {
+                          setCurrentPortfolio(portfolio as Portfolio);
+                          setPortfolioDropdownOpen(false);
+                        }}
+                        className={clsx(
+                          "w-full px-4 py-2.5 text-left text-sm hover:bg-surface-hover transition-colors",
+                          currentPortfolio?.id === portfolio.id
+                            ? "text-accent bg-accent/5"
+                            : "text-text-secondary"
+                        )}
+                      >
+                        {portfolio.name}
+                        {portfolio.role !== "owner" && (
+                          <span className="ml-2 text-xs text-text-muted">({portfolio.role})</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link
+                href="/onboarding"
+                className="block px-4 py-3 rounded-xl bg-surface-hover text-sm text-text-muted hover:text-text-primary hover:bg-border transition-colors text-center"
               >
-                <span className="truncate">
-                  {currentPortfolio?.name || "Select Portfolio"}
-                </span>
-                <ChevronDown className={clsx("w-4 h-4 transition-transform", portfolioDropdownOpen && "rotate-180")} />
-              </button>
-              {portfolioDropdownOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-border rounded-xl shadow-lg overflow-hidden z-10">
-                  {portfolios.map((portfolio) => (
-                    <button
-                      key={portfolio.id}
-                      onClick={() => {
-                        setCurrentPortfolio(portfolio as Portfolio);
-                        setPortfolioDropdownOpen(false);
-                      }}
-                      className={clsx(
-                        "w-full px-4 py-2.5 text-left text-sm hover:bg-surface-hover transition-colors",
-                        currentPortfolio?.id === portfolio.id
-                          ? "text-accent bg-accent/5"
-                          : "text-text-secondary"
-                      )}
-                    >
-                      {portfolio.name}
-                      {portfolio.role !== "owner" && (
-                        <span className="ml-2 text-xs text-text-muted">({portfolio.role})</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                Create a Portfolio
+              </Link>
+            )}
           </div>
         )}
 
@@ -177,7 +181,7 @@ export default function Sidebar() {
           ) : (
             <Link
               href="/sign-in"
-              className="block px-4 py-3 rounded-xl bg-accent text-white text-center text-sm font-medium hover:bg-accent-hover"
+              className="block px-4 py-3 rounded-xl bg-accent text-black text-center text-sm font-medium hover:bg-accent-hover"
             >
               Sign In
             </Link>

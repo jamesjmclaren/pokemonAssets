@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { clsx } from "clsx";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
 import { formatCurrency, formatPercentage } from "@/lib/format";
 import type { PortfolioAsset } from "@/types";
 
@@ -12,12 +12,19 @@ interface AssetCardProps {
 }
 
 export default function AssetCard({ asset }: AssetCardProps) {
+  const qty = asset.quantity || 1;
   const currentPrice = asset.current_price ?? asset.purchase_price;
-  const profit = currentPrice - asset.purchase_price;
+  const totalValue = currentPrice * qty;
+  const totalInvested = asset.purchase_price * qty;
+  const profit = totalValue - totalInvested;
   const profitPercent =
-    asset.purchase_price > 0 ? (profit / asset.purchase_price) * 100 : 0;
+    totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
 
   const imageUrl = asset.custom_image_url || asset.image_url;
+
+  const stale = asset.manual_price && asset.price_updated_at
+    ? Date.now() - new Date(asset.price_updated_at).getTime() > 30 * 24 * 60 * 60 * 1000
+    : asset.manual_price && !asset.price_updated_at;
 
   return (
     <Link href={`/asset/${asset.id}`}>
@@ -39,8 +46,8 @@ export default function AssetCard({ asset }: AssetCardProps) {
                 <div className="text-text-muted text-xs md:text-sm">No Image</div>
               </div>
             )}
-            {/* Type badge - hidden on mobile row, shown on desktop */}
-            <div className="absolute top-2 left-2 hidden md:block">
+            {/* Badges - hidden on mobile row, shown on desktop */}
+            <div className="absolute top-2 left-2 hidden md:flex gap-1">
               <span
                 className={clsx(
                   "px-2 py-1 rounded-lg text-xs font-semibold",
@@ -51,7 +58,24 @@ export default function AssetCard({ asset }: AssetCardProps) {
               >
                 {asset.asset_type === "card" ? "Card" : "Sealed"}
               </span>
+              {asset.psa_grade && (
+                <span className="px-2 py-1 rounded-lg text-xs font-semibold bg-gold/20 text-gold">
+                  {asset.psa_grade}
+                </span>
+              )}
             </div>
+            {qty > 1 && (
+              <div className="absolute top-2 right-2 hidden md:block">
+                <span className="px-2 py-1 rounded-lg text-xs font-bold bg-surface/80 text-text-primary backdrop-blur-sm">
+                  x{qty}
+                </span>
+              </div>
+            )}
+            {stale && (
+              <div className="absolute bottom-2 right-2 hidden md:block">
+                <AlertTriangle className="w-4 h-4 text-warning" />
+              </div>
+            )}
           </div>
 
           {/* Info */}
@@ -65,24 +89,33 @@ export default function AssetCard({ asset }: AssetCardProps) {
                   {asset.set_name}
                 </p>
               </div>
-              {/* Mobile type badge */}
-              <span
-                className={clsx(
-                  "md:hidden px-1.5 py-0.5 rounded text-[10px] font-semibold flex-shrink-0",
-                  asset.asset_type === "card"
-                    ? "bg-accent-muted text-accent-hover"
-                    : "bg-warning-muted text-warning"
+              {/* Mobile badges */}
+              <div className="md:hidden flex gap-1 flex-shrink-0">
+                <span
+                  className={clsx(
+                    "px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                    asset.asset_type === "card"
+                      ? "bg-accent-muted text-accent-hover"
+                      : "bg-warning-muted text-warning"
+                  )}
+                >
+                  {asset.asset_type === "card" ? "Card" : "Sealed"}
+                </span>
+                {qty > 1 && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-hover text-text-secondary">
+                    x{qty}
+                  </span>
                 )}
-              >
-                {asset.asset_type === "card" ? "Card" : "Sealed"}
-              </span>
+              </div>
             </div>
 
             <div className="flex items-end justify-between mt-2 md:mt-3">
               <div>
-                <p className="text-[10px] md:text-xs text-text-muted">Current Value</p>
+                <p className="text-[10px] md:text-xs text-text-muted">
+                  {qty > 1 ? "Total Value" : "Current Value"}
+                </p>
                 <p className="text-sm md:text-lg font-bold text-text-primary">
-                  {formatCurrency(currentPrice)}
+                  {formatCurrency(totalValue)}
                 </p>
               </div>
               <div
@@ -106,7 +139,7 @@ export default function AssetCard({ asset }: AssetCardProps) {
 
             <div className="flex items-center justify-between mt-1.5 md:mt-2 pt-1.5 md:pt-2 border-t border-border">
               <span className="text-[10px] md:text-xs text-text-muted">
-                Paid {formatCurrency(asset.purchase_price)}
+                Invested {formatCurrency(totalInvested)}
               </span>
               <span
                 className={clsx(

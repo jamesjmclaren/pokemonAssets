@@ -93,6 +93,9 @@ export async function POST(request: NextRequest) {
       current_price,
       rarity,
       card_number,
+      psa_grade,
+      manual_price,
+      quantity,
     } = body;
 
     if (!portfolio_id || !external_id || !name || !purchase_price || !purchase_date) {
@@ -149,6 +152,9 @@ export async function POST(request: NextRequest) {
         price_updated_at: current_price ? new Date().toISOString() : null,
         rarity: rarity || null,
         card_number: card_number || null,
+        psa_grade: psa_grade || null,
+        manual_price: manual_price || false,
+        quantity: quantity ? parseInt(quantity) : 1,
       })
       .select()
       .single();
@@ -159,6 +165,47 @@ export async function POST(request: NextRequest) {
     console.error("Asset creation error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create asset" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { id, current_price, manual_price, quantity, psa_grade } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "Asset ID is required" }, { status: 400 });
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (current_price !== undefined) {
+      updates.current_price = current_price ? parseFloat(current_price) : null;
+      updates.price_updated_at = new Date().toISOString();
+    }
+    if (manual_price !== undefined) updates.manual_price = manual_price;
+    if (quantity !== undefined) updates.quantity = parseInt(quantity);
+    if (psa_grade !== undefined) updates.psa_grade = psa_grade || null;
+
+    const { data, error } = await supabase
+      .from("assets")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("Asset update error:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to update asset" },
       { status: 500 }
     );
   }

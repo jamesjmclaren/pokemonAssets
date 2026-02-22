@@ -59,15 +59,15 @@ export default function PortfolioChart({ data, className = "" }: PortfolioChartP
         <AreaChart data={data}>
           <defs>
             <linearGradient id="valueGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+              <stop offset="0%" stopColor="#D4AF37" stopOpacity={0.3} />
+              <stop offset="100%" stopColor="#D4AF37" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="investedGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#9090a8" stopOpacity={0.1} />
               <stop offset="100%" stopColor="#9090a8" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
           <XAxis
             dataKey="date"
             tickFormatter={formatDateShort}
@@ -86,8 +86,8 @@ export default function PortfolioChart({ data, className = "" }: PortfolioChartP
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#1e1e2a",
-              border: "1px solid #2a2a3a",
+              backgroundColor: "#1e1e1e",
+              border: "1px solid #2a2a2a",
               borderRadius: "12px",
               padding: "12px",
             }}
@@ -109,7 +109,7 @@ export default function PortfolioChart({ data, className = "" }: PortfolioChartP
           <Area
             type="monotone"
             dataKey="value"
-            stroke="#6366f1"
+            stroke="#D4AF37"
             strokeWidth={2}
             fill="url(#valueGradient)"
           />

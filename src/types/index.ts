@@ -66,6 +66,9 @@ export interface PortfolioAsset {
   updated_at: string;
   rarity?: string;
   card_number?: string;
+  psa_grade?: string | null;
+  manual_price?: boolean;
+  quantity?: number;
 }
 
 export interface PortfolioSummary {
