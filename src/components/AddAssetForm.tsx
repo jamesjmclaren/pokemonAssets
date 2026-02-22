@@ -567,9 +567,16 @@ export default function AddAssetForm() {
                 />
               </div>
 
+              {!currentPortfolio && (
+                <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-xl text-warning text-sm">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  No portfolio selected. Please select a portfolio from the sidebar.
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={!selectedCard || !form.purchasePrice || submitting}
+                disabled={!selectedCard || !form.purchasePrice || !currentPortfolio || submitting}
                 className="w-full py-4 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-xl flex items-center justify-center gap-2"
               >
                 {submitting ? (
