@@ -59,7 +59,10 @@ export default function Sidebar() {
           <Menu className="w-5 h-5" />
         </button>
         <Link href="/dashboard" className="ml-3 flex items-center gap-2">
-          <img src="/logo.png" alt="West Investments Ltd" className="w-7 h-7 object-contain" />
+          <svg viewBox="0 0 36 36" className="w-7 h-7 flex-shrink-0" aria-label="West Investments Ltd">
+              <rect width="36" height="36" rx="8" fill="#D4AF37" />
+              <text x="18" y="26" textAnchor="middle" fill="#1a1a2e" fontSize="22" fontWeight="bold" fontFamily="system-ui, sans-serif">W</text>
+            </svg>
           <h1 className="text-base font-bold text-gold tracking-tight">
             West Investments
           </h1>
@@ -86,11 +89,10 @@ export default function Sidebar() {
         {/* Logo */}
         <div className="p-6 border-b border-border flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="West Investments Ltd"
-              className="w-9 h-9 object-contain"
-            />
+            <svg viewBox="0 0 36 36" className="w-9 h-9 flex-shrink-0" aria-label="West Investments Ltd">
+              <rect width="36" height="36" rx="8" fill="#D4AF37" />
+              <text x="18" y="26" textAnchor="middle" fill="#1a1a2e" fontSize="22" fontWeight="bold" fontFamily="system-ui, sans-serif">W</text>
+            </svg>
             <div>
               <h1 className="text-base font-bold text-gold tracking-tight leading-tight">
                 West Investments
