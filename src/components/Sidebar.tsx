@@ -59,10 +59,7 @@ export default function Sidebar() {
           <Menu className="w-5 h-5" />
         </button>
         <Link href="/dashboard" className="ml-3 flex items-center gap-2">
-          <img src="/logo.png" alt="West Investments Ltd" className="w-7 h-7 object-contain" />
-          <h1 className="text-base font-bold text-gold tracking-tight">
-            West Investments
-          </h1>
+          <img src="/logo.png" alt="West Investments Ltd" className="h-8 object-contain" />
         </Link>
       </div>
 
@@ -86,15 +83,7 @@ export default function Sidebar() {
         {/* Logo */}
         <div className="p-6 border-b border-border flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <img src="/logo.png" alt="West Investments Ltd" className="w-9 h-9 object-contain" />
-            <div>
-              <h1 className="text-base font-bold text-gold tracking-tight leading-tight">
-                West Investments
-              </h1>
-              <p className="text-[10px] text-text-muted tracking-widest uppercase">
-                Ltd
-              </p>
-            </div>
+            <img src="/logo.png" alt="West Investments Ltd" className="h-10 object-contain" />
           </Link>
           <button
             onClick={() => setOpen(false)}
