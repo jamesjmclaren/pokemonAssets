@@ -165,6 +165,8 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
+    if (error) throw error;
+
     // Record the initial price snapshot if we have a price
     if (data && data.current_price != null) {
       await supabase.from("price_snapshots").insert({
@@ -174,7 +176,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (error) throw error;
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
     console.error("Asset creation error:", error);
