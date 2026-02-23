@@ -142,7 +142,8 @@ export default function AssetDetailPage({
   const profit = totalValue - totalInvested;
   const profitPercent =
     totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
-  const imageUrl = asset.custom_image_url || asset.image_url;
+  const [imgSrc, setImgSrc] = useState(asset.custom_image_url || asset.image_url);
+  const imageUrl = imgSrc;
   const stale = isPriceStale(asset);
 
   return (
@@ -179,6 +180,13 @@ export default function AssetDetailPage({
                   fill
                   className="object-contain p-3 md:p-4"
                   sizes="(max-width: 768px) 280px, 400px"
+                  onError={() => {
+                    if (asset.custom_image_url && asset.image_url && imgSrc !== asset.image_url) {
+                      setImgSrc(asset.image_url);
+                    } else {
+                      setImgSrc(null);
+                    }
+                  }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-text-muted">

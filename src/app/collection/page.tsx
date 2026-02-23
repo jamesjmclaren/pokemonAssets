@@ -361,6 +361,14 @@ export default function CollectionPage() {
                                 src={asset.custom_image_url || asset.image_url || ""}
                                 alt=""
                                 className="w-full h-full object-contain p-0.5"
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  if (asset.custom_image_url && asset.image_url && target.src !== asset.image_url) {
+                                    target.src = asset.image_url;
+                                  } else {
+                                    target.style.display = "none";
+                                  }
+                                }}
                               />
                             )}
                           </div>
@@ -563,6 +571,14 @@ export default function CollectionPage() {
                         src={asset.custom_image_url || asset.image_url || ""}
                         alt=""
                         className="w-full h-full object-contain p-0.5"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (asset.custom_image_url && asset.image_url && target.src !== asset.image_url) {
+                            target.src = asset.image_url;
+                          } else {
+                            target.style.display = "none";
+                          }
+                        }}
                       />
                     )}
                   </div>

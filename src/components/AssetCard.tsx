@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { clsx } from "clsx";
@@ -20,7 +21,17 @@ export default function AssetCard({ asset }: AssetCardProps) {
   const profitPercent =
     totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
 
-  const imageUrl = asset.custom_image_url || asset.image_url;
+  const [imgSrc, setImgSrc] = useState(asset.custom_image_url || asset.image_url);
+
+  const handleImageError = () => {
+    if (asset.custom_image_url && asset.image_url && imgSrc !== asset.image_url) {
+      setImgSrc(asset.image_url);
+    } else {
+      setImgSrc(null);
+    }
+  };
+
+  const imageUrl = imgSrc;
 
   const stale = !asset.price_updated_at
     || Date.now() - new Date(asset.price_updated_at).getTime() > 30 * 24 * 60 * 60 * 1000;
@@ -39,6 +50,7 @@ export default function AssetCard({ asset }: AssetCardProps) {
                 fill
                 className="object-contain p-2 md:p-3 group-hover:scale-105 transition-transform duration-300"
                 sizes="(max-width: 768px) 96px, (max-width: 1200px) 33vw, 25vw"
+                onError={handleImageError}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">

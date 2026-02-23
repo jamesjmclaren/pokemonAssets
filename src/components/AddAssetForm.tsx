@@ -177,12 +177,14 @@ export default function AddAssetForm() {
           .from("asset-images")
           .upload(fileName, customImage);
 
-        if (!uploadError) {
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from("asset-images").getPublicUrl(fileName);
-          customImageUrl = publicUrl;
+        if (uploadError) {
+          throw new Error("Failed to upload image. Please try again.");
         }
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("asset-images").getPublicUrl(fileName);
+        customImageUrl = publicUrl;
       }
 
       const currentPrice = form.manualPrice && form.manualPriceValue
