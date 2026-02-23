@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { clsx } from "clsx";
 import { TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
-import { formatCurrency, formatPercentage } from "@/lib/format";
+import { formatCurrency, formatPercentage, fixStorageUrl } from "@/lib/format";
 import type { PortfolioAsset } from "@/types";
 
 interface AssetCardProps {
@@ -21,7 +21,7 @@ export default function AssetCard({ asset }: AssetCardProps) {
   const profitPercent =
     totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
 
-  const [imgSrc, setImgSrc] = useState(asset.custom_image_url || asset.image_url);
+  const [imgSrc, setImgSrc] = useState(fixStorageUrl(asset.custom_image_url) || asset.image_url);
 
   const handleImageError = () => {
     if (asset.custom_image_url && asset.image_url && imgSrc !== asset.image_url) {

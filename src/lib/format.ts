@@ -42,6 +42,18 @@ export function getProfitBgColor(profit: number): string {
 }
 
 /**
+ * Fix Supabase storage URLs that are missing the /public/ segment.
+ * e.g. /storage/v1/object/asset-images/... → /storage/v1/object/public/asset-images/...
+ */
+export function fixStorageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.includes("/storage/v1/object/") && !url.includes("/storage/v1/object/public/")) {
+    return url.replace("/storage/v1/object/", "/storage/v1/object/public/");
+  }
+  return url;
+}
+
+/**
  * Extract a market price from a card object.
  * Handles multiple API formats including Pokemon TCG API (RapidAPI).
  */

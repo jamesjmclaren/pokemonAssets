@@ -25,7 +25,7 @@ import {
   PenLine,
 } from "lucide-react";
 import PriceChart from "@/components/PriceChart";
-import { formatCurrency, formatPercentage, formatDate } from "@/lib/format";
+import { formatCurrency, formatPercentage, formatDate, fixStorageUrl } from "@/lib/format";
 import { clsx } from "clsx";
 import type { PortfolioAsset } from "@/types";
 
@@ -48,6 +48,7 @@ export default function AssetDetailPage({
   const [editingPrice, setEditingPrice] = useState(false);
   const [newPrice, setNewPrice] = useState("");
   const [saving, setSaving] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchAsset() {
@@ -57,6 +58,9 @@ export default function AssetDetailPage({
         const data: PortfolioAsset[] = await res.json();
         const found = data.find((a) => a.id === id);
         setAsset(found || null);
+        if (found) {
+          setImgSrc(fixStorageUrl(found.custom_image_url) || found.image_url);
+        }
       } catch (error) {
         console.error("Error fetching asset:", error);
       } finally {
@@ -142,7 +146,6 @@ export default function AssetDetailPage({
   const profit = totalValue - totalInvested;
   const profitPercent =
     totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
-  const [imgSrc, setImgSrc] = useState(asset.custom_image_url || asset.image_url);
   const imageUrl = imgSrc;
   const stale = isPriceStale(asset);
 

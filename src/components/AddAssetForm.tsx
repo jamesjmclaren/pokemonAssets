@@ -13,7 +13,7 @@ import {
   AlertTriangle,
   PenLine,
 } from "lucide-react";
-import { formatCurrency, extractCardPrice } from "@/lib/format";
+import { formatCurrency, extractCardPrice, fixStorageUrl } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import { usePortfolio } from "@/lib/portfolio-context";
 import SearchModal from "./SearchModal";
@@ -178,13 +178,13 @@ export default function AddAssetForm() {
           .upload(fileName, customImage);
 
         if (uploadError) {
-          throw new Error("Failed to upload image. Please try again.");
+          throw new Error(`Failed to upload image: ${uploadError.message}`);
         }
 
         const {
           data: { publicUrl },
         } = supabase.storage.from("asset-images").getPublicUrl(fileName);
-        customImageUrl = publicUrl;
+        customImageUrl = fixStorageUrl(publicUrl);
       }
 
       const currentPrice = form.manualPrice && form.manualPriceValue

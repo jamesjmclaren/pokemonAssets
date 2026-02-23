@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import AssetCard from "@/components/AssetCard";
 import MiniSparkline from "@/components/MiniSparkline";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, fixStorageUrl } from "@/lib/format";
 import type { PortfolioAsset } from "@/types";
 
 type SortField = "name" | "purchase_price" | "current_price" | "profit" | "purchase_date" | "performance";
@@ -358,7 +358,7 @@ export default function CollectionPage() {
                           <div className="w-10 h-10 bg-background rounded-lg overflow-hidden flex-shrink-0 relative">
                             {(asset.custom_image_url || asset.image_url) && (
                               <img
-                                src={asset.custom_image_url || asset.image_url || ""}
+                                src={fixStorageUrl(asset.custom_image_url) || asset.image_url || ""}
                                 alt=""
                                 className="w-full h-full object-contain p-0.5"
                                 onError={(e) => {
@@ -568,7 +568,7 @@ export default function CollectionPage() {
                   <div className="w-10 h-10 bg-background rounded-lg overflow-hidden flex-shrink-0 relative">
                     {(asset.custom_image_url || asset.image_url) && (
                       <img
-                        src={asset.custom_image_url || asset.image_url || ""}
+                        src={fixStorageUrl(asset.custom_image_url) || asset.image_url || ""}
                         alt=""
                         className="w-full h-full object-contain p-0.5"
                         onError={(e) => {
