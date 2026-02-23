@@ -69,6 +69,9 @@ export interface PortfolioAsset {
   psa_grade?: string | null;
   manual_price?: boolean;
   quantity?: number;
+  language?: string;
+  storage_location?: string;
+  is_manual_submission?: boolean;
 }
 
 export interface PortfolioSummary {

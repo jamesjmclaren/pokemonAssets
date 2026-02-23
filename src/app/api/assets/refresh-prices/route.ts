@@ -95,15 +95,52 @@ export async function POST() {
           })
           .eq("id", asset.id);
 
-        if (!updateError) updated++;
+        if (!updateError) {
+          updated++;
+
+          // Record a price snapshot for pricing history
+          await supabase.from("price_snapshots").insert({
+            asset_id: asset.id,
+            price: marketPrice,
+            source: asset.asset_type === "sealed" ? "pokemonpricetracker" : "tcgplayer",
+          });
+        }
       } catch (e) {
         console.error(`Failed to refresh price for ${asset.name}:`, e);
+      }
+    }
+
+    // Record daily price snapshots for ALL assets that have a current price
+    // This builds pricing history even when the price hasn't changed
+    const assetsWithPrices = assets.filter((a) => !staleAssets.some((s) => s.id === a.id));
+    let snapshotsRecorded = 0;
+
+    for (const asset of assetsWithPrices) {
+      try {
+        // Fetch the current_price for this asset
+        const { data: fullAsset } = await supabase
+          .from("assets")
+          .select("current_price")
+          .eq("id", asset.id)
+          .single();
+
+        if (fullAsset?.current_price != null) {
+          const { error: snapError } = await supabase.from("price_snapshots").insert({
+            asset_id: asset.id,
+            price: fullAsset.current_price,
+            source: asset.manual_price ? "manual" : (asset.asset_type === "sealed" ? "pokemonpricetracker" : "tcgplayer"),
+          });
+          if (!snapError) snapshotsRecorded++;
+        }
+      } catch {
+        // Don't fail the whole operation for a snapshot error
       }
     }
 
     return NextResponse.json({
       updated,
       skipped: assets.length - staleAssets.length,
+      snapshots_recorded: snapshotsRecorded + updated,
     });
   } catch (error) {
     console.error("Price refresh error:", error);

@@ -20,6 +20,9 @@ import {
   Save,
   Package,
   Shield,
+  Globe,
+  Archive,
+  PenLine,
 } from "lucide-react";
 import PriceChart from "@/components/PriceChart";
 import { formatCurrency, formatPercentage, formatDate } from "@/lib/format";
@@ -27,7 +30,6 @@ import { clsx } from "clsx";
 import type { PortfolioAsset } from "@/types";
 
 function isPriceStale(asset: PortfolioAsset): boolean {
-  if (!asset.manual_price) return false;
   if (!asset.price_updated_at) return true;
   const thirtyDays = 30 * 24 * 60 * 60 * 1000;
   return Date.now() - new Date(asset.price_updated_at).getTime() > thirtyDays;
@@ -93,6 +95,7 @@ export default function AssetDetailPage({
         body: JSON.stringify({
           id: asset.id,
           current_price: newPrice,
+          manual_price: true,
         }),
       });
       if (!res.ok) throw new Error("Failed to update");
@@ -247,6 +250,24 @@ export default function AssetDetailPage({
                   </div>
                 </div>
               )}
+              {asset.language && asset.language !== "English" && (
+                <div className="flex items-center gap-3">
+                  <Globe className="w-4 h-4 text-text-muted flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-text-muted">Language</p>
+                    <p className="text-sm text-text-primary">{asset.language}</p>
+                  </div>
+                </div>
+              )}
+              {asset.storage_location && (
+                <div className="flex items-center gap-3">
+                  <Archive className="w-4 h-4 text-text-muted flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-text-muted">Physical Location</p>
+                    <p className="text-sm text-text-primary">{asset.storage_location}</p>
+                  </div>
+                </div>
+              )}
               {asset.notes && (
                 <div className="pt-3 border-t border-border">
                   <p className="text-xs text-text-muted mb-1">Notes</p>
@@ -298,10 +319,20 @@ export default function AssetDetailPage({
 
             {/* Stale price warning */}
             {stale && (
-              <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-warning-muted rounded-xl">
-                <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0" />
+              <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-danger/10 border border-danger/30 rounded-xl">
+                <AlertTriangle className="w-4 h-4 text-danger flex-shrink-0" />
+                <p className="text-xs text-danger">
+                  Market price has not been updated in over 30 days. Please update the price to keep your portfolio accurate.
+                </p>
+              </div>
+            )}
+
+            {/* Manual submission badge */}
+            {asset.is_manual_submission && (
+              <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-warning/10 border border-warning/30 rounded-xl">
+                <PenLine className="w-4 h-4 text-warning flex-shrink-0" />
                 <p className="text-xs text-warning">
-                  Market price has not been updated in over 30 days. Please update manually.
+                  This is a manual submission. Prices will not auto-refresh from the API.
                 </p>
               </div>
             )}
@@ -313,20 +344,19 @@ export default function AssetDetailPage({
                   Market Price {asset.manual_price && "(Manual)"}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
-                  <p className="text-base md:text-xl font-bold text-text-primary">
+                  <p className={clsx("text-base md:text-xl font-bold", stale ? "text-danger" : "text-text-primary")}>
                     {formatCurrency(currentPrice)}
                   </p>
-                  {asset.manual_price && (
-                    <button
-                      onClick={() => {
-                        setNewPrice(String(currentPrice));
-                        setEditingPrice(true);
-                      }}
-                      className="p-1 rounded-lg text-text-muted hover:text-gold hover:bg-gold/10"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      setNewPrice(String(currentPrice));
+                      setEditingPrice(true);
+                    }}
+                    className="p-1 rounded-lg text-text-muted hover:text-gold hover:bg-gold/10"
+                    title="Override market price"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
               <div>

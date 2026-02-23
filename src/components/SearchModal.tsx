@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Image from "next/image";
-import { Search, X, Loader2, Package, CreditCard } from "lucide-react";
+import { Search, X, Loader2, Package, CreditCard, PlusCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 
 interface SearchResult {
@@ -29,12 +29,14 @@ interface SearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (card: SearchResult) => void;
+  onManualEntry?: (query: string) => void;
 }
 
 export default function SearchModal({
   isOpen,
   onClose,
   onSelect,
+  onManualEntry,
 }: SearchModalProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -129,11 +131,40 @@ export default function SearchModal({
           )}
 
           {searched && !loading && results.length === 0 && (
-            <div className="flex items-center justify-center py-16">
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
               <p className="text-text-muted text-sm">
                 No results found for &ldquo;{query}&rdquo;
               </p>
+              {onManualEntry && (
+                <button
+                  onClick={() => onManualEntry(query)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-warning-muted border border-warning/30 text-warning hover:bg-warning/20 rounded-xl text-sm font-medium"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  Add &ldquo;{query}&rdquo; manually
+                </button>
+              )}
             </div>
+          )}
+
+          {/* Manual entry option at top when results exist */}
+          {searched && !loading && results.length > 0 && onManualEntry && (
+            <button
+              onClick={() => onManualEntry(query)}
+              className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-surface-hover text-left border border-dashed border-border mb-1"
+            >
+              <div className="w-14 h-20 bg-warning/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                <PlusCircle className="w-6 h-6 text-warning" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-warning">
+                  Can&apos;t find your card?
+                </p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Add it manually with your own title and photo
+                </p>
+              </div>
+            </button>
           )}
 
           {results.map((item) => {

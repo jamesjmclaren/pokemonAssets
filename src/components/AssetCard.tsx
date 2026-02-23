@@ -22,9 +22,8 @@ export default function AssetCard({ asset }: AssetCardProps) {
 
   const imageUrl = asset.custom_image_url || asset.image_url;
 
-  const stale = asset.manual_price && asset.price_updated_at
-    ? Date.now() - new Date(asset.price_updated_at).getTime() > 30 * 24 * 60 * 60 * 1000
-    : asset.manual_price && !asset.price_updated_at;
+  const stale = !asset.price_updated_at
+    || Date.now() - new Date(asset.price_updated_at).getTime() > 30 * 24 * 60 * 60 * 1000;
 
   return (
     <Link href={`/asset/${asset.id}`}>
@@ -73,7 +72,7 @@ export default function AssetCard({ asset }: AssetCardProps) {
             )}
             {stale && (
               <div className="absolute bottom-2 right-2 hidden md:block">
-                <AlertTriangle className="w-4 h-4 text-warning" />
+                <AlertTriangle className="w-4 h-4 text-danger" />
               </div>
             )}
           </div>
