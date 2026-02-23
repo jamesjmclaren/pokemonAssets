@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchCards } from "@/lib/pokemon-tcg-api";
+import { searchWithGradedPrices } from "@/lib/pricecharting";
 
 /**
- * Strip card-number suffixes and smart quotes so the RapidAPI search
- * matches on card name only.
+ * Strip card-number suffixes and smart quotes for better search matching.
  */
 function sanitizeCardName(raw: string): string {
   return raw
@@ -28,24 +27,23 @@ export async function GET(request: NextRequest) {
   const cleanQuery = sanitizeCardName(query);
 
   try {
-    const cards = await searchCards(cleanQuery, 10);
+    const cards = await searchWithGradedPrices(cleanQuery, 5);
 
-    // Return all candidates so the user can pick the right one
     const candidates = cards.map((c) => ({
       id: c.id,
       name: c.name,
-      number: c.number,
       setName: c.setName,
-      setCode: c.setCode,
-      rarity: c.rarity,
-      imageUrl: c.imageUrl,
-      currency: c.currency,
+      url: c.url,
+      currency: "USD",
       prices: {
-        raw: c.prices.raw,
+        raw: c.prices.ungraded,
         psa10: c.prices.psa10,
-        psa9: c.prices.psa9,
-        cgc10: c.prices.cgc10,
-        bgs10: c.prices.bgs10,
+        psa9: c.prices.grade9,
+        grade95: c.prices.grade95,
+        grade8: c.prices.grade8,
+        grade7: c.prices.grade7,
+        cgc10: undefined,
+        bgs10: undefined,
       },
     }));
 
@@ -53,7 +51,12 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Graded price API error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch graded prices" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch graded prices",
+      },
       { status: 500 }
     );
   }

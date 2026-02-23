@@ -92,16 +92,16 @@ export default function AddAssetForm() {
   interface GradedCandidate {
     id: string;
     name: string;
-    number?: string;
     setName: string;
-    setCode?: string;
-    rarity?: string;
-    imageUrl?: string;
+    url?: string;
     currency: string;
     prices: {
       raw?: number;
       psa10?: number;
       psa9?: number;
+      grade95?: number;
+      grade8?: number;
+      grade7?: number;
       cgc10?: number;
       bgs10?: number;
     };
@@ -174,11 +174,14 @@ export default function AddAssetForm() {
     setSelectedGradedCard(candidate);
     const g = form.psaGrade.toLowerCase();
     let price: number | undefined;
-    if (g.includes("psa 10")) price = candidate.prices.psa10;
-    else if (g.includes("psa 9")) price = candidate.prices.psa9;
-    else if (g.includes("psa")) price = candidate.prices.psa9;
-    else if (g.includes("cgc")) price = candidate.prices.cgc10;
-    else if (g.includes("bgs")) price = candidate.prices.bgs10;
+
+    // Match grade to PriceCharting fields
+    if (g.includes("10")) price = candidate.prices.psa10; // PSA 10, CGC 10, BGS 10
+    else if (g.includes("9.5")) price = candidate.prices.grade95;
+    else if (g.includes("9")) price = candidate.prices.psa9; // PSA 9, CGC 9, BGS 9
+    else if (g.includes("8")) price = candidate.prices.grade8;
+    else if (g.includes("7")) price = candidate.prices.grade7;
+    else price = candidate.prices.psa9; // fallback to grade 9
 
     if (price != null) {
       setForm((f) => ({
@@ -628,7 +631,7 @@ export default function AddAssetForm() {
                           <div className="max-h-64 overflow-y-auto space-y-1 border border-border rounded-xl p-2 bg-surface">
                             {gradedCandidates.map((candidate) => {
                               const isSelected = selectedGradedCard?.id === candidate.id;
-                              const hasGraded = candidate.prices.psa10 || candidate.prices.psa9 || candidate.prices.cgc10 || candidate.prices.bgs10;
+                              const hasGraded = candidate.prices.psa10 || candidate.prices.psa9;
                               return (
                                 <button
                                   key={candidate.id}
@@ -640,50 +643,28 @@ export default function AddAssetForm() {
                                       : "hover:bg-surface-hover border border-transparent"
                                   }`}
                                 >
-                                  <div className="w-10 h-14 bg-background rounded-md overflow-hidden flex-shrink-0 relative">
-                                    {candidate.imageUrl ? (
-                                      <Image
-                                        src={candidate.imageUrl}
-                                        alt={candidate.name}
-                                        fill
-                                        className="object-contain p-0.5"
-                                        sizes="40px"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center text-text-muted">
-                                        <Search className="w-3 h-3" />
-                                      </div>
-                                    )}
-                                  </div>
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs font-semibold text-text-primary truncate">
                                       {candidate.name}
-                                      {candidate.number ? ` #${candidate.number}` : ""}
                                     </p>
                                     <p className="text-[10px] text-text-muted truncate">
                                       {candidate.setName}
-                                      {candidate.rarity ? ` · ${candidate.rarity}` : ""}
                                     </p>
                                     {hasGraded ? (
-                                      <div className="flex gap-2 mt-0.5 flex-wrap">
-                                        {candidate.prices.psa10 != null && (
-                                          <span className="text-[10px] text-amber-400">
-                                            PSA 10: {formatCurrency(candidate.prices.psa10)}
+                                      <div className="flex gap-3 mt-1 flex-wrap">
+                                        {candidate.prices.raw != null && (
+                                          <span className="text-[10px] text-text-muted">
+                                            Ungraded: {formatCurrency(candidate.prices.raw)}
                                           </span>
                                         )}
                                         {candidate.prices.psa9 != null && (
                                           <span className="text-[10px] text-amber-400/70">
-                                            PSA 9: {formatCurrency(candidate.prices.psa9)}
+                                            Grade 9: {formatCurrency(candidate.prices.psa9)}
                                           </span>
                                         )}
-                                        {candidate.prices.cgc10 != null && (
-                                          <span className="text-[10px] text-blue-400">
-                                            CGC 10: {formatCurrency(candidate.prices.cgc10)}
-                                          </span>
-                                        )}
-                                        {candidate.prices.bgs10 != null && (
-                                          <span className="text-[10px] text-purple-400">
-                                            BGS 10: {formatCurrency(candidate.prices.bgs10)}
+                                        {candidate.prices.psa10 != null && (
+                                          <span className="text-[10px] text-amber-400">
+                                            PSA 10: {formatCurrency(candidate.prices.psa10)}
                                           </span>
                                         )}
                                       </div>
@@ -710,7 +691,27 @@ export default function AddAssetForm() {
                               <div className="flex gap-3 flex-wrap">
                                 {selectedGradedCard.prices.raw != null && (
                                   <span className="text-xs text-text-muted">
-                                    Raw: {formatCurrency(selectedGradedCard.prices.raw)}
+                                    Ungraded: {formatCurrency(selectedGradedCard.prices.raw)}
+                                  </span>
+                                )}
+                                {selectedGradedCard.prices.grade7 != null && (
+                                  <span className="text-xs text-text-secondary">
+                                    Grade 7: {formatCurrency(selectedGradedCard.prices.grade7)}
+                                  </span>
+                                )}
+                                {selectedGradedCard.prices.grade8 != null && (
+                                  <span className="text-xs text-text-secondary">
+                                    Grade 8: {formatCurrency(selectedGradedCard.prices.grade8)}
+                                  </span>
+                                )}
+                                {selectedGradedCard.prices.psa9 != null && (
+                                  <span className="text-xs text-amber-400/70">
+                                    Grade 9: {formatCurrency(selectedGradedCard.prices.psa9)}
+                                  </span>
+                                )}
+                                {selectedGradedCard.prices.grade95 != null && (
+                                  <span className="text-xs text-amber-400/80">
+                                    Grade 9.5: {formatCurrency(selectedGradedCard.prices.grade95)}
                                   </span>
                                 )}
                                 {selectedGradedCard.prices.psa10 != null && (
@@ -718,24 +719,9 @@ export default function AddAssetForm() {
                                     PSA 10: {formatCurrency(selectedGradedCard.prices.psa10)}
                                   </span>
                                 )}
-                                {selectedGradedCard.prices.psa9 != null && (
-                                  <span className="text-xs text-amber-400/70">
-                                    PSA 9: {formatCurrency(selectedGradedCard.prices.psa9)}
-                                  </span>
-                                )}
-                                {selectedGradedCard.prices.cgc10 != null && (
-                                  <span className="text-xs text-blue-400">
-                                    CGC 10: {formatCurrency(selectedGradedCard.prices.cgc10)}
-                                  </span>
-                                )}
-                                {selectedGradedCard.prices.bgs10 != null && (
-                                  <span className="text-xs text-purple-400">
-                                    BGS 10: {formatCurrency(selectedGradedCard.prices.bgs10)}
-                                  </span>
-                                )}
                               </div>
                               <p className="text-[10px] text-text-muted mt-1">
-                                Prices from Cardmarket ({selectedGradedCard.currency})
+                                Prices from PriceCharting (eBay sold data, USD)
                               </p>
                             </div>
                           )}
