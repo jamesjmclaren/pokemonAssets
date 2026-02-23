@@ -2,14 +2,31 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { searchCards, searchSealedProducts } from "@/lib/pokemon-api";
 import { extractCardPrice } from "@/lib/format";
+import { searchWithGradedPrices } from "@/lib/pricecharting";
 
 const STALE_HOURS = 24;
+
+/**
+ * Map a psa_grade string to the corresponding PriceCharting price field.
+ */
+function getGradedPrice(
+  prices: { ungraded?: number; grade7?: number; grade8?: number; grade9?: number; grade95?: number; psa10?: number },
+  grade: string
+): number | undefined {
+  const g = grade.toLowerCase();
+  if (g.includes("10")) return prices.psa10;
+  if (g.includes("9.5")) return prices.grade95;
+  if (g.includes("9")) return prices.grade9;
+  if (g.includes("8")) return prices.grade8;
+  if (g.includes("7")) return prices.grade7;
+  return prices.grade9; // fallback
+}
 
 export async function POST() {
   try {
     const { data: assets, error } = await supabase
       .from("assets")
-      .select("id, external_id, name, asset_type, price_updated_at, manual_price");
+      .select("id, external_id, name, asset_type, price_updated_at, manual_price, psa_grade");
 
     if (error) throw error;
     if (!assets || assets.length === 0) {
@@ -36,53 +53,71 @@ export async function POST() {
       if (!asset.name) continue;
 
       try {
-        let results: Record<string, unknown>[];
+        let marketPrice: number | null = null;
+        let priceSource = "tcgplayer";
 
-        if (asset.asset_type === "sealed") {
-          // Use PokemonPriceTracker for sealed products
+        // Graded cards → fetch from PriceCharting (eBay sold data)
+        if (asset.psa_grade && asset.asset_type === "card") {
           try {
-            results = (await searchSealedProducts(
-              asset.name,
-              undefined,
-              5
-            )) as unknown as Record<string, unknown>[];
-          } catch {
-            // Fall back to JustTCG if PPT unavailable
+            const pcResults = await searchWithGradedPrices(asset.name, 3);
+            if (pcResults.length > 0) {
+              // Use the first result's graded price
+              const gradedPrice = getGradedPrice(pcResults[0].prices, asset.psa_grade);
+              if (gradedPrice != null) {
+                marketPrice = gradedPrice;
+                priceSource = "pricecharting";
+              }
+            }
+          } catch (e) {
+            console.warn(`[refresh-prices] PriceCharting failed for graded "${asset.name}":`, e);
+          }
+        }
+
+        // Ungraded cards or fallback → use JustTCG / PokemonPriceTracker
+        if (marketPrice == null) {
+          let results: Record<string, unknown>[];
+
+          if (asset.asset_type === "sealed") {
+            try {
+              results = (await searchSealedProducts(
+                asset.name,
+                undefined,
+                5
+              )) as unknown as Record<string, unknown>[];
+            } catch {
+              results = (await searchCards(
+                asset.name,
+                undefined,
+                5
+              )) as unknown as Record<string, unknown>[];
+            }
+          } else {
             results = (await searchCards(
               asset.name,
               undefined,
               5
             )) as unknown as Record<string, unknown>[];
           }
-        } else {
-          // Use JustTCG for cards
-          results = (await searchCards(
-            asset.name,
-            undefined,
-            5
-          )) as unknown as Record<string, unknown>[];
+
+          if (results.length === 0) {
+            console.warn(`[refresh-prices] No API results for "${asset.name}"`);
+            continue;
+          }
+
+          const match =
+            results.find(
+              (c: Record<string, unknown>) => c.id === asset.external_id
+            ) || results[0];
+
+          if (!match) continue;
+
+          marketPrice = extractCardPrice(match);
+          priceSource = asset.asset_type === "sealed" ? "pokemonpricetracker" : "tcgplayer";
         }
 
-        if (results.length === 0) {
-          console.warn(`[refresh-prices] No API results for "${asset.name}"`);
-          continue;
-        }
-
-        // Prefer exact ID match, then first result
-        const match =
-          results.find(
-            (c: Record<string, unknown>) => c.id === asset.external_id
-          ) || results[0];
-
-        if (!match) continue;
-
-        const marketPrice = extractCardPrice(match);
         if (marketPrice == null) {
           console.warn(
-            `[refresh-prices] No price found for "${asset.name}". API keys:`,
-            Object.keys(match),
-            "prices field:",
-            JSON.stringify(match.prices ?? "missing")
+            `[refresh-prices] No price found for "${asset.name}" (grade: ${asset.psa_grade || "raw"})`
           );
           continue;
         }
@@ -98,11 +133,10 @@ export async function POST() {
         if (!updateError) {
           updated++;
 
-          // Record a price snapshot for pricing history
           await supabase.from("price_snapshots").insert({
             asset_id: asset.id,
             price: marketPrice,
-            source: asset.asset_type === "sealed" ? "pokemonpricetracker" : "tcgplayer",
+            source: priceSource,
           });
         }
       } catch (e) {
