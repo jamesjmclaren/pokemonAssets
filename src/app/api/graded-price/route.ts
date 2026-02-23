@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
       name: c.name,
       setName: c.setName,
       url: c.url,
+      imageUrl: c.imageUrl,
       currency: "USD",
       prices: {
         raw: c.prices.ungraded,

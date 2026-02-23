@@ -94,6 +94,7 @@ export default function AddAssetForm() {
     name: string;
     setName: string;
     url?: string;
+    imageUrl?: string;
     currency: string;
     prices: {
       raw?: number;
@@ -643,6 +644,18 @@ export default function AddAssetForm() {
                                       : "hover:bg-surface-hover border border-transparent"
                                   }`}
                                 >
+                                  {candidate.imageUrl && (
+                                    <div className="w-10 h-14 bg-background rounded-md overflow-hidden flex-shrink-0 relative">
+                                      <Image
+                                        src={candidate.imageUrl}
+                                        alt={candidate.name}
+                                        fill
+                                        className="object-contain p-0.5"
+                                        sizes="40px"
+                                        unoptimized
+                                      />
+                                    </div>
+                                  )}
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs font-semibold text-text-primary truncate">
                                       {candidate.name}

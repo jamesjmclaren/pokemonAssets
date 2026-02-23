@@ -22,6 +22,7 @@ export interface PriceChartingCard {
   name: string;
   setName: string;
   url: string;
+  imageUrl?: string;
   prices: {
     ungraded?: number;
     grade7?: number;
@@ -65,20 +66,33 @@ export async function searchPriceCharting(
   while ((match = rowRegex.exec(html)) !== null) {
     const [, productId, rowHtml] = match;
 
-    // Extract card URL and name
-    const linkMatch = rowHtml.match(
-      /href="(https:\/\/www\.pricecharting\.com\/game\/[^"]+)"[^>]*>([^<]+)/
+    // Extract all anchors pointing to /game/ URLs
+    const anchorRegex = new RegExp(
+      '<a[^>]*href="(https://www\\.pricecharting\\.com/game/[^"]+)"[^>]*>(.*?)</a>',
+      "gs"
     );
-    if (!linkMatch) continue;
-
-    const cardUrl = linkMatch[1];
-    const cardName = linkMatch[2].trim();
+    let cardUrl = "";
+    let cardName = "";
+    let anchorMatch;
+    while ((anchorMatch = anchorRegex.exec(rowHtml)) !== null) {
+      const url = anchorMatch[1];
+      const text = anchorMatch[2].replace(/<[^>]+>/g, "").trim();
+      if (!cardUrl) cardUrl = url;
+      if (text && !cardName) cardName = text;
+    }
+    if (!cardUrl) continue;
 
     // Extract set name
     const setMatch = rowHtml.match(
       /href="\/console\/[^"]*"[^>]*>([^<]+)/
     );
     const setName = setMatch ? setMatch[1].trim() : "";
+
+    // Extract card image
+    const imgMatch = rowHtml.match(
+      /src="(https:\/\/storage\.googleapis\.com\/images\.pricecharting\.com\/[^"]+)"/
+    );
+    const imageUrl = imgMatch ? imgMatch[1] : undefined;
 
     // Extract the 3 prices from search results (Ungraded, Grade 7, Grade 8)
     const priceMatches = rowHtml.match(
@@ -94,6 +108,7 @@ export async function searchPriceCharting(
       name: cardName,
       setName,
       url: cardUrl,
+      imageUrl,
       prices: {
         ungraded: priceValues[0] ? parsePrice(priceValues[0]) : undefined,
         grade7: priceValues[1] ? parsePrice(priceValues[1]) : undefined,
