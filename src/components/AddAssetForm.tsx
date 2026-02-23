@@ -88,15 +88,28 @@ export default function AddAssetForm() {
   );
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [gradedPrices, setGradedPrices] = useState<{
-    raw?: number;
-    psa10?: number;
-    psa9?: number;
-    cgc10?: number;
-    bgs10?: number;
-  } | null>(null);
+
+  interface GradedCandidate {
+    id: string;
+    name: string;
+    number?: string;
+    setName: string;
+    setCode?: string;
+    rarity?: string;
+    imageUrl?: string;
+    currency: string;
+    prices: {
+      raw?: number;
+      psa10?: number;
+      psa9?: number;
+      cgc10?: number;
+      bgs10?: number;
+    };
+  }
+
+  const [gradedCandidates, setGradedCandidates] = useState<GradedCandidate[]>([]);
+  const [selectedGradedCard, setSelectedGradedCard] = useState<GradedCandidate | null>(null);
   const [gradedPriceLoading, setGradedPriceLoading] = useState(false);
-  const [gradedPriceCurrency, setGradedPriceCurrency] = useState("USD");
 
   const [form, setForm] = useState({
     manualName: "",
@@ -136,45 +149,55 @@ export default function AddAssetForm() {
     }));
   };
 
-  // Fetch graded prices from RapidAPI when a card is selected
-  const fetchGradedPrices = useCallback(async (cardName: string, grade: string) => {
-    if (!cardName || !grade) return;
+  // Fetch graded price candidates from RapidAPI
+  const fetchGradedCandidates = useCallback(async (cardName: string) => {
+    if (!cardName) return;
     setGradedPriceLoading(true);
+    setSelectedGradedCard(null);
     try {
       const res = await fetch(
-        `/api/graded-price?q=${encodeURIComponent(cardName)}&grade=${encodeURIComponent(grade)}`
+        `/api/graded-price?q=${encodeURIComponent(cardName)}`
       );
       if (!res.ok) throw new Error("Failed to fetch graded prices");
       const data = await res.json();
-      setGradedPrices(data.prices || null);
-      setGradedPriceCurrency(data.currency || "USD");
-
-      // Auto-populate the manual price with the graded price
-      if (data.price != null) {
-        setForm((f) => ({
-          ...f,
-          manualPrice: true,
-          manualPriceValue: data.price.toFixed(2),
-        }));
-      }
+      setGradedCandidates(data.candidates || []);
     } catch (error) {
       console.error("Failed to fetch graded prices:", error);
-      setGradedPrices(null);
+      setGradedCandidates([]);
     } finally {
       setGradedPriceLoading(false);
     }
   }, []);
 
-  // Trigger graded price fetch when grade or selected card changes
+  // When user picks a graded card candidate, populate the price
+  const handleGradedCardSelect = useCallback((candidate: GradedCandidate) => {
+    setSelectedGradedCard(candidate);
+    const g = form.psaGrade.toLowerCase();
+    let price: number | undefined;
+    if (g.includes("psa 10")) price = candidate.prices.psa10;
+    else if (g.includes("psa 9")) price = candidate.prices.psa9;
+    else if (g.includes("psa")) price = candidate.prices.psa9;
+    else if (g.includes("cgc")) price = candidate.prices.cgc10;
+    else if (g.includes("bgs")) price = candidate.prices.bgs10;
+
+    if (price != null) {
+      setForm((f) => ({
+        ...f,
+        manualPrice: true,
+        manualPriceValue: price.toFixed(2),
+      }));
+    }
+  }, [form.psaGrade]);
+
+  // Trigger graded candidate fetch when grade is selected + card exists
   useEffect(() => {
     if (form.psaGrade && selectedCard && !isManualSubmission) {
-      fetchGradedPrices(selectedCard.name, form.psaGrade);
+      fetchGradedCandidates(selectedCard.name);
     } else if (!form.psaGrade) {
-      setGradedPrices(null);
-      // Reset manual price when grade is cleared
-      setForm((f) => ({ ...f, manualPrice: false, manualPriceValue: "" }));
+      setGradedCandidates([]);
+      setSelectedGradedCard(null);
     }
-  }, [form.psaGrade, selectedCard, isManualSubmission, fetchGradedPrices]);
+  }, [form.psaGrade, selectedCard, isManualSubmission, fetchGradedCandidates]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -589,74 +612,137 @@ export default function AddAssetForm() {
                     ))}
                   </select>
 
-                  {/* Graded price feedback */}
+                  {/* Graded card picker */}
                   {form.psaGrade && selectedCard && !isManualSubmission && (
-                    <div className="mt-2">
+                    <div className="mt-3">
                       {gradedPriceLoading ? (
-                        <div className="flex items-center gap-2 text-xs text-text-muted">
+                        <div className="flex items-center gap-2 text-xs text-text-muted py-2">
                           <Loader2 className="w-3 h-3 animate-spin" />
-                          Fetching graded price…
+                          Searching for graded prices…
                         </div>
-                      ) : gradedPrices ? (
-                        <div className="bg-surface-hover border border-border rounded-xl p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-text-secondary">
-                              Graded Market Prices {gradedPriceCurrency !== "USD" && (
-                                <span className="text-text-muted">({gradedPriceCurrency})</span>
-                              )}
-                            </span>
+                      ) : gradedCandidates.length > 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-text-secondary">
+                            Select the correct card for graded pricing:
+                          </p>
+                          <div className="max-h-64 overflow-y-auto space-y-1 border border-border rounded-xl p-2 bg-surface">
+                            {gradedCandidates.map((candidate) => {
+                              const isSelected = selectedGradedCard?.id === candidate.id;
+                              const hasGraded = candidate.prices.psa10 || candidate.prices.psa9 || candidate.prices.cgc10 || candidate.prices.bgs10;
+                              return (
+                                <button
+                                  key={candidate.id}
+                                  type="button"
+                                  onClick={() => handleGradedCardSelect(candidate)}
+                                  className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition-colors ${
+                                    isSelected
+                                      ? "bg-accent-muted border border-accent"
+                                      : "hover:bg-surface-hover border border-transparent"
+                                  }`}
+                                >
+                                  <div className="w-10 h-14 bg-background rounded-md overflow-hidden flex-shrink-0 relative">
+                                    {candidate.imageUrl ? (
+                                      <Image
+                                        src={candidate.imageUrl}
+                                        alt={candidate.name}
+                                        fill
+                                        className="object-contain p-0.5"
+                                        sizes="40px"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-text-muted">
+                                        <Search className="w-3 h-3" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-semibold text-text-primary truncate">
+                                      {candidate.name}
+                                      {candidate.number ? ` #${candidate.number}` : ""}
+                                    </p>
+                                    <p className="text-[10px] text-text-muted truncate">
+                                      {candidate.setName}
+                                      {candidate.rarity ? ` · ${candidate.rarity}` : ""}
+                                    </p>
+                                    {hasGraded ? (
+                                      <div className="flex gap-2 mt-0.5 flex-wrap">
+                                        {candidate.prices.psa10 != null && (
+                                          <span className="text-[10px] text-amber-400">
+                                            PSA 10: {formatCurrency(candidate.prices.psa10)}
+                                          </span>
+                                        )}
+                                        {candidate.prices.psa9 != null && (
+                                          <span className="text-[10px] text-amber-400/70">
+                                            PSA 9: {formatCurrency(candidate.prices.psa9)}
+                                          </span>
+                                        )}
+                                        {candidate.prices.cgc10 != null && (
+                                          <span className="text-[10px] text-blue-400">
+                                            CGC 10: {formatCurrency(candidate.prices.cgc10)}
+                                          </span>
+                                        )}
+                                        {candidate.prices.bgs10 != null && (
+                                          <span className="text-[10px] text-purple-400">
+                                            BGS 10: {formatCurrency(candidate.prices.bgs10)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <p className="text-[10px] text-text-muted mt-0.5">
+                                        No graded data
+                                      </p>
+                                    )}
+                                  </div>
+                                  {isSelected && (
+                                    <CheckCircle2 className="w-4 h-4 text-accent flex-shrink-0" />
+                                  )}
+                                </button>
+                              );
+                            })}
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            {gradedPrices.raw != null && (
-                              <div className="text-xs">
-                                <span className="text-text-muted">Raw: </span>
-                                <span className="text-text-primary font-medium">
-                                  {formatCurrency(gradedPrices.raw)}
-                                </span>
+
+                          {/* Selected card price summary */}
+                          {selectedGradedCard && (
+                            <div className="bg-accent-muted/30 border border-accent/30 rounded-xl p-3">
+                              <p className="text-xs font-medium text-accent-hover mb-1">
+                                {form.psaGrade} price for {selectedGradedCard.name}
+                              </p>
+                              <div className="flex gap-3 flex-wrap">
+                                {selectedGradedCard.prices.raw != null && (
+                                  <span className="text-xs text-text-muted">
+                                    Raw: {formatCurrency(selectedGradedCard.prices.raw)}
+                                  </span>
+                                )}
+                                {selectedGradedCard.prices.psa10 != null && (
+                                  <span className="text-xs text-amber-400">
+                                    PSA 10: {formatCurrency(selectedGradedCard.prices.psa10)}
+                                  </span>
+                                )}
+                                {selectedGradedCard.prices.psa9 != null && (
+                                  <span className="text-xs text-amber-400/70">
+                                    PSA 9: {formatCurrency(selectedGradedCard.prices.psa9)}
+                                  </span>
+                                )}
+                                {selectedGradedCard.prices.cgc10 != null && (
+                                  <span className="text-xs text-blue-400">
+                                    CGC 10: {formatCurrency(selectedGradedCard.prices.cgc10)}
+                                  </span>
+                                )}
+                                {selectedGradedCard.prices.bgs10 != null && (
+                                  <span className="text-xs text-purple-400">
+                                    BGS 10: {formatCurrency(selectedGradedCard.prices.bgs10)}
+                                  </span>
+                                )}
                               </div>
-                            )}
-                            {gradedPrices.psa10 != null && (
-                              <div className="text-xs">
-                                <span className="text-amber-400">PSA 10: </span>
-                                <span className="text-text-primary font-medium">
-                                  {formatCurrency(gradedPrices.psa10)}
-                                </span>
-                              </div>
-                            )}
-                            {gradedPrices.psa9 != null && (
-                              <div className="text-xs">
-                                <span className="text-amber-400/70">PSA 9: </span>
-                                <span className="text-text-primary font-medium">
-                                  {formatCurrency(gradedPrices.psa9)}
-                                </span>
-                              </div>
-                            )}
-                            {gradedPrices.cgc10 != null && (
-                              <div className="text-xs">
-                                <span className="text-blue-400">CGC 10: </span>
-                                <span className="text-text-primary font-medium">
-                                  {formatCurrency(gradedPrices.cgc10)}
-                                </span>
-                              </div>
-                            )}
-                            {gradedPrices.bgs10 != null && (
-                              <div className="text-xs">
-                                <span className="text-purple-400">BGS 10: </span>
-                                <span className="text-text-primary font-medium">
-                                  {formatCurrency(gradedPrices.bgs10)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          {!gradedPrices.psa10 && !gradedPrices.psa9 && !gradedPrices.cgc10 && !gradedPrices.bgs10 && (
-                            <p className="text-xs text-text-muted">
-                              No graded price data available for this card.
-                            </p>
+                              <p className="text-[10px] text-text-muted mt-1">
+                                Prices from Cardmarket ({selectedGradedCard.currency})
+                              </p>
+                            </div>
                           )}
                         </div>
                       ) : (
-                        <p className="text-xs text-text-muted mt-1.5">
-                          Graded: {form.psaGrade} — no price data found
+                        <p className="text-xs text-text-muted">
+                          No graded price results found for this card.
                         </p>
                       )}
                     </div>
