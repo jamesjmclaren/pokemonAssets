@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -88,6 +88,15 @@ export default function AddAssetForm() {
   );
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [gradedPrices, setGradedPrices] = useState<{
+    raw?: number;
+    psa10?: number;
+    psa9?: number;
+    cgc10?: number;
+    bgs10?: number;
+  } | null>(null);
+  const [gradedPriceLoading, setGradedPriceLoading] = useState(false);
+  const [gradedPriceCurrency, setGradedPriceCurrency] = useState("USD");
 
   const [form, setForm] = useState({
     manualName: "",
@@ -126,6 +135,46 @@ export default function AddAssetForm() {
       manualPrice: true,
     }));
   };
+
+  // Fetch graded prices from RapidAPI when a card is selected
+  const fetchGradedPrices = useCallback(async (cardName: string, grade: string) => {
+    if (!cardName || !grade) return;
+    setGradedPriceLoading(true);
+    try {
+      const res = await fetch(
+        `/api/graded-price?q=${encodeURIComponent(cardName)}&grade=${encodeURIComponent(grade)}`
+      );
+      if (!res.ok) throw new Error("Failed to fetch graded prices");
+      const data = await res.json();
+      setGradedPrices(data.prices || null);
+      setGradedPriceCurrency(data.currency || "USD");
+
+      // Auto-populate the manual price with the graded price
+      if (data.price != null) {
+        setForm((f) => ({
+          ...f,
+          manualPrice: true,
+          manualPriceValue: data.price.toFixed(2),
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to fetch graded prices:", error);
+      setGradedPrices(null);
+    } finally {
+      setGradedPriceLoading(false);
+    }
+  }, []);
+
+  // Trigger graded price fetch when grade or selected card changes
+  useEffect(() => {
+    if (form.psaGrade && selectedCard && !isManualSubmission) {
+      fetchGradedPrices(selectedCard.name, form.psaGrade);
+    } else if (!form.psaGrade) {
+      setGradedPrices(null);
+      // Reset manual price when grade is cleared
+      setForm((f) => ({ ...f, manualPrice: false, manualPriceValue: "" }));
+    }
+  }, [form.psaGrade, selectedCard, isManualSubmission, fetchGradedPrices]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -539,7 +588,81 @@ export default function AddAssetForm() {
                       </option>
                     ))}
                   </select>
-                  {form.psaGrade && (
+
+                  {/* Graded price feedback */}
+                  {form.psaGrade && selectedCard && !isManualSubmission && (
+                    <div className="mt-2">
+                      {gradedPriceLoading ? (
+                        <div className="flex items-center gap-2 text-xs text-text-muted">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Fetching graded price…
+                        </div>
+                      ) : gradedPrices ? (
+                        <div className="bg-surface-hover border border-border rounded-xl p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-text-secondary">
+                              Graded Market Prices {gradedPriceCurrency !== "USD" && (
+                                <span className="text-text-muted">({gradedPriceCurrency})</span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {gradedPrices.raw != null && (
+                              <div className="text-xs">
+                                <span className="text-text-muted">Raw: </span>
+                                <span className="text-text-primary font-medium">
+                                  {formatCurrency(gradedPrices.raw)}
+                                </span>
+                              </div>
+                            )}
+                            {gradedPrices.psa10 != null && (
+                              <div className="text-xs">
+                                <span className="text-amber-400">PSA 10: </span>
+                                <span className="text-text-primary font-medium">
+                                  {formatCurrency(gradedPrices.psa10)}
+                                </span>
+                              </div>
+                            )}
+                            {gradedPrices.psa9 != null && (
+                              <div className="text-xs">
+                                <span className="text-amber-400/70">PSA 9: </span>
+                                <span className="text-text-primary font-medium">
+                                  {formatCurrency(gradedPrices.psa9)}
+                                </span>
+                              </div>
+                            )}
+                            {gradedPrices.cgc10 != null && (
+                              <div className="text-xs">
+                                <span className="text-blue-400">CGC 10: </span>
+                                <span className="text-text-primary font-medium">
+                                  {formatCurrency(gradedPrices.cgc10)}
+                                </span>
+                              </div>
+                            )}
+                            {gradedPrices.bgs10 != null && (
+                              <div className="text-xs">
+                                <span className="text-purple-400">BGS 10: </span>
+                                <span className="text-text-primary font-medium">
+                                  {formatCurrency(gradedPrices.bgs10)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {!gradedPrices.psa10 && !gradedPrices.psa9 && !gradedPrices.cgc10 && !gradedPrices.bgs10 && (
+                            <p className="text-xs text-text-muted">
+                              No graded price data available for this card.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-text-muted mt-1.5">
+                          Graded: {form.psaGrade} — no price data found
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {form.psaGrade && (isManualSubmission || !selectedCard) && (
                     <p className="text-xs text-gold mt-1.5">
                       Graded: {form.psaGrade}
                     </p>
