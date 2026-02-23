@@ -148,10 +148,22 @@ export type NormalizedItem = NormalizedCard | NormalizedProduct;
 
 // --- Normalization Functions ---
 
+/**
+ * Convert a Cardmarket cents value to a dollar/euro amount.
+ * The API returns prices in cents (e.g. 46969 = €469.69).
+ */
+function fromCents(value: number | undefined | null): number | undefined {
+  if (value == null) return undefined;
+  return value / 100;
+}
+
 function normalizeCard(card: ApiCard): NormalizedCard {
   const tcgPrice = card.prices?.tcg_player?.market_price;
   const cmPrice = card.prices?.cardmarket?.lowest_near_mint;
-  const graded = card.prices?.cardmarket?.graded;
+  // graded can be an empty array [] when no data exists
+  const graded = Array.isArray(card.prices?.cardmarket?.graded)
+    ? undefined
+    : card.prices?.cardmarket?.graded;
 
   return {
     id: `card-${card.id}`,
@@ -163,13 +175,13 @@ function normalizeCard(card: ApiCard): NormalizedCard {
     imageUrl: card.image,
     type: "card",
     prices: {
-      raw: tcgPrice || cmPrice,
-      psa10: graded?.psa?.psa10,
-      psa9: graded?.psa?.psa9,
-      cgc10: graded?.cgc?.cgc10,
-      bgs10: graded?.bgs?.bgs10,
+      raw: fromCents(tcgPrice) || fromCents(cmPrice),
+      psa10: fromCents(graded?.psa?.psa10),
+      psa9: fromCents(graded?.psa?.psa9),
+      cgc10: fromCents(graded?.cgc?.cgc10),
+      bgs10: fromCents(graded?.bgs?.bgs10),
     },
-    marketPrice: tcgPrice || cmPrice,
+    marketPrice: fromCents(tcgPrice) || fromCents(cmPrice),
     currency: tcgPrice ? "USD" : "EUR",
   };
 }
@@ -187,9 +199,9 @@ function normalizeProduct(product: ApiProduct): NormalizedProduct {
     type: "sealed",
     productType: product.type,
     prices: {
-      market: tcgPrice || cmPrice,
+      market: fromCents(tcgPrice) || fromCents(cmPrice),
     },
-    marketPrice: tcgPrice || cmPrice,
+    marketPrice: fromCents(tcgPrice) || fromCents(cmPrice),
     currency: tcgPrice ? "USD" : "EUR",
   };
 }
