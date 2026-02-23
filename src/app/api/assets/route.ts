@@ -96,6 +96,9 @@ export async function POST(request: NextRequest) {
       psa_grade,
       manual_price,
       quantity,
+      language,
+      storage_location,
+      is_manual_submission,
     } = body;
 
     if (!portfolio_id || !external_id || !name || !purchase_price || !purchase_date) {
@@ -155,11 +158,24 @@ export async function POST(request: NextRequest) {
         psa_grade: psa_grade || null,
         manual_price: manual_price || false,
         quantity: quantity ? parseInt(quantity) : 1,
+        language: language || "English",
+        storage_location: storage_location || "",
+        is_manual_submission: is_manual_submission || false,
       })
       .select()
       .single();
 
     if (error) throw error;
+
+    // Record the initial price snapshot if we have a price
+    if (data && data.current_price != null) {
+      await supabase.from("price_snapshots").insert({
+        asset_id: data.id,
+        price: data.current_price,
+        source: is_manual_submission ? "manual" : "api",
+      });
+    }
+
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
     console.error("Asset creation error:", error);
@@ -178,7 +194,7 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, current_price, manual_price, quantity, psa_grade } = body;
+    const { id, current_price, manual_price, quantity, psa_grade, language, storage_location } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Asset ID is required" }, { status: 400 });
@@ -192,6 +208,8 @@ export async function PATCH(request: NextRequest) {
     if (manual_price !== undefined) updates.manual_price = manual_price;
     if (quantity !== undefined) updates.quantity = parseInt(quantity);
     if (psa_grade !== undefined) updates.psa_grade = psa_grade || null;
+    if (language !== undefined) updates.language = language;
+    if (storage_location !== undefined) updates.storage_location = storage_location;
 
     const { data, error } = await supabase
       .from("assets")
@@ -201,6 +219,16 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Record a price snapshot when the price is manually updated
+    if (data && current_price !== undefined && data.current_price != null) {
+      await supabase.from("price_snapshots").insert({
+        asset_id: data.id,
+        price: data.current_price,
+        source: "manual",
+      });
+    }
+
     return NextResponse.json(data);
   } catch (error) {
     console.error("Asset update error:", error);

@@ -11,8 +11,9 @@ import {
   CheckCircle2,
   Search,
   AlertTriangle,
+  PenLine,
 } from "lucide-react";
-import { formatCurrency, extractCardPrice } from "@/lib/format";
+import { formatCurrency, extractCardPrice, fixStorageUrl } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import { usePortfolio } from "@/lib/portfolio-context";
 import SearchModal from "./SearchModal";
@@ -56,6 +57,23 @@ const PSA_GRADES = [
   { value: "BGS 9", label: "BGS 9 - Mint" },
 ];
 
+const LANGUAGES = [
+  "English",
+  "Japanese",
+  "Korean",
+  "Chinese (Simplified)",
+  "Chinese (Traditional)",
+  "French",
+  "German",
+  "Italian",
+  "Spanish",
+  "Portuguese",
+  "Dutch",
+  "Polish",
+  "Thai",
+  "Indonesian",
+];
+
 export default function AddAssetForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,6 +81,7 @@ export default function AddAssetForm() {
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null);
+  const [isManualSubmission, setIsManualSubmission] = useState(false);
   const [customImage, setCustomImage] = useState<File | null>(null);
   const [customImagePreview, setCustomImagePreview] = useState<string | null>(
     null
@@ -71,6 +90,8 @@ export default function AddAssetForm() {
   const [success, setSuccess] = useState(false);
 
   const [form, setForm] = useState({
+    manualName: "",
+    manualSetName: "",
     purchasePrice: "",
     purchaseDate: new Date().toISOString().split("T")[0],
     purchaseLocation: "",
@@ -81,15 +102,29 @@ export default function AddAssetForm() {
     manualPriceValue: "",
     quantity: "1",
     notes: "",
+    language: "English",
+    storageLocation: "",
   });
 
   const handleCardSelect = (card: SelectedCard) => {
     setSelectedCard(card);
+    setIsManualSubmission(false);
     setSearchOpen(false);
     const price = card.marketPrice || extractCardPrice(card as unknown as Record<string, unknown>);
     if (price && !form.purchasePrice) {
       setForm((f) => ({ ...f, purchasePrice: price.toFixed(2) }));
     }
+  };
+
+  const handleManualEntry = (query: string) => {
+    setIsManualSubmission(true);
+    setSelectedCard(null);
+    setSearchOpen(false);
+    setForm((f) => ({
+      ...f,
+      manualName: query,
+      manualPrice: true,
+    }));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,11 +142,29 @@ export default function AddAssetForm() {
       setCustomImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+
+    // If no card selected and no manual entry yet, switch to manual mode
+    if (!selectedCard && !isManualSubmission) {
+      setIsManualSubmission(true);
+      setForm((f) => ({ ...f, manualPrice: true }));
+    }
   };
+
+  const clearSelection = () => {
+    setSelectedCard(null);
+    setIsManualSubmission(false);
+    setForm((f) => ({ ...f, manualName: "", manualSetName: "" }));
+  };
+
+  // Determine the effective name/id for submission
+  const effectiveName = isManualSubmission ? form.manualName : selectedCard?.name || "";
+  const canSubmit = isManualSubmission
+    ? form.manualName.trim().length > 0 && !!form.purchasePrice && !!currentPortfolio
+    : !!selectedCard && !!form.purchasePrice && !!currentPortfolio;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCard || !currentPortfolio) return;
+    if (!canSubmit) return;
 
     setSubmitting(true);
     try {
@@ -124,28 +177,36 @@ export default function AddAssetForm() {
           .from("asset-images")
           .upload(fileName, customImage);
 
-        if (!uploadError) {
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from("asset-images").getPublicUrl(fileName);
-          customImageUrl = publicUrl;
+        if (uploadError) {
+          throw new Error(`Failed to upload image: ${uploadError.message}`);
         }
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("asset-images").getPublicUrl(fileName);
+        customImageUrl = fixStorageUrl(publicUrl);
       }
 
       const currentPrice = form.manualPrice && form.manualPriceValue
         ? parseFloat(form.manualPriceValue)
-        : extractCardPrice(selectedCard as unknown as Record<string, unknown>);
+        : selectedCard
+          ? extractCardPrice(selectedCard as unknown as Record<string, unknown>)
+          : null;
 
       const res = await fetch("/api/assets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          portfolio_id: currentPortfolio.id,
-          external_id: selectedCard.id,
-          name: selectedCard.name,
-          set_name: selectedCard.setName || "",
-          asset_type: selectedCard.type === "sealed" ? "sealed" : form.assetType,
-          image_url: selectedCard.imageUrl || null,
+          portfolio_id: currentPortfolio!.id,
+          external_id: isManualSubmission
+            ? `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`
+            : selectedCard!.id,
+          name: isManualSubmission ? form.manualName.trim() : selectedCard!.name,
+          set_name: isManualSubmission ? form.manualSetName : (selectedCard!.setName || ""),
+          asset_type: isManualSubmission
+            ? form.assetType
+            : (selectedCard!.type === "sealed" ? "sealed" : form.assetType),
+          image_url: isManualSubmission ? null : (selectedCard!.imageUrl || null),
           custom_image_url: customImageUrl,
           purchase_price: form.purchasePrice,
           purchase_date: form.purchaseDate,
@@ -153,11 +214,14 @@ export default function AddAssetForm() {
           condition: form.condition,
           notes: form.notes || null,
           current_price: currentPrice,
-          rarity: selectedCard.rarity || null,
-          card_number: selectedCard.number || null,
+          rarity: isManualSubmission ? null : (selectedCard!.rarity || null),
+          card_number: isManualSubmission ? null : (selectedCard!.number || null),
           psa_grade: form.psaGrade || null,
-          manual_price: form.manualPrice,
+          manual_price: form.manualPrice || isManualSubmission,
           quantity: form.quantity,
+          language: form.language,
+          storage_location: form.storageLocation,
+          is_manual_submission: isManualSubmission,
         }),
       });
 
@@ -221,6 +285,7 @@ export default function AddAssetForm() {
         isOpen={searchOpen}
         onClose={() => setSearchOpen(false)}
         onSelect={handleCardSelect}
+        onManualEntry={handleManualEntry}
       />
 
       <div className="max-w-4xl mx-auto">
@@ -233,15 +298,25 @@ export default function AddAssetForm() {
                 {cardImage ? (
                   <Image
                     src={cardImage}
-                    alt={selectedCard?.name || "Card preview"}
+                    alt={effectiveName || "Card preview"}
                     fill
                     className="object-contain p-3 md:p-4"
                     sizes="(max-width: 768px) 220px, 300px"
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-text-muted">
-                    <Search className="w-8 h-8 md:w-10 md:h-10 mb-2" />
-                    <p className="text-sm">Search for a card</p>
+                    {isManualSubmission ? (
+                      <>
+                        <PenLine className="w-8 h-8 md:w-10 md:h-10 mb-2" />
+                        <p className="text-sm">Manual Entry</p>
+                        <p className="text-xs mt-1">Upload a photo below</p>
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-8 h-8 md:w-10 md:h-10 mb-2" />
+                        <p className="text-sm">Search for a card</p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -285,7 +360,7 @@ export default function AddAssetForm() {
               )}
 
               {/* Selected info */}
-              {selectedCard && (
+              {selectedCard && !isManualSubmission && (
                 <div className="mt-4 pt-4 border-t border-border space-y-2">
                   <h3 className="text-sm font-semibold text-text-primary">
                     {selectedCard.name}
@@ -307,45 +382,115 @@ export default function AddAssetForm() {
                   })()}
                 </div>
               )}
+
+              {/* Manual submission info */}
+              {isManualSubmission && (
+                <div className="mt-4 pt-4 border-t border-warning/30 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <PenLine className="w-4 h-4 text-warning" />
+                    <h3 className="text-sm font-semibold text-warning">
+                      Manual Submission
+                    </h3>
+                  </div>
+                  <p className="text-xs text-text-muted">
+                    This asset was not found in the API. You&apos;ll need to manage the price manually.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right: Form */}
           <div className="lg:col-span-3">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Search button */}
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Select Asset *
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSearchOpen(true)}
-                    className="flex-1 flex items-center gap-3 px-4 py-4 bg-surface border border-border rounded-xl text-left hover:border-border-hover hover:bg-surface-hover"
-                  >
-                    <Search className="w-5 h-5 text-text-muted" />
-                    <span
-                      className={
-                        selectedCard ? "text-text-primary" : "text-text-muted"
-                      }
-                    >
-                      {selectedCard
-                        ? selectedCard.name
-                        : "Search for a card or product..."}
-                    </span>
-                  </button>
-                  {selectedCard && (
+              {/* Search button / Manual entry toggle */}
+              {!isManualSubmission ? (
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Select Asset *
+                  </label>
+                  <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => setSelectedCard(null)}
-                      className="px-3 bg-surface border border-border rounded-xl hover:bg-surface-hover hover:border-border-hover"
+                      onClick={() => setSearchOpen(true)}
+                      className="flex-1 flex items-center gap-3 px-4 py-4 bg-surface border border-border rounded-xl text-left hover:border-border-hover hover:bg-surface-hover"
                     >
-                      <X className="w-4 h-4 text-text-muted" />
+                      <Search className="w-5 h-5 text-text-muted" />
+                      <span
+                        className={
+                          selectedCard ? "text-text-primary" : "text-text-muted"
+                        }
+                      >
+                        {selectedCard
+                          ? selectedCard.name
+                          : "Search for a card or product..."}
+                      </span>
                     </button>
-                  )}
+                    {selectedCard && (
+                      <button
+                        type="button"
+                        onClick={clearSelection}
+                        className="px-3 bg-surface border border-border rounded-xl hover:bg-surface-hover hover:border-border-hover"
+                      >
+                        <X className="w-4 h-4 text-text-muted" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-text-secondary">
+                      Manual Entry
+                    </label>
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      className="text-xs text-accent hover:text-accent-hover font-medium"
+                    >
+                      Switch to search
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-warning/10 border border-warning/30 rounded-xl">
+                    <div className="flex items-center gap-2 text-warning text-xs">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                      Manual submission &mdash; prices won&apos;t auto-refresh from the API.
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-2">
+                      Card / Product Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={form.manualName}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, manualName: e.target.value }))
+                      }
+                      className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                      placeholder="e.g. Charizard VMAX 074/073"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-2">
+                      Set Name
+                    </label>
+                    <input
+                      type="text"
+                      value={form.manualSetName}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, manualSetName: e.target.value }))
+                      }
+                      className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                      placeholder="e.g. Champion's Path"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Asset type */}
               <div>
@@ -401,6 +546,26 @@ export default function AddAssetForm() {
                   )}
                 </div>
               )}
+
+              {/* Language */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Language
+                </label>
+                <select
+                  value={form.language}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, language: e.target.value }))
+                  }
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
+                >
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang} value={lang}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               {/* Quantity */}
               <div>
@@ -479,6 +644,28 @@ export default function AddAssetForm() {
                 />
               </div>
 
+              {/* Physical Storage Location */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Physical Location
+                </label>
+                <input
+                  type="text"
+                  value={form.storageLocation}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      storageLocation: e.target.value,
+                    }))
+                  }
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                  placeholder="e.g. Binder A, Safe, Display Case..."
+                />
+                <p className="text-xs text-text-muted mt-1">
+                  Where the physical card or product is stored
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-2">
                   Condition
@@ -501,56 +688,90 @@ export default function AddAssetForm() {
                 </select>
               </div>
 
-              {/* Manual Price Toggle */}
-              <div className="bg-surface-hover border border-border rounded-xl p-4">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.manualPrice}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, manualPrice: e.target.checked }))
-                    }
-                    className="w-4 h-4 accent-gold rounded"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-text-primary">
-                      Manually enter market price
+              {/* Manual Price Toggle - not shown for manual submissions (always manual) */}
+              {!isManualSubmission && (
+                <div className="bg-surface-hover border border-border rounded-xl p-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.manualPrice}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, manualPrice: e.target.checked }))
+                      }
+                      className="w-4 h-4 accent-gold rounded"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-text-primary">
+                        Manually enter market price
+                      </span>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        Override the API price. You will manage this value yourself.
+                      </p>
+                    </div>
+                  </label>
+                  {form.manualPrice && (
+                    <div className="mt-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="w-4 h-4 text-warning" />
+                        <span className="text-xs text-warning">
+                          This price will not auto-refresh. You&apos;ll be warned if not updated in 30 days.
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">
+                          $
+                        </span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={form.manualPriceValue}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              manualPriceValue: e.target.value,
+                            }))
+                          }
+                          className="w-full pl-8 pr-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                          placeholder="Enter current market value..."
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Manual price for manual submissions */}
+              {isManualSubmission && (
+                <div className="bg-warning/5 border border-warning/20 rounded-xl p-4">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Current Market Price
+                  </label>
+                  <p className="text-xs text-text-muted mb-3">
+                    Since this is a manual submission, enter the current market value.
+                    You&apos;ll be reminded to update it every 30 days.
+                  </p>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">
+                      $
                     </span>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      Override the API price. You will manage this value yourself.
-                    </p>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.manualPriceValue}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          manualPriceValue: e.target.value,
+                        }))
+                      }
+                      className="w-full pl-8 pr-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                      placeholder="Enter current market value..."
+                    />
                   </div>
-                </label>
-                {form.manualPrice && (
-                  <div className="mt-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertTriangle className="w-4 h-4 text-warning" />
-                      <span className="text-xs text-warning">
-                        This price will not auto-refresh. You&apos;ll be warned if not updated in 30 days.
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">
-                        $
-                      </span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={form.manualPriceValue}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            manualPriceValue: e.target.value,
-                          }))
-                        }
-                        className="w-full pl-8 pr-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
-                        placeholder="Enter current market value..."
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -597,7 +818,7 @@ export default function AddAssetForm() {
 
               <button
                 type="submit"
-                disabled={!selectedCard || !form.purchasePrice || !currentPortfolio || submitting}
+                disabled={!canSubmit || submitting}
                 className="w-full py-4 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-xl flex items-center justify-center gap-2"
               >
                 {submitting ? (

@@ -17,16 +17,15 @@ import {
 } from "lucide-react";
 import AssetCard from "@/components/AssetCard";
 import MiniSparkline from "@/components/MiniSparkline";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, fixStorageUrl } from "@/lib/format";
 import type { PortfolioAsset } from "@/types";
 
 type SortField = "name" | "purchase_price" | "current_price" | "profit" | "purchase_date" | "performance";
 type SortDir = "asc" | "desc";
 type ViewMode = "grid" | "table";
-type TypeTab = "all" | "card" | "sealed";
+type TypeTab = "all" | "raw" | "graded" | "sealed";
 
 function isPriceStale(asset: PortfolioAsset): boolean {
-  if (!asset.manual_price) return false;
   if (!asset.price_updated_at) return true;
   const thirtyDays = 30 * 24 * 60 * 60 * 1000;
   return Date.now() - new Date(asset.price_updated_at).getTime() > thirtyDays;
@@ -66,8 +65,10 @@ export default function CollectionPage() {
     return () => document.removeEventListener("click", handler);
   }, [actionMenuId]);
 
-  const cardCount = useMemo(() => assets.filter((a) => a.asset_type === "card").length, [assets]);
+  const rawCardCount = useMemo(() => assets.filter((a) => a.asset_type === "card" && !a.psa_grade).length, [assets]);
+  const gradedCardCount = useMemo(() => assets.filter((a) => a.asset_type === "card" && !!a.psa_grade).length, [assets]);
   const sealedCount = useMemo(() => assets.filter((a) => a.asset_type === "sealed").length, [assets]);
+  const staleCount = useMemo(() => assets.filter(isPriceStale).length, [assets]);
 
   const filtered = useMemo(() => {
     let result = [...assets];
@@ -81,8 +82,12 @@ export default function CollectionPage() {
       );
     }
 
-    if (typeTab !== "all") {
-      result = result.filter((a) => a.asset_type === typeTab);
+    if (typeTab === "raw") {
+      result = result.filter((a) => a.asset_type === "card" && !a.psa_grade);
+    } else if (typeTab === "graded") {
+      result = result.filter((a) => a.asset_type === "card" && !!a.psa_grade);
+    } else if (typeTab === "sealed") {
+      result = result.filter((a) => a.asset_type === "sealed");
     }
 
     result.sort((a, b) => {
@@ -197,17 +202,31 @@ export default function CollectionPage() {
         />
       </div>
 
-      {/* Tabs: Cards / Sealed Products */}
+      {/* Stale price warning banner */}
+      {staleCount > 0 && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-danger/10 border border-danger/30 rounded-xl">
+          <AlertTriangle className="w-4 h-4 text-danger flex-shrink-0" />
+          <p className="text-sm text-danger">
+            <span className="font-semibold">{staleCount} asset{staleCount !== 1 ? "s" : ""}</span>{" "}
+            {staleCount === 1 ? "has" : "have"} not had {staleCount === 1 ? "its" : "their"} price updated in over 30 days.
+            Update prices to keep your portfolio accurate.
+          </p>
+        </div>
+      )}
+
+      {/* Tabs: All / Raw Cards / Graded Cards / Sealed Products */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-1 border-b border-border">
+        <div className="flex gap-1 border-b border-border overflow-x-auto">
           {([
-            { key: "card" as TypeTab, label: `Cards (${cardCount})` },
-            { key: "sealed" as TypeTab, label: `Sealed Products (${sealedCount})` },
+            { key: "all" as TypeTab, label: `All (${assets.length})` },
+            { key: "raw" as TypeTab, label: `Raw Cards (${rawCardCount})` },
+            { key: "graded" as TypeTab, label: `Graded (${gradedCardCount})` },
+            { key: "sealed" as TypeTab, label: `Sealed (${sealedCount})` },
           ]).map((tab) => (
             <button
               key={tab.key}
               onClick={() => setTypeTab(tab.key)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px ${
+              className={`px-3 md:px-4 py-2.5 text-xs md:text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${
                 typeTab === tab.key
                   ? "border-gold text-gold"
                   : "border-transparent text-text-muted hover:text-text-secondary"
@@ -339,9 +358,17 @@ export default function CollectionPage() {
                           <div className="w-10 h-10 bg-background rounded-lg overflow-hidden flex-shrink-0 relative">
                             {(asset.custom_image_url || asset.image_url) && (
                               <img
-                                src={asset.custom_image_url || asset.image_url || ""}
+                                src={fixStorageUrl(asset.custom_image_url) || asset.image_url || ""}
                                 alt=""
                                 className="w-full h-full object-contain p-0.5"
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  if (asset.custom_image_url && asset.image_url && target.src !== asset.image_url) {
+                                    target.src = asset.image_url;
+                                  } else {
+                                    target.style.display = "none";
+                                  }
+                                }}
                               />
                             )}
                           </div>
@@ -371,12 +398,12 @@ export default function CollectionPage() {
                               <Pencil className="w-3.5 h-3.5 text-gold" />
                             </span>
                           )}
-                          <span className={`text-sm font-semibold ${stale ? "text-warning" : "text-gold"}`}>
+                          <span className={`text-sm font-semibold ${stale ? "text-danger" : "text-gold"}`}>
                             {formatCurrency(marketPrice)}
                           </span>
                           {stale && (
                             <span title="Price not updated in 30+ days">
-                              <AlertTriangle className="w-3.5 h-3.5 text-warning flex-shrink-0" />
+                              <AlertTriangle className="w-3.5 h-3.5 text-danger flex-shrink-0" />
                             </span>
                           )}
                         </div>
@@ -541,9 +568,17 @@ export default function CollectionPage() {
                   <div className="w-10 h-10 bg-background rounded-lg overflow-hidden flex-shrink-0 relative">
                     {(asset.custom_image_url || asset.image_url) && (
                       <img
-                        src={asset.custom_image_url || asset.image_url || ""}
+                        src={fixStorageUrl(asset.custom_image_url) || asset.image_url || ""}
                         alt=""
                         className="w-full h-full object-contain p-0.5"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (asset.custom_image_url && asset.image_url && target.src !== asset.image_url) {
+                            target.src = asset.image_url;
+                          } else {
+                            target.style.display = "none";
+                          }
+                        }}
                       />
                     )}
                   </div>
@@ -559,7 +594,7 @@ export default function CollectionPage() {
                         <span className="text-[10px] text-text-muted">x{qty}</span>
                       )}
                       {stale && (
-                        <AlertTriangle className="w-3 h-3 text-warning" />
+                        <AlertTriangle className="w-3 h-3 text-danger" />
                       )}
                     </div>
                   </div>
