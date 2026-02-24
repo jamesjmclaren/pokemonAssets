@@ -263,11 +263,34 @@ export default function AddAssetForm() {
         customImageUrl = fixStorageUrl(publicUrl);
       }
 
-      const currentPrice = form.manualPrice && form.manualPriceValue
-        ? parseFloat(form.manualPriceValue)
-        : selectedCard
-          ? extractCardPrice(selectedCard as unknown as Record<string, unknown>)
-          : null;
+      // Determine current market price:
+      // 1. Graded card with PriceCharting selection → use graded price
+      // 2. Manual price override → use manual value
+      // 3. Default → extract raw price from selected card
+      const hasGradedPrice = !!selectedGradedCard && !!form.psaGrade;
+      let currentPrice: number | null = null;
+
+      if (hasGradedPrice) {
+        // Use the graded price from PriceCharting
+        const g = form.psaGrade.toLowerCase();
+        const p = selectedGradedCard!.prices;
+        if (g.includes("10")) currentPrice = p.psa10 ?? null;
+        else if (g.includes("9.5")) currentPrice = p.grade95 ?? null;
+        else if (g.includes("9")) currentPrice = p.psa9 ?? null;
+        else if (g.includes("8")) currentPrice = p.grade8 ?? null;
+        else if (g.includes("7")) currentPrice = p.grade7 ?? null;
+        else currentPrice = p.psa9 ?? null;
+      } else if (form.manualPrice && form.manualPriceValue) {
+        currentPrice = parseFloat(form.manualPriceValue);
+      } else if (selectedCard) {
+        currentPrice = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
+      }
+
+      // Graded cards with PriceCharting prices should NOT be marked manual
+      // so the refresh route can auto-update them
+      const isManualPrice = hasGradedPrice
+        ? false
+        : (form.manualPrice || isManualSubmission);
 
       const res = await fetch("/api/assets", {
         method: "POST",
@@ -293,7 +316,7 @@ export default function AddAssetForm() {
           rarity: isManualSubmission ? null : (selectedCard!.rarity || null),
           card_number: isManualSubmission ? null : (selectedCard!.number || null),
           psa_grade: form.psaGrade || null,
-          manual_price: form.manualPrice || isManualSubmission,
+          manual_price: isManualPrice,
           quantity: form.quantity,
           language: form.language,
           storage_location: form.storageLocation,
