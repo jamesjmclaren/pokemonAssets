@@ -146,6 +146,7 @@ function normalizeCard(card: JustTCGCard) {
     tcgplayerId: card.tcgplayerId,
     prices: price != null ? { tcgplayer: { market: price } } : undefined,
     marketPrice: price,
+    type: "card" as const,
     // Attach raw variants for detailed usage
     _variants: card.variants,
   };
