@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -49,6 +49,36 @@ export default function AssetDetailPage({
   const [newPrice, setNewPrice] = useState("");
   const [saving, setSaving] = useState(false);
   const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const [gradedPrices, setGradedPrices] = useState<{
+    raw?: number;
+    psa10?: number;
+    psa9?: number;
+    grade95?: number;
+    grade8?: number;
+    grade7?: number;
+  } | null>(null);
+  const [gradedLoading, setGradedLoading] = useState(false);
+
+  const fetchGradedPrices = useCallback(async (name: string) => {
+    setGradedLoading(true);
+    try {
+      const res = await fetch(`/api/graded-price?q=${encodeURIComponent(name)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const candidates = data.candidates || [];
+      if (candidates.length > 0) {
+        // Use the first result that has graded data
+        const best = candidates.find(
+          (c: { prices: { psa10?: number; psa9?: number } }) => c.prices.psa10 || c.prices.psa9
+        ) || candidates[0];
+        setGradedPrices(best.prices);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setGradedLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchAsset() {
@@ -69,6 +99,13 @@ export default function AssetDetailPage({
     }
     fetchAsset();
   }, [id]);
+
+  // Fetch graded price breakdown for graded cards
+  useEffect(() => {
+    if (asset?.psa_grade && asset.asset_type === "card") {
+      fetchGradedPrices(asset.name);
+    }
+  }, [asset?.psa_grade, asset?.name, asset?.asset_type, fetchGradedPrices]);
 
   const handleDelete = async () => {
     if (!asset) return;
@@ -457,6 +494,71 @@ export default function AssetDetailPage({
             )}
           </div>
 
+          {/* Graded Price Breakdown */}
+          {asset.psa_grade && (
+            <div className="bg-surface border border-border rounded-2xl p-4 md:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-text-primary">
+                  Graded Price Breakdown
+                </h3>
+                <span className="text-[10px] text-text-muted">
+                  Source: PriceCharting (eBay sold data)
+                </span>
+              </div>
+              {gradedLoading ? (
+                <div className="flex items-center gap-2 text-sm text-text-muted py-4">
+                  <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                  Loading graded prices…
+                </div>
+              ) : gradedPrices ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { label: "Ungraded", value: gradedPrices.raw, color: "text-text-secondary" },
+                    { label: "Grade 7", value: gradedPrices.grade7, color: "text-text-secondary" },
+                    { label: "Grade 8", value: gradedPrices.grade8, color: "text-text-secondary" },
+                    { label: "Grade 9", value: gradedPrices.psa9, color: "text-amber-400/70" },
+                    { label: "Grade 9.5", value: gradedPrices.grade95, color: "text-amber-400/80" },
+                    { label: "PSA 10", value: gradedPrices.psa10, color: "text-amber-400" },
+                  ]
+                    .filter((g) => g.value != null)
+                    .map((g) => {
+                      const isCurrentGrade =
+                        (asset.psa_grade?.includes("10") && g.label === "PSA 10") ||
+                        (asset.psa_grade?.includes("9.5") && g.label === "Grade 9.5") ||
+                        (asset.psa_grade?.includes("9") && !asset.psa_grade?.includes("9.5") && g.label === "Grade 9") ||
+                        (asset.psa_grade?.includes("8") && g.label === "Grade 8") ||
+                        (asset.psa_grade?.includes("7") && g.label === "Grade 7");
+                      return (
+                        <div
+                          key={g.label}
+                          className={clsx(
+                            "p-3 rounded-xl border",
+                            isCurrentGrade
+                              ? "bg-accent-muted/30 border-accent/30"
+                              : "bg-surface-hover border-border"
+                          )}
+                        >
+                          <p className={clsx("text-xs font-medium", g.color)}>
+                            {g.label}
+                            {isCurrentGrade && (
+                              <span className="ml-1.5 text-[10px] text-accent">● Your grade</span>
+                            )}
+                          </p>
+                          <p className="text-lg font-bold text-text-primary mt-1">
+                            {formatCurrency(g.value!)}
+                          </p>
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <p className="text-sm text-text-muted py-2">
+                  No graded price data available.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Price Chart */}
           <PriceChart
             externalId={asset.external_id}
@@ -478,9 +580,11 @@ export default function AssetDetailPage({
                 ) : (
                   <>
                     Price data from{" "}
-                    {asset.asset_type === "sealed"
-                      ? "PokemonPriceTracker"
-                      : "JustTCG"}
+                    {asset.psa_grade
+                      ? "PriceCharting"
+                      : asset.asset_type === "sealed"
+                        ? "PokemonPriceTracker"
+                        : "JustTCG"}
                     {asset.price_updated_at &&
                       ` · Updated ${formatDate(asset.price_updated_at)}`}
                   </>
@@ -489,18 +593,22 @@ export default function AssetDetailPage({
               {!asset.manual_price && (
                 <a
                   href={
-                    asset.asset_type === "sealed"
-                      ? "https://www.pokemonpricetracker.com"
-                      : "https://justtcg.com"
+                    asset.psa_grade
+                      ? "https://www.pricecharting.com/category/pokemon-cards"
+                      : asset.asset_type === "sealed"
+                        ? "https://www.pokemonpricetracker.com"
+                        : "https://justtcg.com"
                   }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
                 >
                   View on{" "}
-                  {asset.asset_type === "sealed"
-                    ? "PokemonPriceTracker"
-                    : "JustTCG"}
+                  {asset.psa_grade
+                    ? "PriceCharting"
+                    : asset.asset_type === "sealed"
+                      ? "PokemonPriceTracker"
+                      : "JustTCG"}
                   <ExternalLink className="w-3 h-3" />
                 </a>
               )}
