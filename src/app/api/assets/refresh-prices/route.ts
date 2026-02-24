@@ -1,10 +1,24 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { searchCards, searchSealedProducts } from "@/lib/pokemon-api";
 import { extractCardPrice } from "@/lib/format";
 import { searchWithGradedPrices } from "@/lib/pricecharting";
 
 const STALE_HOURS = 24;
+
+/**
+ * GET handler for Vercel Cron Jobs.
+ * Protected by the CRON_SECRET env var.
+ */
+export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Delegate to the same refresh logic as POST
+  return refreshPrices();
+}
 
 /**
  * Map a psa_grade string to the corresponding PriceCharting price field.
@@ -23,6 +37,10 @@ function getGradedPrice(
 }
 
 export async function POST() {
+  return refreshPrices();
+}
+
+async function refreshPrices() {
   try {
     const { data: assets, error } = await supabase
       .from("assets")
