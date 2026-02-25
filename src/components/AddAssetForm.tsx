@@ -714,7 +714,7 @@ export default function AddAssetForm() {
                       <div className="flex items-center gap-2 mb-2">
                         <AlertTriangle className="w-4 h-4 text-warning" />
                         <span className="text-xs text-warning">
-                          This price will not auto-refresh. You&apos;ll be warned if not updated in 30 days.
+                          This price will not auto-refresh. You&apos;ll be warned if not updated in 7 days.
                         </span>
                       </div>
                       <div className="relative">
@@ -749,7 +749,7 @@ export default function AddAssetForm() {
                   </label>
                   <p className="text-xs text-text-muted mb-3">
                     Since this is a manual submission, enter the current market value.
-                    You&apos;ll be reminded to update it every 30 days.
+                    You&apos;ll be reminded to update it every 7 days.
                   </p>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">

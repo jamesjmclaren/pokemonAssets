@@ -194,18 +194,74 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, current_price, manual_price, quantity, psa_grade, language, storage_location } = body;
+    const {
+      id,
+      name,
+      set_name,
+      asset_type,
+      current_price,
+      manual_price,
+      purchase_price,
+      purchase_date,
+      purchase_location,
+      condition,
+      notes,
+      quantity,
+      psa_grade,
+      language,
+      storage_location,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Asset ID is required" }, { status: 400 });
     }
 
+    // Verify the asset exists and user has write access
+    const { data: asset } = await supabase
+      .from("assets")
+      .select("portfolio_id")
+      .eq("id", id)
+      .single();
+
+    if (!asset) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+
+    // Check write access
+    const { data: portfolio } = await supabase
+      .from("portfolios")
+      .select("owner_id")
+      .eq("id", asset.portfolio_id)
+      .single();
+
+    const isOwner = portfolio?.owner_id === userId;
+    if (!isOwner) {
+      const { data: member } = await supabase
+        .from("portfolio_members")
+        .select("role")
+        .eq("portfolio_id", asset.portfolio_id)
+        .eq("user_id", userId)
+        .single();
+
+      if (member?.role !== "admin") {
+        return NextResponse.json({ error: "Read-only access" }, { status: 403 });
+      }
+    }
+
     const updates: Record<string, unknown> = {};
+    if (name !== undefined) updates.name = name;
+    if (set_name !== undefined) updates.set_name = set_name;
+    if (asset_type !== undefined) updates.asset_type = asset_type;
     if (current_price !== undefined) {
       updates.current_price = current_price ? parseFloat(current_price) : null;
       updates.price_updated_at = new Date().toISOString();
     }
     if (manual_price !== undefined) updates.manual_price = manual_price;
+    if (purchase_price !== undefined) updates.purchase_price = parseFloat(purchase_price);
+    if (purchase_date !== undefined) updates.purchase_date = purchase_date;
+    if (purchase_location !== undefined) updates.purchase_location = purchase_location;
+    if (condition !== undefined) updates.condition = condition;
+    if (notes !== undefined) updates.notes = notes || null;
     if (quantity !== undefined) updates.quantity = parseInt(quantity);
     if (psa_grade !== undefined) updates.psa_grade = psa_grade || null;
     if (language !== undefined) updates.language = language;
