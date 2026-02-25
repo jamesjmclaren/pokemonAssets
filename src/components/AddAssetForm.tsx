@@ -111,8 +111,17 @@ export default function AddAssetForm() {
     setIsManualSubmission(false);
     setSearchOpen(false);
     const price = card.marketPrice || extractCardPrice(card as unknown as Record<string, unknown>);
+    const updates: Partial<typeof form> = {};
     if (price && !form.purchasePrice) {
-      setForm((f) => ({ ...f, purchasePrice: price.toFixed(2) }));
+      updates.purchasePrice = price.toFixed(2);
+    }
+    if (card.type === "sealed") {
+      updates.assetType = "sealed";
+    } else {
+      updates.assetType = "card";
+    }
+    if (Object.keys(updates).length > 0) {
+      setForm((f) => ({ ...f, ...updates }));
     }
   };
 
