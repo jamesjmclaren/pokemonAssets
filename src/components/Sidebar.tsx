@@ -12,6 +12,7 @@ import {
   X,
   Users,
   ChevronDown,
+  Plus,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { usePortfolio, Portfolio } from "@/lib/portfolio-context";
@@ -184,6 +185,14 @@ export default function Sidebar() {
                         </button>
                       );
                     })}
+                    <Link
+                      href="/onboarding?new=true"
+                      onClick={() => setPortfolioDropdownOpen(false)}
+                      className="w-full px-4 py-2.5 text-left text-sm text-accent hover:bg-surface-hover transition-colors flex items-center gap-2 border-t border-border"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      New Portfolio
+                    </Link>
                   </div>
                 )}
               </div>
