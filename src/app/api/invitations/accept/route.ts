@@ -32,9 +32,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // Verify email matches (optional - you might want to allow any authenticated user)
-  const userEmail = user.emailAddresses[0]?.emailAddress?.toLowerCase();
-  if (invitation.email !== userEmail) {
+  // Verify the invitation email matches one of the user's email addresses
+  const userEmails = user.emailAddresses.map((e) =>
+    e.emailAddress.toLowerCase()
+  );
+  if (!userEmails.includes(invitation.email)) {
     return NextResponse.json(
       { error: "This invitation was sent to a different email address" },
       { status: 400 }

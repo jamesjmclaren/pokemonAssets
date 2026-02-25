@@ -135,6 +135,11 @@ function normalizeCard(card: JustTCGCard) {
     ? `https://tcgplayer-cdn.tcgplayer.com/product/${card.tcgplayerId}_200w.jpg`
     : undefined;
 
+  // JustTCG returns sealed products (ETBs, booster boxes, tins) through the
+  // same /cards endpoint. Sealed products have no card number and no rarity —
+  // use that to distinguish them from actual trading cards.
+  const type = !card.number && !card.rarity ? "sealed" : "card";
+
   return {
     id: card.id,
     name: card.name,
@@ -146,6 +151,7 @@ function normalizeCard(card: JustTCGCard) {
     tcgplayerId: card.tcgplayerId,
     prices: price != null ? { tcgplayer: { market: price } } : undefined,
     marketPrice: price,
+    type: type as "card" | "sealed",
     // Attach raw variants for detailed usage
     _variants: card.variants,
   };
