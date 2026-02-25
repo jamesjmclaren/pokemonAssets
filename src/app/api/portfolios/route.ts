@@ -1,12 +1,57 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   const { userId } = await auth();
+  const user = await currentUser();
 
-  if (!userId) {
+  if (!userId || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Auto-accept any pending invitations for this user's email addresses.
+  // This handles the case where the Clerk invitation redirect was lost
+  // (e.g. during Google OAuth) and the user never landed on /invite/{token}.
+  const userEmails = user.emailAddresses.map((e) =>
+    e.emailAddress.toLowerCase()
+  );
+
+  if (userEmails.length > 0) {
+    const { data: pendingInvitations } = await supabase
+      .from("portfolio_invitations")
+      .select("*")
+      .in("email", userEmails)
+      .gt("expires_at", new Date().toISOString());
+
+    if (pendingInvitations && pendingInvitations.length > 0) {
+      for (const invitation of pendingInvitations) {
+        // Check if already a member of this portfolio
+        const { data: existingMember } = await supabase
+          .from("portfolio_members")
+          .select("id")
+          .eq("portfolio_id", invitation.portfolio_id)
+          .eq("user_id", userId)
+          .single();
+
+        if (!existingMember) {
+          await supabase.from("portfolio_members").insert({
+            portfolio_id: invitation.portfolio_id,
+            user_id: userId,
+            email: invitation.email,
+            role: invitation.role,
+            invited_by: invitation.invited_by,
+            accepted_at: new Date().toISOString(),
+          });
+        }
+
+        // Delete the invitation regardless (consumed or already a member)
+        await supabase
+          .from("portfolio_invitations")
+          .delete()
+          .eq("id", invitation.id);
+      }
+    }
   }
 
   // Get portfolios where user is owner OR member
