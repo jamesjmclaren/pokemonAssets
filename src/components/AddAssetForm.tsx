@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -12,6 +12,7 @@ import {
   Search,
   AlertTriangle,
   PenLine,
+  Link2,
 } from "lucide-react";
 import { formatCurrency, extractCardPrice, fixStorageUrl } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
@@ -89,6 +90,28 @@ export default function AddAssetForm() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  interface TetherCandidate {
+    id: string;
+    name: string;
+    setName: string;
+    url: string;
+    imageUrl?: string;
+    currency: string;
+    prices: {
+      ungraded?: number;
+      grade7?: number;
+      grade8?: number;
+      grade9?: number;
+      grade95?: number;
+      psa10?: number;
+    };
+  }
+
+  const [tetherCandidates, setTetherCandidates] = useState<TetherCandidate[]>([]);
+  const [selectedTether, setSelectedTether] = useState<TetherCandidate | null>(null);
+  const [tetherLoading, setTetherLoading] = useState(false);
+  const [tetherSearchQuery, setTetherSearchQuery] = useState("");
+
   const [form, setForm] = useState({
     manualName: "",
     manualSetName: "",
@@ -164,7 +187,64 @@ export default function AddAssetForm() {
     setSelectedCard(null);
     setIsManualSubmission(false);
     setForm((f) => ({ ...f, manualName: "", manualSetName: "" }));
+    setTetherCandidates([]);
+    setSelectedTether(null);
+    setTetherSearchQuery("");
   };
+
+  // Search PriceCharting for tether candidates
+  const searchTether = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+    setTetherLoading(true);
+    setSelectedTether(null);
+    try {
+      const res = await fetch(
+        `/api/pricecharting-search?q=${encodeURIComponent(query)}`
+      );
+      if (!res.ok) throw new Error("Failed to search PriceCharting");
+      const data = await res.json();
+      setTetherCandidates(data.candidates || []);
+    } catch (error) {
+      console.error("Tether search failed:", error);
+      setTetherCandidates([]);
+    } finally {
+      setTetherLoading(false);
+    }
+  }, []);
+
+  // Get the price field name for the current grade
+  const getTetherGradeField = useCallback((): string => {
+    if (!form.psaGrade) return "ungraded";
+    const g = form.psaGrade.toLowerCase();
+    if (g.includes("10")) return "psa10";
+    if (g.includes("9.5")) return "grade95";
+    if (g.includes("9")) return "grade9";
+    if (g.includes("8")) return "grade8";
+    if (g.includes("7")) return "grade7";
+    return "ungraded";
+  }, [form.psaGrade]);
+
+  // When user selects a tether candidate, populate the price
+  const handleTetherSelect = useCallback((candidate: TetherCandidate) => {
+    setSelectedTether(candidate);
+    const field = getTetherGradeField();
+    const price = candidate.prices[field as keyof typeof candidate.prices];
+    if (price != null) {
+      setForm((f) => ({
+        ...f,
+        manualPrice: true,
+        manualPriceValue: price.toFixed(2),
+      }));
+    }
+  }, [getTetherGradeField]);
+
+  // Auto-search tether when manual name changes or graded card selected
+  useEffect(() => {
+    const name = isManualSubmission ? form.manualName : selectedCard?.name;
+    if (name && (isManualSubmission || form.psaGrade)) {
+      setTetherSearchQuery(name);
+    }
+  }, [isManualSubmission, form.manualName, form.psaGrade, selectedCard?.name]);
 
   // Determine the effective name/id for submission
   const effectiveName = isManualSubmission ? form.manualName : selectedCard?.name || "";
@@ -197,11 +277,23 @@ export default function AddAssetForm() {
         customImageUrl = fixStorageUrl(publicUrl);
       }
 
-      const currentPrice = form.manualPrice && form.manualPriceValue
-        ? parseFloat(form.manualPriceValue)
-        : selectedCard
-          ? extractCardPrice(selectedCard as unknown as Record<string, unknown>)
-          : null;
+      // Determine current market price
+      const hasTether = !!selectedTether;
+      let currentPrice: number | null = null;
+
+      if (hasTether) {
+        const field = getTetherGradeField();
+        currentPrice = selectedTether!.prices[field as keyof typeof selectedTether.prices] ?? null;
+      } else if (form.manualPrice && form.manualPriceValue) {
+        currentPrice = parseFloat(form.manualPriceValue);
+      } else if (selectedCard) {
+        currentPrice = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
+      }
+
+      // Tethered assets should NOT be marked manual so the cron can auto-refresh
+      const isManualPrice = hasTether
+        ? false
+        : (form.manualPrice || isManualSubmission);
 
       const res = await fetch("/api/assets", {
         method: "POST",
@@ -227,11 +319,14 @@ export default function AddAssetForm() {
           rarity: isManualSubmission ? null : (selectedCard!.rarity || null),
           card_number: isManualSubmission ? null : (selectedCard!.number || null),
           psa_grade: form.psaGrade || null,
-          manual_price: form.manualPrice || isManualSubmission,
+          manual_price: isManualPrice,
           quantity: form.quantity,
           language: form.language,
           storage_location: form.storageLocation,
           is_manual_submission: isManualSubmission,
+          pc_product_id: selectedTether?.id || null,
+          pc_url: selectedTether?.url || null,
+          pc_grade_field: hasTether ? getTetherGradeField() : null,
         }),
       });
 
@@ -553,6 +648,179 @@ export default function AddAssetForm() {
                     <p className="text-xs text-gold mt-1.5">
                       Graded: {form.psaGrade}
                     </p>
+                  )}
+                </div>
+              )}
+
+              {/* PriceCharting Tether - show for manual submissions or graded API cards */}
+              {(isManualSubmission || (selectedCard && form.psaGrade)) && (
+                <div className="bg-surface-hover border border-border rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Link2 className="w-4 h-4 text-accent" />
+                    <span className="text-sm font-medium text-text-primary">
+                      Tether to PriceCharting
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-muted mb-3">
+                    Link this asset to a PriceCharting listing for automatic price updates from eBay sold data.
+                  </p>
+
+                  {/* Search input */}
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={tetherSearchQuery}
+                      onChange={(e) => setTetherSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          searchTether(tetherSearchQuery);
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                      placeholder="Search PriceCharting..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => searchTether(tetherSearchQuery)}
+                      disabled={tetherLoading || !tetherSearchQuery.trim()}
+                      className="px-3 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-black rounded-lg text-sm font-medium flex items-center gap-1.5"
+                    >
+                      {tetherLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Search className="w-3.5 h-3.5" />
+                      )}
+                      Search
+                    </button>
+                  </div>
+
+                  {/* Results */}
+                  {tetherLoading && (
+                    <div className="flex items-center gap-2 text-xs text-text-muted py-2">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Searching PriceCharting…
+                    </div>
+                  )}
+
+                  {!tetherLoading && tetherCandidates.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-text-secondary">
+                        Select a listing to tether:
+                      </p>
+                      <div className="max-h-64 overflow-y-auto space-y-1 border border-border rounded-xl p-2 bg-surface">
+                        {tetherCandidates.map((candidate) => {
+                          const isSelected = selectedTether?.id === candidate.id;
+                          const field = getTetherGradeField();
+                          const relevantPrice = candidate.prices[field as keyof typeof candidate.prices];
+                          return (
+                            <button
+                              key={candidate.id}
+                              type="button"
+                              onClick={() => handleTetherSelect(candidate)}
+                              className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition-colors ${
+                                isSelected
+                                  ? "bg-accent-muted border border-accent"
+                                  : "hover:bg-surface-hover border border-transparent"
+                              }`}
+                            >
+                              {candidate.imageUrl && (
+                                <div className="w-10 h-14 bg-background rounded-md overflow-hidden flex-shrink-0 relative">
+                                  <Image
+                                    src={candidate.imageUrl}
+                                    alt={candidate.name}
+                                    fill
+                                    className="object-contain p-0.5"
+                                    sizes="40px"
+                                    unoptimized
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-text-primary truncate">
+                                  {candidate.name}
+                                </p>
+                                <p className="text-[10px] text-text-muted truncate">
+                                  {candidate.setName}
+                                </p>
+                                <div className="flex gap-3 mt-1 flex-wrap">
+                                  {candidate.prices.ungraded != null && (
+                                    <span className="text-[10px] text-text-muted">
+                                      Raw: {formatCurrency(candidate.prices.ungraded)}
+                                    </span>
+                                  )}
+                                  {relevantPrice != null && field !== "ungraded" && (
+                                    <span className="text-[10px] text-amber-400">
+                                      {form.psaGrade || "Selected"}: {formatCurrency(relevantPrice)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <CheckCircle2 className="w-4 h-4 text-accent flex-shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Selected tether summary */}
+                  {selectedTether && (
+                    <div className="mt-3 bg-accent-muted/30 border border-accent/30 rounded-xl p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Link2 className="w-3.5 h-3.5 text-accent" />
+                        <p className="text-xs font-medium text-accent-hover">
+                          Tethered to: {selectedTether.name}
+                        </p>
+                      </div>
+                      <div className="flex gap-3 flex-wrap">
+                        {selectedTether.prices.ungraded != null && (
+                          <span className="text-xs text-text-muted">
+                            Raw: {formatCurrency(selectedTether.prices.ungraded)}
+                          </span>
+                        )}
+                        {selectedTether.prices.grade7 != null && (
+                          <span className="text-xs text-text-secondary">
+                            Grade 7: {formatCurrency(selectedTether.prices.grade7)}
+                          </span>
+                        )}
+                        {selectedTether.prices.grade8 != null && (
+                          <span className="text-xs text-text-secondary">
+                            Grade 8: {formatCurrency(selectedTether.prices.grade8)}
+                          </span>
+                        )}
+                        {selectedTether.prices.grade9 != null && (
+                          <span className="text-xs text-amber-400/70">
+                            Grade 9: {formatCurrency(selectedTether.prices.grade9)}
+                          </span>
+                        )}
+                        {selectedTether.prices.grade95 != null && (
+                          <span className="text-xs text-amber-400/80">
+                            Grade 9.5: {formatCurrency(selectedTether.prices.grade95)}
+                          </span>
+                        )}
+                        {selectedTether.prices.psa10 != null && (
+                          <span className="text-xs text-amber-400">
+                            PSA 10: {formatCurrency(selectedTether.prices.psa10)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-text-muted mt-1">
+                        Prices from PriceCharting (eBay sold data, USD) · Price will auto-refresh daily
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTether(null);
+                          setTetherCandidates([]);
+                        }}
+                        className="text-[10px] text-danger hover:text-danger mt-1"
+                      >
+                        Remove tether
+                      </button>
+                    </div>
                   )}
                 </div>
               )}

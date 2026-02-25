@@ -24,6 +24,7 @@ import {
   Archive,
   PenLine,
   X,
+  Link2,
 } from "lucide-react";
 import PriceChart from "@/components/PriceChart";
 import { formatCurrency, formatPercentage, formatDate, fixStorageUrl } from "@/lib/format";
@@ -697,11 +698,21 @@ export default function AssetDetailPage({
             )}
 
             {/* Manual submission badge */}
-            {asset.is_manual_submission && (
+            {asset.is_manual_submission && !asset.pc_url && (
               <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-warning/10 border border-warning/30 rounded-xl">
                 <PenLine className="w-4 h-4 text-warning flex-shrink-0" />
                 <p className="text-xs text-warning">
                   This is a manual submission. Prices will not auto-refresh from the API.
+                </p>
+              </div>
+            )}
+
+            {/* Tether badge */}
+            {asset.pc_url && (
+              <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-accent/10 border border-accent/30 rounded-xl">
+                <Link2 className="w-4 h-4 text-accent flex-shrink-0" />
+                <p className="text-xs text-accent">
+                  Tethered to PriceCharting — prices auto-refresh daily from eBay sold data.
                 </p>
               </div>
             )}
@@ -830,7 +841,16 @@ export default function AssetDetailPage({
           <div className="bg-surface border border-border rounded-2xl p-3 md:p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
               <p className="text-xs text-text-muted">
-                {asset.manual_price ? (
+                {asset.pc_url ? (
+                  <>
+                    Tethered to PriceCharting (eBay sold data, USD)
+                    {asset.pc_grade_field && asset.pc_grade_field !== "ungraded" && (
+                      <> · Using {asset.pc_grade_field} price</>
+                    )}
+                    {asset.price_updated_at &&
+                      ` · Updated ${formatDate(asset.price_updated_at)}`}
+                  </>
+                ) : asset.manual_price ? (
                   <>
                     Price manually managed
                     {asset.price_updated_at &&
@@ -847,7 +867,17 @@ export default function AssetDetailPage({
                   </>
                 )}
               </p>
-              {!asset.manual_price && (
+              {asset.pc_url ? (
+                <a
+                  href={asset.pc_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
+                >
+                  View on PriceCharting
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ) : !asset.manual_price && (
                 <a
                   href={
                     asset.asset_type === "sealed"
