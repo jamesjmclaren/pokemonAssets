@@ -60,7 +60,7 @@ export default function DashboardPage() {
       const r = await fetch("/api/assets/refresh-prices", { method: "POST" });
       const result = await r.json();
       if (result.updated > 0) {
-        const refreshed = await fetch("/api/assets");
+        const refreshed = await fetch(`/api/assets?portfolioId=${currentPortfolio?.id}`);
         if (refreshed.ok) setAssets(await refreshed.json());
       }
     } catch {

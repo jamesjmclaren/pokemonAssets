@@ -90,7 +90,7 @@ export default function AssetDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const { isReadOnly } = usePortfolio();
+  const { currentPortfolio, isReadOnly } = usePortfolio();
   const [asset, setAsset] = useState<PortfolioAsset | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
@@ -103,8 +103,9 @@ export default function AssetDetailPage({
 
   useEffect(() => {
     async function fetchAsset() {
+      if (!currentPortfolio) return;
       try {
-        const res = await fetch("/api/assets");
+        const res = await fetch(`/api/assets?portfolioId=${currentPortfolio.id}`);
         if (!res.ok) throw new Error("Failed to fetch");
         const data: PortfolioAsset[] = await res.json();
         const found = data.find((a) => a.id === id);
@@ -119,7 +120,7 @@ export default function AssetDetailPage({
       }
     }
     fetchAsset();
-  }, [id]);
+  }, [id, currentPortfolio]);
 
   const startEditing = () => {
     if (!asset) return;

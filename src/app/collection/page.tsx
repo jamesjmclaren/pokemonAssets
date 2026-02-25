@@ -33,7 +33,7 @@ function isPriceStale(asset: PortfolioAsset): boolean {
 }
 
 export default function CollectionPage() {
-  const { isReadOnly } = usePortfolio();
+  const { currentPortfolio, loading: portfolioLoading, isReadOnly } = usePortfolio();
   const [assets, setAssets] = useState<PortfolioAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -45,19 +45,30 @@ export default function CollectionPage() {
 
   useEffect(() => {
     async function fetchAssets() {
+      if (!currentPortfolio) {
+        setAssets([]);
+        setLoading(false);
+        return;
+      }
       try {
-        const res = await fetch("/api/assets");
+        const res = await fetch(`/api/assets?portfolioId=${currentPortfolio.id}`);
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
-        setAssets(data);
+        setAssets(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching assets:", error);
+        setAssets([]);
       } finally {
         setLoading(false);
       }
     }
-    fetchAssets();
-  }, []);
+    if (currentPortfolio) {
+      setLoading(true);
+      fetchAssets();
+    } else if (!portfolioLoading) {
+      setLoading(false);
+    }
+  }, [currentPortfolio, portfolioLoading]);
 
   // Close action menu on outside click
   useEffect(() => {
