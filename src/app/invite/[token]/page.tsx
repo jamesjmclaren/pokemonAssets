@@ -53,7 +53,10 @@ export default function AcceptInvitePage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 p-4">
         <p className="text-zinc-400 mb-6">Sign in to accept your invitation</p>
-        <SignIn afterSignInUrl={`/invite/${token}`} />
+        <SignIn
+          forceRedirectUrl={`/invite/${token}`}
+          signUpForceRedirectUrl={`/invite/${token}`}
+        />
       </div>
     );
   }
