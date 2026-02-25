@@ -15,6 +15,7 @@ import type { PriceHistoryPoint } from "@/types";
 
 interface PriceChartProps {
   externalId: string;
+  assetId?: string;
   cardName?: string;
   purchasePrice?: number;
   assetType?: "card" | "sealed";
@@ -25,10 +26,12 @@ const TIME_RANGES = [
   { label: "30D", days: 30 },
   { label: "90D", days: 90 },
   { label: "1Y", days: 365 },
+  { label: "All", days: 9999 },
 ];
 
 export default function PriceChart({
   externalId,
+  assetId,
   cardName,
   purchasePrice,
   assetType,
@@ -50,8 +53,9 @@ export default function PriceChart({
           .split("T")[0];
         const nameParam = cardName ? `&name=${encodeURIComponent(cardName)}` : "";
         const typeParam = assetType ? `&assetType=${assetType}` : "";
+        const assetIdParam = assetId ? `&assetId=${assetId}` : "";
         const res = await fetch(
-          `/api/price-history?cardId=${encodeURIComponent(externalId)}&startDate=${startDate}&endDate=${endDate}${nameParam}${typeParam}`
+          `/api/price-history?cardId=${encodeURIComponent(externalId)}&startDate=${startDate}&endDate=${endDate}${nameParam}${typeParam}${assetIdParam}`
         );
         if (!res.ok) throw new Error("Failed to fetch price history");
         const json = await res.json();
@@ -68,7 +72,7 @@ export default function PriceChart({
       }
     }
     fetchHistory();
-  }, [externalId, cardName, assetType, range]);
+  }, [externalId, assetId, cardName, assetType, range]);
 
   if (loading) {
     return (

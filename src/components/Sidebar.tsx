@@ -12,21 +12,22 @@ import {
   X,
   Users,
   ChevronDown,
+  Plus,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { usePortfolio, Portfolio } from "@/lib/portfolio-context";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/collection", label: "Collection", icon: FolderOpen },
-  { href: "/dashboard/add", label: "Add Asset", icon: Search },
-  { href: "/team", label: "Team", icon: Users },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
+  { href: "/collection", label: "Collection", icon: FolderOpen, adminOnly: false },
+  { href: "/dashboard/add", label: "Add Asset", icon: Search, adminOnly: true },
+  { href: "/team", label: "Team", icon: Users, adminOnly: false },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { isSignedIn } = useUser();
-  const { portfolios, currentPortfolio, setCurrentPortfolio } = usePortfolio();
+  const { portfolios, currentPortfolio, setCurrentPortfolio, isReadOnly } = usePortfolio();
   const [open, setOpen] = useState(false);
   const [portfolioDropdownOpen, setPortfolioDropdownOpen] = useState(false);
 
@@ -97,27 +98,29 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={clsx(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium",
-                  isActive
-                    ? "bg-accent-muted text-accent-hover"
-                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-                )}
-              >
-                <Icon className="w-5 h-5" />
-                {item.label}
-              </Link>
-            );
-          })}
+          {navItems
+            .filter((item) => !item.adminOnly || !isReadOnly)
+            .map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                pathname === item.href ||
+                (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={clsx(
+                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium",
+                    isActive
+                      ? "bg-accent-muted text-accent-hover"
+                      : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+                  )}
+                >
+                  <Icon className="w-5 h-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
         </nav>
 
         {/* Portfolio Switcher */}
@@ -130,33 +133,66 @@ export default function Sidebar() {
                   onClick={() => setPortfolioDropdownOpen(!portfolioDropdownOpen)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-surface-hover text-sm text-text-primary hover:bg-border transition-colors"
                 >
-                  <span className="truncate">
-                    {currentPortfolio?.name || "Select Portfolio"}
-                  </span>
-                  <ChevronDown className={clsx("w-4 h-4 transition-transform", portfolioDropdownOpen && "rotate-180")} />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="truncate">
+                      {currentPortfolio?.name || "Select Portfolio"}
+                    </span>
+                    {currentPortfolio && (
+                      <span
+                        className={clsx(
+                          "flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide",
+                          currentPortfolio.role === "read_only"
+                            ? "bg-blue-500/15 text-blue-400"
+                            : "bg-accent/15 text-accent"
+                        )}
+                      >
+                        {currentPortfolio.role === "read_only" ? "Viewer" : "Admin"}
+                      </span>
+                    )}
+                  </div>
+                  <ChevronDown className={clsx("w-4 h-4 transition-transform flex-shrink-0", portfolioDropdownOpen && "rotate-180")} />
                 </button>
                 {portfolioDropdownOpen && (
                   <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-border rounded-xl shadow-lg overflow-hidden z-10">
-                    {portfolios.map((portfolio) => (
-                      <button
-                        key={portfolio.id}
-                        onClick={() => {
-                          setCurrentPortfolio(portfolio as Portfolio);
-                          setPortfolioDropdownOpen(false);
-                        }}
-                        className={clsx(
-                          "w-full px-4 py-2.5 text-left text-sm hover:bg-surface-hover transition-colors",
-                          currentPortfolio?.id === portfolio.id
-                            ? "text-accent bg-accent/5"
-                            : "text-text-secondary"
-                        )}
-                      >
-                        {portfolio.name}
-                        {portfolio.role !== "owner" && (
-                          <span className="ml-2 text-xs text-text-muted">({portfolio.role})</span>
-                        )}
-                      </button>
-                    ))}
+                    {portfolios.map((portfolio) => {
+                      const roleLabel = portfolio.role === "read_only" ? "Viewer" : "Admin";
+                      const isViewer = portfolio.role === "read_only";
+                      return (
+                        <button
+                          key={portfolio.id}
+                          onClick={() => {
+                            setCurrentPortfolio(portfolio as Portfolio);
+                            setPortfolioDropdownOpen(false);
+                          }}
+                          className={clsx(
+                            "w-full px-4 py-2.5 text-left text-sm hover:bg-surface-hover transition-colors flex items-center justify-between",
+                            currentPortfolio?.id === portfolio.id
+                              ? "text-accent bg-accent/5"
+                              : "text-text-secondary"
+                          )}
+                        >
+                          <span className="truncate">{portfolio.name}</span>
+                          <span
+                            className={clsx(
+                              "flex-shrink-0 ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide",
+                              isViewer
+                                ? "bg-blue-500/15 text-blue-400"
+                                : "bg-accent/15 text-accent"
+                            )}
+                          >
+                            {roleLabel}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    <Link
+                      href="/onboarding?new=true"
+                      onClick={() => setPortfolioDropdownOpen(false)}
+                      className="w-full px-4 py-2.5 text-left text-sm text-accent hover:bg-surface-hover transition-colors flex items-center gap-2 border-t border-border"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      New Portfolio
+                    </Link>
                   </div>
                 )}
               </div>

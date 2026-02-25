@@ -10,6 +10,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
+  AlertTriangle,
+  Bell,
 } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import PortfolioChart from "@/components/PortfolioChart";
@@ -58,7 +60,7 @@ export default function DashboardPage() {
       const r = await fetch("/api/assets/refresh-prices", { method: "POST" });
       const result = await r.json();
       if (result.updated > 0) {
-        const refreshed = await fetch("/api/assets");
+        const refreshed = await fetch(`/api/assets?portfolioId=${currentPortfolio?.id}`);
         if (refreshed.ok) setAssets(await refreshed.json());
       }
     } catch {
@@ -95,6 +97,13 @@ export default function DashboardPage() {
         },
       ]
     : [];
+
+  // Stale price detection (7 days)
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  const staleAssets = assets.filter((a) => {
+    if (!a.price_updated_at) return true;
+    return Date.now() - new Date(a.price_updated_at).getTime() > sevenDaysMs;
+  });
 
   const topGainers = [...assets]
     .filter((a) => a.current_price != null)
@@ -135,7 +144,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 md:gap-3">
-          {assets.length > 0 && (
+          {assets.length > 0 && !isReadOnly && (
             <button
               onClick={handleRefreshPrices}
               disabled={refreshing}
@@ -146,14 +155,16 @@ export default function DashboardPage() {
               <span className="md:hidden">{refreshing ? "..." : "Refresh"}</span>
             </button>
           )}
-          <Link
-            href="/dashboard/add"
-            className="flex items-center gap-2 px-3 md:px-5 py-2.5 md:py-3 bg-accent hover:bg-accent-hover text-black font-semibold rounded-xl text-sm"
-          >
-            <PlusCircle className="w-4 h-4 md:w-5 md:h-5" />
-            <span className="hidden md:inline">Add Asset</span>
-            <span className="md:hidden">Add</span>
-          </Link>
+          {!isReadOnly && (
+            <Link
+              href="/dashboard/add"
+              className="flex items-center gap-2 px-3 md:px-5 py-2.5 md:py-3 bg-accent hover:bg-accent-hover text-black font-semibold rounded-xl text-sm"
+            >
+              <PlusCircle className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="hidden md:inline">Add Asset</span>
+              <span className="md:hidden">Add</span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -200,6 +211,47 @@ export default function DashboardPage() {
           icon={Package}
         />
       </div>
+
+      {/* Stale Price Alert for Admins */}
+      {!isReadOnly && staleAssets.length > 0 && (
+        <div className="bg-danger/10 border-2 border-danger/40 rounded-2xl p-5">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-full bg-danger/20 flex items-center justify-center flex-shrink-0">
+              <Bell className="w-6 h-6 text-danger" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-bold text-danger flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                Price Update Required
+              </h3>
+              <p className="text-sm text-danger/80 mt-1">
+                {staleAssets.length} asset{staleAssets.length !== 1 ? "s have" : " has"} not had {staleAssets.length === 1 ? "its" : "their"} price
+                updated in over 7 days. Update prices to maintain accurate portfolio valuations.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {staleAssets.slice(0, 5).map((a) => (
+                  <Link
+                    key={a.id}
+                    href={`/asset/${a.id}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-danger/15 hover:bg-danger/25 rounded-lg text-xs font-medium text-danger"
+                  >
+                    <AlertTriangle className="w-3 h-3" />
+                    {a.name.length > 25 ? a.name.slice(0, 25) + "..." : a.name}
+                  </Link>
+                ))}
+                {staleAssets.length > 5 && (
+                  <Link
+                    href="/collection"
+                    className="inline-flex items-center px-3 py-1.5 bg-danger/15 hover:bg-danger/25 rounded-lg text-xs font-medium text-danger"
+                  >
+                    +{staleAssets.length - 5} more
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Chart */}
       <PortfolioChart data={chartData} />

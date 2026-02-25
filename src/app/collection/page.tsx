@@ -18,6 +18,7 @@ import {
 import AssetCard from "@/components/AssetCard";
 import MiniSparkline from "@/components/MiniSparkline";
 import { formatCurrency, formatDate, fixStorageUrl } from "@/lib/format";
+import { usePortfolio } from "@/lib/portfolio-context";
 import type { PortfolioAsset } from "@/types";
 
 type SortField = "name" | "purchase_price" | "current_price" | "profit" | "purchase_date" | "performance";
@@ -27,11 +28,12 @@ type TypeTab = "all" | "raw" | "graded" | "sealed";
 
 function isPriceStale(asset: PortfolioAsset): boolean {
   if (!asset.price_updated_at) return true;
-  const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-  return Date.now() - new Date(asset.price_updated_at).getTime() > thirtyDays;
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  return Date.now() - new Date(asset.price_updated_at).getTime() > sevenDays;
 }
 
 export default function CollectionPage() {
+  const { currentPortfolio, loading: portfolioLoading, isReadOnly } = usePortfolio();
   const [assets, setAssets] = useState<PortfolioAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -43,19 +45,30 @@ export default function CollectionPage() {
 
   useEffect(() => {
     async function fetchAssets() {
+      if (!currentPortfolio) {
+        setAssets([]);
+        setLoading(false);
+        return;
+      }
       try {
-        const res = await fetch("/api/assets");
+        const res = await fetch(`/api/assets?portfolioId=${currentPortfolio.id}`);
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
-        setAssets(data);
+        setAssets(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching assets:", error);
+        setAssets([]);
       } finally {
         setLoading(false);
       }
     }
-    fetchAssets();
-  }, []);
+    if (currentPortfolio) {
+      setLoading(true);
+      fetchAssets();
+    } else if (!portfolioLoading) {
+      setLoading(false);
+    }
+  }, [currentPortfolio, portfolioLoading]);
 
   // Close action menu on outside click
   useEffect(() => {
@@ -180,14 +193,16 @@ export default function CollectionPage() {
             {formatCurrency(totalValue)} total value
           </p>
         </div>
-        <Link
-          href="/dashboard/add"
-          className="flex items-center gap-2 px-3 md:px-5 py-2.5 md:py-3 bg-accent hover:bg-accent-hover text-black font-semibold rounded-xl text-sm flex-shrink-0"
-        >
-          <PlusCircle className="w-4 h-4 md:w-5 md:h-5" />
-          <span className="hidden md:inline">Add Asset</span>
-          <span className="md:hidden">Add</span>
-        </Link>
+        {!isReadOnly && (
+          <Link
+            href="/dashboard/add"
+            className="flex items-center gap-2 px-3 md:px-5 py-2.5 md:py-3 bg-accent hover:bg-accent-hover text-black font-semibold rounded-xl text-sm flex-shrink-0"
+          >
+            <PlusCircle className="w-4 h-4 md:w-5 md:h-5" />
+            <span className="hidden md:inline">Add Asset</span>
+            <span className="md:hidden">Add</span>
+          </Link>
+        )}
       </div>
 
       {/* Search bar */}
@@ -204,13 +219,20 @@ export default function CollectionPage() {
 
       {/* Stale price warning banner */}
       {staleCount > 0 && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-danger/10 border border-danger/30 rounded-xl">
-          <AlertTriangle className="w-4 h-4 text-danger flex-shrink-0" />
-          <p className="text-sm text-danger">
-            <span className="font-semibold">{staleCount} asset{staleCount !== 1 ? "s" : ""}</span>{" "}
-            {staleCount === 1 ? "has" : "have"} not had {staleCount === 1 ? "its" : "their"} price updated in over 30 days.
-            Update prices to keep your portfolio accurate.
-          </p>
+        <div className="flex items-center gap-3 px-5 py-4 bg-danger/15 border-2 border-danger/50 rounded-xl">
+          <div className="w-10 h-10 rounded-full bg-danger/20 flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-5 h-5 text-danger" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-danger">
+              Price Update Required
+            </p>
+            <p className="text-sm text-danger/80 mt-0.5">
+              <span className="font-semibold">{staleCount} asset{staleCount !== 1 ? "s" : ""}</span>{" "}
+              {staleCount === 1 ? "has" : "have"} not had {staleCount === 1 ? "its" : "their"} price updated in over 7 days.
+              Update prices to keep your portfolio accurate.
+            </p>
+          </div>
         </div>
       )}
 
@@ -402,7 +424,7 @@ export default function CollectionPage() {
                             {formatCurrency(marketPrice)}
                           </span>
                           {stale && (
-                            <span title="Price not updated in 30+ days">
+                            <span title="Price not updated in 7+ days">
                               <AlertTriangle className="w-3.5 h-3.5 text-danger flex-shrink-0" />
                             </span>
                           )}
@@ -493,11 +515,12 @@ export default function CollectionPage() {
                             <div className="absolute right-0 top-full mt-1 bg-surface-elevated border border-border rounded-xl shadow-lg z-20 min-w-[140px]">
                               <Link
                                 href={`/asset/${asset.id}`}
-                                className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary rounded-t-xl"
+                                className={`flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary ${isReadOnly ? "rounded-xl" : "rounded-t-xl"}`}
                               >
                                 <Pencil className="w-3.5 h-3.5" />
-                                View / Edit
+                                {isReadOnly ? "View" : "View / Edit"}
                               </Link>
+                              {!isReadOnly && (
                               <button
                                 onClick={() => handleDelete(asset.id)}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger-muted rounded-b-xl"
@@ -505,6 +528,7 @@ export default function CollectionPage() {
                                 <Trash2 className="w-3.5 h-3.5" />
                                 Remove
                               </button>
+                              )}
                             </div>
                           )}
                         </div>
