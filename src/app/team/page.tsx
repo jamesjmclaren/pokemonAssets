@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePortfolio } from "@/lib/portfolio-context";
-import { UserPlus, Trash2, Copy, Check, Shield, Eye, Users, Crown } from "lucide-react";
+import { UserPlus, Trash2, Copy, Check, Shield, Eye, Users, Crown, X } from "lucide-react";
 
 interface Member {
   id: string;
@@ -31,6 +31,7 @@ export default function TeamPage() {
   const [inviting, setInviting] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const isOwner = currentPortfolio?.role === "owner";
   const canInvite = isOwner || currentPortfolio?.role === "admin";
@@ -73,6 +74,7 @@ export default function TeamPage() {
 
     setInviting(true);
     setError("");
+    setSuccessMsg("");
     try {
       const res = await fetch(`/api/portfolios/${currentPortfolio.id}/invitations`, {
         method: "POST",
@@ -80,11 +82,17 @@ export default function TeamPage() {
         body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
         setInviteEmail("");
+        if (data.added_directly) {
+          setSuccessMsg("User already has an account — added to the portfolio directly.");
+        } else {
+          setSuccessMsg("Invitation email sent successfully.");
+        }
         fetchData();
       } else {
-        const data = await res.json();
         setError(data.error || "Failed to send invitation");
       }
     } catch {
@@ -108,6 +116,23 @@ export default function TeamPage() {
       }
     } catch (err) {
       console.error("Failed to remove member:", err);
+    }
+  }
+
+  async function revokeInvitation(invitationId: string) {
+    if (!confirm("Are you sure you want to revoke this invitation?") || !currentPortfolio) return;
+
+    try {
+      const res = await fetch(
+        `/api/portfolios/${currentPortfolio.id}/invitations?invitationId=${invitationId}`,
+        { method: "DELETE" }
+      );
+
+      if (res.ok) {
+        fetchData();
+      }
+    } catch (err) {
+      console.error("Failed to revoke invitation:", err);
     }
   }
 
@@ -186,6 +211,7 @@ export default function TeamPage() {
                 {inviting ? "Sending..." : "Send Invitation"}
               </button>
               {error && <p className="text-red-400 text-sm">{error}</p>}
+              {successMsg && <p className="text-green-400 text-sm">{successMsg}</p>}
             </div>
           </form>
 
@@ -226,17 +252,28 @@ export default function TeamPage() {
                     Expires {new Date(inv.expires_at).toLocaleDateString()}
                   </p>
                 </div>
-                <button
-                  onClick={() => copyInviteLink(inv.token)}
-                  className="p-2.5 hover:bg-surface rounded-xl transition-colors"
-                  title="Copy invite link"
-                >
-                  {copiedToken === inv.token ? (
-                    <Check className="w-5 h-5 text-green-400" />
-                  ) : (
-                    <Copy className="w-5 h-5 text-text-muted" />
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => copyInviteLink(inv.token)}
+                    className="p-2.5 hover:bg-surface rounded-xl transition-colors"
+                    title="Copy invite link"
+                  >
+                    {copiedToken === inv.token ? (
+                      <Check className="w-5 h-5 text-green-400" />
+                    ) : (
+                      <Copy className="w-5 h-5 text-text-muted" />
+                    )}
+                  </button>
+                  {canInvite && (
+                    <button
+                      onClick={() => revokeInvitation(inv.id)}
+                      className="p-2.5 hover:bg-red-500/10 rounded-xl transition-colors"
+                      title="Revoke invitation"
+                    >
+                      <X className="w-5 h-5 text-red-400" />
+                    </button>
                   )}
-                </button>
+                </div>
               </div>
             ))}
           </div>
