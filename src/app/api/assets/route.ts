@@ -99,6 +99,9 @@ export async function POST(request: NextRequest) {
       language,
       storage_location,
       is_manual_submission,
+      pc_product_id,
+      pc_url,
+      pc_grade_field,
     } = body;
 
     if (!portfolio_id || !external_id || !name || !purchase_price || !purchase_date) {
@@ -161,6 +164,9 @@ export async function POST(request: NextRequest) {
         language: language || "English",
         storage_location: storage_location || "",
         is_manual_submission: is_manual_submission || false,
+        pc_product_id: pc_product_id || null,
+        pc_url: pc_url || null,
+        pc_grade_field: pc_grade_field || null,
       })
       .select()
       .single();
@@ -210,6 +216,9 @@ export async function PATCH(request: NextRequest) {
       psa_grade,
       language,
       storage_location,
+      pc_product_id,
+      pc_url,
+      pc_grade_field,
     } = body;
 
     if (!id) {
@@ -266,6 +275,9 @@ export async function PATCH(request: NextRequest) {
     if (psa_grade !== undefined) updates.psa_grade = psa_grade || null;
     if (language !== undefined) updates.language = language;
     if (storage_location !== undefined) updates.storage_location = storage_location;
+    if (pc_product_id !== undefined) updates.pc_product_id = pc_product_id || null;
+    if (pc_url !== undefined) updates.pc_url = pc_url || null;
+    if (pc_grade_field !== undefined) updates.pc_grade_field = pc_grade_field || null;
 
     const { data, error } = await supabase
       .from("assets")

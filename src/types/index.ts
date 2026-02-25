@@ -72,6 +72,9 @@ export interface PortfolioAsset {
   language?: string;
   storage_location?: string;
   is_manual_submission?: boolean;
+  pc_product_id?: string | null;
+  pc_url?: string | null;
+  pc_grade_field?: string | null;
 }
 
 export interface PortfolioSummary {

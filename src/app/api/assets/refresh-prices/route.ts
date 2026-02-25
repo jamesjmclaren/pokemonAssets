@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { searchCards, searchSealedProducts } from "@/lib/pokemon-api";
 import { extractCardPrice } from "@/lib/format";
+import { fetchTetheredPrice } from "@/lib/pricecharting";
 
 const STALE_HOURS = 24;
 
@@ -9,7 +10,7 @@ export async function POST() {
   try {
     const { data: assets, error } = await supabase
       .from("assets")
-      .select("id, external_id, name, asset_type, price_updated_at, manual_price");
+      .select("id, external_id, name, asset_type, price_updated_at, manual_price, pc_product_id, pc_url, pc_grade_field");
 
     if (error) throw error;
     if (!assets || assets.length === 0) {
@@ -19,9 +20,9 @@ export async function POST() {
     const now = Date.now();
     const staleMs = STALE_HOURS * 60 * 60 * 1000;
 
-    // Only refresh assets with stale or missing prices (skip manual_price assets)
+    // Refresh stale assets. Skip manual_price UNLESS they have a PriceCharting tether.
     const staleAssets = assets.filter((a) => {
-      if (a.manual_price) return false;
+      if (a.manual_price && !a.pc_url) return false;
       if (!a.price_updated_at) return true;
       return now - new Date(a.price_updated_at).getTime() > staleMs;
     });
@@ -36,53 +37,70 @@ export async function POST() {
       if (!asset.name) continue;
 
       try {
-        let results: Record<string, unknown>[];
+        let marketPrice: number | null = null;
+        let priceSource = asset.asset_type === "sealed" ? "pokemonpricetracker" : "tcgplayer";
 
-        if (asset.asset_type === "sealed") {
-          // Use PokemonPriceTracker for sealed products
+        // Tethered assets → fetch price from PriceCharting (with delay to avoid 429)
+        if (asset.pc_url) {
           try {
-            results = (await searchSealedProducts(
-              asset.name,
-              undefined,
-              5
-            )) as unknown as Record<string, unknown>[];
-          } catch {
-            // Fall back to JustTCG if PPT unavailable
+            if (updated > 0) await new Promise((r) => setTimeout(r, 500));
+            const tetheredPrice = await fetchTetheredPrice(
+              asset.pc_url,
+              asset.pc_grade_field || undefined
+            );
+            if (tetheredPrice != null) {
+              marketPrice = tetheredPrice;
+              priceSource = "pricecharting";
+            }
+          } catch (e) {
+            console.warn(`[refresh-prices] PriceCharting tether failed for "${asset.name}":`, e);
+          }
+        }
+
+        // Fallback to JustTCG / PokemonPriceTracker for non-tethered assets
+        if (marketPrice == null) {
+          let results: Record<string, unknown>[];
+
+          if (asset.asset_type === "sealed") {
+            try {
+              results = (await searchSealedProducts(
+                asset.name,
+                undefined,
+                5
+              )) as unknown as Record<string, unknown>[];
+            } catch {
+              results = (await searchCards(
+                asset.name,
+                undefined,
+                5
+              )) as unknown as Record<string, unknown>[];
+            }
+          } else {
             results = (await searchCards(
               asset.name,
               undefined,
               5
             )) as unknown as Record<string, unknown>[];
           }
-        } else {
-          // Use JustTCG for cards
-          results = (await searchCards(
-            asset.name,
-            undefined,
-            5
-          )) as unknown as Record<string, unknown>[];
+
+          if (results.length === 0) {
+            console.warn(`[refresh-prices] No API results for "${asset.name}"`);
+            continue;
+          }
+
+          const match =
+            results.find(
+              (c: Record<string, unknown>) => c.id === asset.external_id
+            ) || results[0];
+
+          if (!match) continue;
+
+          marketPrice = extractCardPrice(match);
         }
 
-        if (results.length === 0) {
-          console.warn(`[refresh-prices] No API results for "${asset.name}"`);
-          continue;
-        }
-
-        // Prefer exact ID match, then first result
-        const match =
-          results.find(
-            (c: Record<string, unknown>) => c.id === asset.external_id
-          ) || results[0];
-
-        if (!match) continue;
-
-        const marketPrice = extractCardPrice(match);
         if (marketPrice == null) {
           console.warn(
-            `[refresh-prices] No price found for "${asset.name}". API keys:`,
-            Object.keys(match),
-            "prices field:",
-            JSON.stringify(match.prices ?? "missing")
+            `[refresh-prices] No price found for "${asset.name}"`
           );
           continue;
         }
@@ -98,11 +116,10 @@ export async function POST() {
         if (!updateError) {
           updated++;
 
-          // Record a price snapshot for pricing history
           await supabase.from("price_snapshots").insert({
             asset_id: asset.id,
             price: marketPrice,
-            source: asset.asset_type === "sealed" ? "pokemonpricetracker" : "tcgplayer",
+            source: priceSource,
           });
         }
       } catch (e) {
