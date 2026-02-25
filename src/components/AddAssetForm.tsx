@@ -117,6 +117,7 @@ export default function AddAssetForm() {
     }
     if (card.type === "sealed") {
       updates.assetType = "sealed";
+      updates.condition = "Sealed";
     } else {
       updates.assetType = "card";
     }

@@ -136,9 +136,16 @@ function normalizeCard(card: JustTCGCard) {
     : undefined;
 
   // JustTCG returns sealed products (ETBs, booster boxes, tins) through the
-  // same /cards endpoint. Sealed products have no card number and no rarity —
-  // use that to distinguish them from actual trading cards.
-  const type = !card.number && !card.rarity ? "sealed" : "card";
+  // same /cards endpoint. Sealed products are identified by their variant
+  // condition being "Sealed" (or "S") — use that instead of guessing from
+  // the absence of number/rarity, which is unreliable.
+  const isSealedProduct =
+    card.variants?.length > 0 &&
+    card.variants.some((v) => {
+      const cond = v.condition?.toLowerCase();
+      return cond === "sealed" || cond === "s";
+    });
+  const type = isSealedProduct ? "sealed" : "card";
 
   return {
     id: card.id,
