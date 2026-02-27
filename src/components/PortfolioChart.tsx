@@ -28,20 +28,22 @@ interface PortfolioChartProps {
   className?: string;
 }
 
-const SERIES: Array<{ key: string; label: string; color: string; dashed?: boolean }> = [
-  { key: "total", label: "Total", color: "#6366f1" },
+// Stacked series (bottom to top): sealed, raw, graded
+// These stack to form the total portfolio value
+const STACKED_SERIES: Array<{ key: string; label: string; color: string }> = [
+  { key: "sealed", label: "Sealed Products", color: "#22c55e" },
   { key: "raw", label: "Raw Cards", color: "#f97316" },
   { key: "graded", label: "Graded Cards", color: "#a78bfa" },
-  { key: "sealed", label: "Sealed Products", color: "#22c55e" },
-  { key: "costBasis", label: "Cost Basis", color: "#9090a8", dashed: true },
 ];
+
+const COST_BASIS = { key: "costBasis", label: "Cost Basis", color: "#9090a8" };
 
 export default function PortfolioChart({ portfolioId, className = "" }: PortfolioChartProps) {
   const [range, setRange] = useState<TimeRange>("3M");
   const [data, setData] = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [visibleSeries, setVisibleSeries] = useState<Set<string>>(
-    new Set(["total", "raw", "graded", "sealed", "costBasis"])
+    new Set(["raw", "graded", "sealed", "costBasis"])
   );
 
   useEffect(() => {
@@ -101,6 +103,44 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
   const latest = data[data.length - 1];
   const isUp = latest.total >= latest.costBasis;
 
+  // Custom tooltip to show the stacked breakdown + cost basis
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || payload.length === 0) return null;
+    const point = payload[0]?.payload as ChartPoint | undefined;
+    if (!point) return null;
+
+    return (
+      <div className="bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl p-3 text-xs">
+        <p className="text-[#9090a8] mb-2">{formatDateShort(label)}</p>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-text-primary font-semibold">Total</span>
+            <span className="text-text-primary font-semibold">{formatCurrency(point.total)}</span>
+          </div>
+          <div className="border-t border-[#2a2a2a] my-1" />
+          {[...STACKED_SERIES].reverse().map((s) => (
+            <div key={s.key} className="flex items-center justify-between gap-4">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                <span className="text-[#9090a8]">{s.label}</span>
+              </span>
+              <span className="text-text-primary">{formatCurrency(point[s.key as keyof ChartPoint] as number)}</span>
+            </div>
+          ))}
+          <div className="border-t border-[#2a2a2a] my-1" />
+          <div className="flex items-center justify-between gap-4">
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 border-t-2 border-dashed border-[#9090a8]" />
+              <span className="text-[#9090a8]">{COST_BASIS.label}</span>
+            </span>
+            <span className="text-text-primary">{formatCurrency(point.costBasis)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={`bg-surface border border-border rounded-2xl p-4 md:p-6 ${className}`}>
       {/* Header */}
@@ -116,32 +156,38 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
               {formatCurrency(latest.total - latest.costBasis)}
             </span>
           </div>
-        </div>
-
-        {/* Time range + Legend */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Time range buttons */}
-          <div className="flex rounded-lg border border-border overflow-hidden">
-            {(["1M", "3M", "1Y", "All"] as TimeRange[]).map((r) => (
-              <button
-                key={r}
-                onClick={() => setRange(r)}
-                className={`px-3 py-1.5 text-xs font-semibold ${
-                  range === r
-                    ? "bg-accent text-black"
-                    : "text-text-muted hover:text-text-primary hover:bg-surface-hover"
-                }`}
-              >
-                {r}
-              </button>
+          {/* Breakdown */}
+          <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+            {[...STACKED_SERIES].reverse().map((s) => (
+              <span key={s.key} className="text-xs text-text-muted">
+                <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: s.color }} />
+                {s.label}: {formatCurrency(latest[s.key as keyof ChartPoint] as number)}
+              </span>
             ))}
           </div>
         </div>
+
+        {/* Time range buttons */}
+        <div className="flex rounded-lg border border-border overflow-hidden flex-shrink-0">
+          {(["1M", "3M", "1Y", "All"] as TimeRange[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={`px-3 py-1.5 text-xs font-semibold ${
+                range === r
+                  ? "bg-accent text-black"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-hover"
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Legend */}
+      {/* Legend (toggleable) */}
       <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4">
-        {SERIES.map((s) => (
+        {[...STACKED_SERIES].reverse().map((s) => (
           <button
             key={s.key}
             onClick={() => toggleSeries(s.key)}
@@ -149,24 +195,29 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
               visibleSeries.has(s.key) ? "opacity-100" : "opacity-40"
             }`}
           >
-            {s.dashed ? (
-              <span className="w-3 border-t-2 border-dashed" style={{ borderColor: s.color }} />
-            ) : (
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }} />
-            )}
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }} />
             <span className="text-text-secondary">{s.label}</span>
           </button>
         ))}
+        <button
+          onClick={() => toggleSeries("costBasis")}
+          className={`flex items-center gap-1.5 text-xs transition-opacity ${
+            visibleSeries.has("costBasis") ? "opacity-100" : "opacity-40"
+          }`}
+        >
+          <span className="w-3 border-t-2 border-dashed" style={{ borderColor: COST_BASIS.color }} />
+          <span className="text-text-secondary">{COST_BASIS.label}</span>
+        </button>
       </div>
 
-      {/* Chart */}
+      {/* Chart — stacked area */}
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data}>
           <defs>
-            {SERIES.filter((s) => !s.dashed).map((s) => (
+            {STACKED_SERIES.map((s) => (
               <linearGradient key={s.key} id={`grad-${s.key}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={s.color} stopOpacity={s.key === "total" ? 0.25 : 0.15} />
-                <stop offset="100%" stopColor={s.color} stopOpacity={0} />
+                <stop offset="0%" stopColor={s.color} stopOpacity={0.4} />
+                <stop offset="100%" stopColor={s.color} stopOpacity={0.05} />
               </linearGradient>
             ))}
           </defs>
@@ -187,22 +238,9 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
             axisLine={false}
             width={55}
           />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "#1e1e1e",
-              border: "1px solid #2a2a2a",
-              borderRadius: "12px",
-              padding: "12px",
-            }}
-            labelStyle={{ color: "#9090a8", fontSize: 12 }}
-            formatter={(value: number, name: string) => {
-              const series = SERIES.find((s) => s.key === name);
-              return [formatCurrency(value), series?.label ?? name];
-            }}
-            labelFormatter={formatDateShort}
-          />
+          <Tooltip content={<CustomTooltip />} />
 
-          {/* Cost basis (dashed) — render first so it's behind */}
+          {/* Cost basis (dashed, non-stacked) — rendered first so it's behind */}
           {visibleSeries.has("costBasis") && (
             <Area
               type="monotone"
@@ -212,55 +250,35 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
               strokeDasharray="6 4"
               fill="none"
               dot={false}
+              stackId={undefined}
             />
           )}
 
-          {/* Sealed */}
-          {visibleSeries.has("sealed") && (
-            <Area
-              type="monotone"
-              dataKey="sealed"
-              stroke="#22c55e"
-              strokeWidth={2}
-              fill="url(#grad-sealed)"
-              dot={false}
-            />
-          )}
-
-          {/* Graded */}
-          {visibleSeries.has("graded") && (
-            <Area
-              type="monotone"
-              dataKey="graded"
-              stroke="#a78bfa"
-              strokeWidth={2}
-              fill="url(#grad-graded)"
-              dot={false}
-            />
-          )}
-
-          {/* Raw */}
-          {visibleSeries.has("raw") && (
-            <Area
-              type="monotone"
-              dataKey="raw"
-              stroke="#f97316"
-              strokeWidth={2}
-              fill="url(#grad-raw)"
-              dot={false}
-            />
-          )}
-
-          {/* Total — on top */}
-          {visibleSeries.has("total") && (
-            <Area
-              type="monotone"
-              dataKey="total"
-              stroke="#6366f1"
-              strokeWidth={2.5}
-              fill="url(#grad-total)"
-              dot={false}
-            />
+          {/* Stacked areas: sealed (bottom) → raw → graded (top) */}
+          {STACKED_SERIES.map((s) =>
+            visibleSeries.has(s.key) ? (
+              <Area
+                key={s.key}
+                type="monotone"
+                dataKey={s.key}
+                stackId="portfolio"
+                stroke={s.color}
+                strokeWidth={2}
+                fill={`url(#grad-${s.key})`}
+                dot={false}
+              />
+            ) : (
+              <Area
+                key={s.key}
+                type="monotone"
+                dataKey={s.key}
+                stackId="portfolio"
+                stroke="transparent"
+                strokeWidth={0}
+                fill="transparent"
+                dot={false}
+              />
+            )
           )}
         </AreaChart>
       </ResponsiveContainer>
