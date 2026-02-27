@@ -28,13 +28,13 @@ interface PortfolioChartProps {
   className?: string;
 }
 
-const SERIES = [
+const SERIES: Array<{ key: string; label: string; color: string; dashed?: boolean }> = [
   { key: "total", label: "Total", color: "#6366f1" },
   { key: "raw", label: "Raw Cards", color: "#f97316" },
   { key: "graded", label: "Graded Cards", color: "#a78bfa" },
   { key: "sealed", label: "Sealed Products", color: "#22c55e" },
   { key: "costBasis", label: "Cost Basis", color: "#9090a8", dashed: true },
-] as const;
+];
 
 export default function PortfolioChart({ portfolioId, className = "" }: PortfolioChartProps) {
   const [range, setRange] = useState<TimeRange>("3M");
