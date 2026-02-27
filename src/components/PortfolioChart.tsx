@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   AreaChart,
   Area,
@@ -103,11 +103,34 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
   const latest = data[data.length - 1];
   const isUp = latest.total >= latest.costBasis;
 
-  // Custom tooltip to show the stacked breakdown + cost basis
+  // Zero out hidden stacked series so the Y-axis rescales to visible data only
+  const chartData = useMemo(() => {
+    const hiddenKeys = STACKED_SERIES.filter((s) => !visibleSeries.has(s.key)).map((s) => s.key);
+    if (hiddenKeys.length === 0 && visibleSeries.has("costBasis")) return data;
+    return data.map((point) => {
+      const p = { ...point };
+      for (const key of hiddenKeys) {
+        (p as Record<string, number>)[key] = 0;
+      }
+      if (!visibleSeries.has("costBasis")) {
+        p.costBasis = 0;
+      }
+      return p;
+    });
+  }, [data, visibleSeries]);
+
+  // Custom tooltip — always show real values from `data`, not zeroed chartData
+  // Build a lookup from original data so tooltip always shows real values
+  const realDataByDate = useMemo(() => {
+    const map = new Map<string, ChartPoint>();
+    for (const point of data) map.set(point.date, point);
+    return map;
+  }, [data]);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || payload.length === 0) return null;
-    const point = payload[0]?.payload as ChartPoint | undefined;
+    const point = realDataByDate.get(label) ?? (payload[0]?.payload as ChartPoint | undefined);
     if (!point) return null;
 
     return (
@@ -212,7 +235,7 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
 
       {/* Chart — stacked area */}
       <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={data}>
+        <AreaChart data={chartData}>
           <defs>
             {STACKED_SERIES.map((s) => (
               <linearGradient key={s.key} id={`grad-${s.key}`} x1="0" y1="0" x2="0" y2="1">
@@ -250,36 +273,22 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
               strokeDasharray="6 4"
               fill="none"
               dot={false}
-              stackId={undefined}
             />
           )}
 
           {/* Stacked areas: sealed (bottom) → raw → graded (top) */}
-          {STACKED_SERIES.map((s) =>
-            visibleSeries.has(s.key) ? (
-              <Area
-                key={s.key}
-                type="monotone"
-                dataKey={s.key}
-                stackId="portfolio"
-                stroke={s.color}
-                strokeWidth={2}
-                fill={`url(#grad-${s.key})`}
-                dot={false}
-              />
-            ) : (
-              <Area
-                key={s.key}
-                type="monotone"
-                dataKey={s.key}
-                stackId="portfolio"
-                stroke="transparent"
-                strokeWidth={0}
-                fill="transparent"
-                dot={false}
-              />
-            )
-          )}
+          {STACKED_SERIES.map((s) => (
+            <Area
+              key={s.key}
+              type="monotone"
+              dataKey={s.key}
+              stackId="portfolio"
+              stroke={visibleSeries.has(s.key) ? s.color : "transparent"}
+              strokeWidth={visibleSeries.has(s.key) ? 2 : 0}
+              fill={visibleSeries.has(s.key) ? `url(#grad-${s.key})` : "transparent"}
+              dot={false}
+            />
+          ))}
         </AreaChart>
       </ResponsiveContainer>
     </div>
