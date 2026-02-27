@@ -76,6 +76,31 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
     });
   };
 
+  // Zero out hidden stacked series so the Y-axis rescales to visible data only
+  // Must be above early returns to preserve hook call order
+  const chartData = useMemo(() => {
+    if (data.length === 0) return data;
+    const hiddenKeys = STACKED_SERIES.filter((s) => !visibleSeries.has(s.key)).map((s) => s.key);
+    if (hiddenKeys.length === 0 && visibleSeries.has("costBasis")) return data;
+    return data.map((point) => {
+      const p = { ...point };
+      for (const key of hiddenKeys) {
+        (p as unknown as Record<string, number>)[key] = 0;
+      }
+      if (!visibleSeries.has("costBasis")) {
+        p.costBasis = 0;
+      }
+      return p;
+    });
+  }, [data, visibleSeries]);
+
+  // Build a lookup from original data so tooltip always shows real values
+  const realDataByDate = useMemo(() => {
+    const map = new Map<string, ChartPoint>();
+    for (const point of data) map.set(point.date, point);
+    return map;
+  }, [data]);
+
   if (loading) {
     return (
       <div className={`bg-surface border border-border rounded-2xl p-6 ${className}`}>
@@ -102,30 +127,6 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
 
   const latest = data[data.length - 1];
   const isUp = latest.total >= latest.costBasis;
-
-  // Zero out hidden stacked series so the Y-axis rescales to visible data only
-  const chartData = useMemo(() => {
-    const hiddenKeys = STACKED_SERIES.filter((s) => !visibleSeries.has(s.key)).map((s) => s.key);
-    if (hiddenKeys.length === 0 && visibleSeries.has("costBasis")) return data;
-    return data.map((point) => {
-      const p = { ...point };
-      for (const key of hiddenKeys) {
-        (p as unknown as Record<string, number>)[key] = 0;
-      }
-      if (!visibleSeries.has("costBasis")) {
-        p.costBasis = 0;
-      }
-      return p;
-    });
-  }, [data, visibleSeries]);
-
-  // Custom tooltip — always show real values from `data`, not zeroed chartData
-  // Build a lookup from original data so tooltip always shows real values
-  const realDataByDate = useMemo(() => {
-    const map = new Map<string, ChartPoint>();
-    for (const point of data) map.set(point.date, point);
-    return map;
-  }, [data]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const CustomTooltip = ({ active, payload, label }: any) => {
