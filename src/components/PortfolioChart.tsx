@@ -110,7 +110,7 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
     return data.map((point) => {
       const p = { ...point };
       for (const key of hiddenKeys) {
-        (p as Record<string, number>)[key] = 0;
+        (p as unknown as Record<string, number>)[key] = 0;
       }
       if (!visibleSeries.has("costBasis")) {
         p.costBasis = 0;
