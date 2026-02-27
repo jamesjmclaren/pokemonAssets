@@ -182,16 +182,20 @@ export async function searchPriceCharting(
 export async function getGradedPrices(
   cardUrl: string
 ): Promise<PriceChartingCard["prices"]> {
+  console.log(`[pricecharting] Fetching detail page: ${cardUrl}`);
+
   const res = await fetch(cardUrl, {
     headers: { "User-Agent": UA },
     next: { revalidate: 3600 },
   });
 
   if (!res.ok) {
+    console.error(`[pricecharting] Detail page failed with status ${res.status} for ${cardUrl}`);
     throw new Error(`PriceCharting detail page failed: ${res.status}`);
   }
 
   const html = await res.text();
+  console.log(`[pricecharting] Received ${html.length} bytes of HTML from ${cardUrl}`);
 
   const extractPrice = (id: string): number | undefined => {
     const regex = new RegExp(
@@ -202,7 +206,7 @@ export async function getGradedPrices(
     return match ? parsePrice(match[1]) : undefined;
   };
 
-  return {
+  const prices = {
     ungraded: extractPrice("used_price"),
     grade7: extractPrice("complete_price"),
     grade8: extractPrice("new_price"),
@@ -210,6 +214,10 @@ export async function getGradedPrices(
     grade95: extractPrice("box_only_price"),
     psa10: extractPrice("manual_only_price"),
   };
+
+  console.log(`[pricecharting] Parsed prices from ${cardUrl}:`, JSON.stringify(prices));
+
+  return prices;
 }
 
 /**
@@ -257,9 +265,28 @@ export async function fetchTetheredPrice(
   pcUrl: string,
   gradeField?: string
 ): Promise<number | undefined> {
+  console.log(`[pricecharting] fetchTetheredPrice called — url: ${pcUrl}, gradeField: ${gradeField || "ungraded"}`);
+
   const prices = await getGradedPrices(pcUrl);
-  if (!gradeField || gradeField === "ungraded") return prices.ungraded;
-  return prices[gradeField as keyof typeof prices] ?? prices.ungraded;
+
+  let selectedPrice: number | undefined;
+  let selectedField: string;
+
+  if (!gradeField || gradeField === "ungraded") {
+    selectedPrice = prices.ungraded;
+    selectedField = "ungraded";
+  } else {
+    selectedPrice = prices[gradeField as keyof typeof prices];
+    selectedField = gradeField;
+    if (selectedPrice == null) {
+      console.warn(`[pricecharting] Grade field "${gradeField}" returned null, falling back to ungraded ($${prices.ungraded})`);
+      selectedPrice = prices.ungraded;
+      selectedField = "ungraded (fallback)";
+    }
+  }
+
+  console.log(`[pricecharting] fetchTetheredPrice result — field: ${selectedField}, price: $${selectedPrice ?? "null"}`);
+  return selectedPrice;
 }
 
 /**
