@@ -104,8 +104,11 @@ export default function AssetDetailPage({
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshResult, setRefreshResult] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
-  const [deletingSnapshots, setDeletingSnapshots] = useState(false);
   const [chartKey, setChartKey] = useState(0);
+  const [showSnapshots, setShowSnapshots] = useState(false);
+  const [snapshots, setSnapshots] = useState<{ id: string; price: number; source: string; recorded_at: string }[]>([]);
+  const [loadingSnapshots, setLoadingSnapshots] = useState(false);
+  const [deletingSnapshotId, setDeletingSnapshotId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchAsset() {
@@ -271,30 +274,44 @@ export default function AssetDetailPage({
     }
   };
 
-  const handleDeleteSnapshots = async () => {
+  const fetchSnapshots = async () => {
     if (!asset) return;
-    if (!confirm("Are you sure you want to delete ALL price history for this asset? This cannot be undone.")) return;
-
-    setDeletingSnapshots(true);
+    setLoadingSnapshots(true);
     try {
-      const res = await fetch(`/api/assets/${asset.id}/price-snapshots?all=true`, {
+      const res = await fetch(`/api/assets/${asset.id}/price-snapshots`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch");
+      setSnapshots(data);
+    } catch {
+      setSnapshots([]);
+    } finally {
+      setLoadingSnapshots(false);
+    }
+  };
+
+  const handleToggleSnapshots = () => {
+    if (!showSnapshots) {
+      fetchSnapshots();
+    }
+    setShowSnapshots((v) => !v);
+  };
+
+  const handleDeleteSnapshot = async (snapshotId: string) => {
+    if (!asset) return;
+    setDeletingSnapshotId(snapshotId);
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/price-snapshots?snapshotId=${snapshotId}`, {
         method: "DELETE",
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to delete");
 
-      setRefreshResult({
-        message: `Deleted ${data.deleted} price snapshots`,
-        type: "success",
-      });
+      setSnapshots((prev) => prev.filter((s) => s.id !== snapshotId));
       setChartKey((k) => k + 1);
     } catch (err) {
-      setRefreshResult({
-        message: err instanceof Error ? err.message : "Failed to delete snapshots",
-        type: "error",
-      });
+      alert(err instanceof Error ? err.message : "Failed to delete snapshot");
     } finally {
-      setDeletingSnapshots(false);
+      setDeletingSnapshotId(null);
     }
   };
 
@@ -787,14 +804,30 @@ export default function AssetDetailPage({
 
             {/* Price summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-4 md:mt-6 pt-4 md:pt-6 border-t border-border">
-              <div>
-                <p className="text-[10px] md:text-xs text-text-muted">
-                  Market Price {asset.manual_price && "(Manual)"}
-                </p>
+              <div className={clsx(
+                "rounded-xl px-2 py-1.5 -mx-2 -my-1.5",
+                stale && "bg-danger/10 ring-1 ring-danger/30"
+              )}>
+                {asset.manual_price ? (
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <PenLine className="w-3 h-3 text-warning" />
+                    <p className="text-[10px] md:text-xs font-semibold text-warning">Manual Price</p>
+                  </div>
+                ) : (
+                  <p className="text-[10px] md:text-xs text-text-muted">
+                    Market Price
+                  </p>
+                )}
                 <div className="flex items-center gap-2 mt-1">
-                  <p className={clsx("text-base md:text-xl font-bold", stale ? "text-danger" : "text-text-primary")}>
+                  <p className={clsx(
+                    "text-base md:text-xl font-bold",
+                    stale ? "text-danger" : asset.manual_price ? "text-warning" : "text-text-primary"
+                  )}>
                     {formatCurrency(currentPrice)}
                   </p>
+                  {stale && (
+                    <span className="text-[9px] font-semibold text-danger bg-danger/15 px-1.5 py-0.5 rounded">STALE</span>
+                  )}
                   {!isReadOnly && (
                     <button
                       onClick={() => {
@@ -929,20 +962,59 @@ export default function AssetDetailPage({
           {/* Admin: Manage Price History */}
           {isAdmin && (
             <div className="bg-surface border border-border rounded-2xl p-3 md:p-4">
-              <div className="flex items-center justify-between">
-                <div>
+              <button
+                onClick={handleToggleSnapshots}
+                className="flex items-center justify-between w-full"
+              >
+                <div className="text-left">
                   <p className="text-xs font-semibold text-text-primary">Price History Management</p>
-                  <p className="text-[10px] text-text-muted mt-0.5">Admin only — delete incorrect price entries</p>
+                  <p className="text-[10px] text-text-muted mt-0.5">Admin only — view and delete individual price entries</p>
                 </div>
-                <button
-                  onClick={handleDeleteSnapshots}
-                  disabled={deletingSnapshots}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-danger hover:bg-danger-muted rounded-lg text-xs font-medium disabled:opacity-50"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  {deletingSnapshots ? "Deleting..." : "Delete All Price History"}
-                </button>
-              </div>
+                <span className="text-text-muted text-xs">{showSnapshots ? "Hide" : "Show"}</span>
+              </button>
+
+              {showSnapshots && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  {loadingSnapshots ? (
+                    <p className="text-xs text-text-muted py-2">Loading snapshots...</p>
+                  ) : snapshots.length === 0 ? (
+                    <p className="text-xs text-text-muted py-2">No price history entries found.</p>
+                  ) : (
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {snapshots.map((snap) => (
+                        <div
+                          key={snap.id}
+                          className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-hover group"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-sm font-medium text-text-primary w-20 flex-shrink-0">
+                              {formatCurrency(snap.price)}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover text-text-muted flex-shrink-0">
+                              {snap.source}
+                            </span>
+                            <span className="text-xs text-text-muted truncate">
+                              {formatDate(snap.recorded_at)}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteSnapshot(snap.id)}
+                            disabled={deletingSnapshotId === snap.id}
+                            className="p-1 rounded text-text-muted hover:text-danger hover:bg-danger-muted opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 flex-shrink-0"
+                            title="Delete this entry"
+                          >
+                            {deletingSnapshotId === snap.id ? (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
