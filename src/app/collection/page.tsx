@@ -14,6 +14,7 @@ import {
   Pencil,
   Trash2,
   TrendingUp,
+  PenLine,
 } from "lucide-react";
 import AssetCard from "@/components/AssetCard";
 import MiniSparkline from "@/components/MiniSparkline";
@@ -414,20 +415,21 @@ export default function CollectionPage() {
 
                       {/* Market Price */}
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
+                        <div>
                           {asset.manual_price && (
-                            <span className="w-4 h-4 flex-shrink-0" title="Manually entered">
-                              <Pencil className="w-3.5 h-3.5 text-gold" />
-                            </span>
+                            <div className="flex items-center gap-1 mb-0.5">
+                              <PenLine className="w-2.5 h-2.5 text-warning" />
+                              <span className="text-[10px] font-semibold text-warning">Manual</span>
+                            </div>
                           )}
-                          <span className={`text-sm font-semibold ${stale ? "text-danger" : "text-gold"}`}>
-                            {formatCurrency(marketPrice)}
-                          </span>
-                          {stale && (
-                            <span title="Price not updated in 7+ days">
-                              <AlertTriangle className="w-3.5 h-3.5 text-danger flex-shrink-0" />
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-sm font-semibold ${stale ? "text-danger" : asset.manual_price ? "text-warning" : "text-gold"}`}>
+                              {formatCurrency(marketPrice)}
                             </span>
-                          )}
+                            {stale && (
+                              <span className="text-[9px] font-bold text-danger bg-danger/15 px-1 py-0.5 rounded leading-none">STALE</span>
+                            )}
+                          </div>
                         </div>
                       </td>
 
@@ -617,13 +619,19 @@ export default function CollectionPage() {
                       {qty > 1 && (
                         <span className="text-[10px] text-text-muted">x{qty}</span>
                       )}
+                      {asset.manual_price && (
+                        <span className="flex items-center gap-0.5">
+                          <PenLine className="w-2.5 h-2.5 text-warning" />
+                          <span className="text-[10px] font-semibold text-warning">Manual</span>
+                        </span>
+                      )}
                       {stale && (
-                        <AlertTriangle className="w-3 h-3 text-danger" />
+                        <span className="text-[8px] font-bold text-danger bg-danger/15 px-1 py-0.5 rounded leading-none">STALE</span>
                       )}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-semibold text-text-primary">
+                    <p className={`text-sm font-semibold ${stale ? "text-danger" : "text-text-primary"}`}>
                       {formatCurrency(total)}
                     </p>
                     <p
