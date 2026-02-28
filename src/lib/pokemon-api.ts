@@ -66,7 +66,7 @@ interface JustTCGVariant {
   priceChange7d?: number | null;
   priceChange30d?: number | null;
   priceChange90d?: number | null;
-  priceHistory?: Array<{ date: string; price: number }> | null;
+  priceHistory?: Array<{ t: number; p: number }> | null;
 }
 
 interface JustTCGCard {
@@ -250,8 +250,8 @@ export async function getPriceHistory(
   if (!bestVariant?.priceHistory) return [];
 
   let points = bestVariant.priceHistory.map((entry) => ({
-    date: entry.date,
-    price: entry.price,
+    date: new Date(entry.t * 1000).toISOString().split("T")[0],
+    price: entry.p,
     source: "tcgplayer" as const,
   }));
 
