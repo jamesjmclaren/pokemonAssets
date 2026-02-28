@@ -53,38 +53,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // If we have enough snapshot data, return it directly
-    if (snapshotData.length >= 2) {
-      return NextResponse.json(snapshotData);
+    // Try to get external API price history (JustTCG for cards, PPT for sealed)
+    let apiPoints: { date: string; price: number; source?: string }[] = [];
+    try {
+      let apiData;
+      if (assetType) {
+        apiData = await getPriceHistoryByType(
+          assetType,
+          cardId || "",
+          name || undefined,
+          startDate || undefined,
+          endDate || undefined
+        );
+      } else {
+        apiData = await getPriceHistory(
+          cardId || "",
+          startDate || undefined,
+          endDate || undefined,
+          name || undefined
+        );
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawPoints = Array.isArray(apiData) ? apiData : (apiData as any)?.data || [];
+      apiPoints = rawPoints as { date: string; price: number; source?: string }[];
+    } catch (apiError) {
+      console.warn("[price-history] External API failed, using snapshots only:", apiError instanceof Error ? apiError.message : apiError);
     }
 
-    // Fall back to external API for price history
-    let apiData;
-
-    if (assetType) {
-      apiData = await getPriceHistoryByType(
-        assetType,
-        cardId || "",
-        name || undefined,
-        startDate || undefined,
-        endDate || undefined
-      );
-    } else {
-      apiData = await getPriceHistory(
-        cardId || "",
-        startDate || undefined,
-        endDate || undefined,
-        name || undefined
-      );
-    }
-
-    // Merge: use API data as base and overlay snapshot data
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawPoints = Array.isArray(apiData) ? apiData : (apiData as any)?.data || [];
-    const apiPoints = rawPoints as { date: string; price: number; source?: string }[];
-
+    // Merge both sources, preferring snapshot data for overlapping dates
     if (snapshotData.length > 0 && apiPoints.length > 0) {
-      // Merge both sources, preferring snapshot data for dates where we have both
       const merged = new Map<string, { price: number; source?: string }>();
       for (const point of apiPoints) {
         merged.set(point.date, { price: point.price, source: point.source });
@@ -98,7 +95,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(result);
     }
 
-    return NextResponse.json(apiData);
+    // Return whichever source has data
+    if (snapshotData.length > 0) {
+      return NextResponse.json(snapshotData);
+    }
+
+    return NextResponse.json(apiPoints);
   } catch (error) {
     console.error("Price history API error:", error);
     return NextResponse.json(
