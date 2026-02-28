@@ -14,6 +14,10 @@ import {
   Pencil,
   Trash2,
   TrendingUp,
+  PenLine,
+  ChevronsUpDown,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import AssetCard from "@/components/AssetCard";
 import MiniSparkline from "@/components/MiniSparkline";
@@ -237,8 +241,8 @@ export default function CollectionPage() {
       )}
 
       {/* Tabs: All / Raw Cards / Graded Cards / Sealed Products */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 border-b border-border overflow-x-auto">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="flex gap-1 border-b border-border overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: "none" }}>
           {([
             { key: "all" as TypeTab, label: `All (${assets.length})` },
             { key: "raw" as TypeTab, label: `Raw Cards (${rawCardCount})` },
@@ -259,8 +263,8 @@ export default function CollectionPage() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          {/* Sort */}
-          <div className="hidden md:flex items-center gap-2">
+          {/* Sort (mobile only — desktop uses clickable table headers) */}
+          <div className="flex md:hidden items-center gap-2">
             <SlidersHorizontal className="w-4 h-4 text-text-muted" />
             <select
               value={sortField}
@@ -325,33 +329,43 @@ export default function CollectionPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                    Product
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                    Purchase Date
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                    Market Price
-                  </th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                    Price Chart
-                  </th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                    Qty
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                    Invested
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                    Profit/Loss
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                    Performance
-                  </th>
+                  {([
+                    { label: "Card", field: "name" as SortField, align: "left" },
+                    { label: "Purchase Date", field: "purchase_date" as SortField, align: "left" },
+                    { label: "Market Price", field: "current_price" as SortField, align: "left" },
+                    { label: "Price Chart", field: null, align: "center" },
+                    { label: "Qty", field: null, align: "center" },
+                    { label: "Total", field: "current_price" as SortField, align: "right" },
+                    { label: "Invested", field: "purchase_price" as SortField, align: "right" },
+                    { label: "Profit/Loss", field: "profit" as SortField, align: "right" },
+                    { label: "Performance", field: "performance" as SortField, align: "right" },
+                  ]).map((col, i) => (
+                    <th
+                      key={i}
+                      className={`px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider ${
+                        col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                      } ${col.field ? "cursor-pointer hover:text-text-primary select-none" : ""}`}
+                      onClick={col.field ? () => {
+                        if (sortField === col.field) {
+                          setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                        } else {
+                          setSortField(col.field!);
+                          setSortDir("desc");
+                        }
+                      } : undefined}
+                    >
+                      <span className={`inline-flex items-center gap-1 ${col.align === "right" ? "justify-end" : ""}`}>
+                        {col.label}
+                        {col.field && (
+                          sortField === col.field ? (
+                            sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                          ) : (
+                            <ChevronsUpDown className="w-3 h-3 opacity-40" />
+                          )
+                        )}
+                      </span>
+                    </th>
+                  ))}
                   <th className="text-center px-2 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">
                     Actions
                   </th>
@@ -414,20 +428,21 @@ export default function CollectionPage() {
 
                       {/* Market Price */}
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
+                        <div>
                           {asset.manual_price && (
-                            <span className="w-4 h-4 flex-shrink-0" title="Manually entered">
-                              <Pencil className="w-3.5 h-3.5 text-gold" />
-                            </span>
+                            <div className="flex items-center gap-1 mb-0.5">
+                              <PenLine className="w-2.5 h-2.5 text-warning" />
+                              <span className="text-[10px] font-semibold text-warning">Manual</span>
+                            </div>
                           )}
-                          <span className={`text-sm font-semibold ${stale ? "text-danger" : "text-gold"}`}>
-                            {formatCurrency(marketPrice)}
-                          </span>
-                          {stale && (
-                            <span title="Price not updated in 7+ days">
-                              <AlertTriangle className="w-3.5 h-3.5 text-danger flex-shrink-0" />
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-sm font-semibold ${stale ? "text-danger" : asset.manual_price ? "text-warning" : "text-gold"}`}>
+                              {formatCurrency(marketPrice)}
                             </span>
-                          )}
+                            {stale && (
+                              <span className="text-[9px] font-bold text-danger bg-danger/15 px-1 py-0.5 rounded leading-none">STALE</span>
+                            )}
+                          </div>
                         </div>
                       </td>
 
@@ -617,13 +632,19 @@ export default function CollectionPage() {
                       {qty > 1 && (
                         <span className="text-[10px] text-text-muted">x{qty}</span>
                       )}
+                      {asset.manual_price && (
+                        <span className="flex items-center gap-0.5">
+                          <PenLine className="w-2.5 h-2.5 text-warning" />
+                          <span className="text-[10px] font-semibold text-warning">Manual</span>
+                        </span>
+                      )}
                       {stale && (
-                        <AlertTriangle className="w-3 h-3 text-danger" />
+                        <span className="text-[8px] font-bold text-danger bg-danger/15 px-1 py-0.5 rounded leading-none">STALE</span>
                       )}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-semibold text-text-primary">
+                    <p className={`text-sm font-semibold ${stale ? "text-danger" : "text-text-primary"}`}>
                       {formatCurrency(total)}
                     </p>
                     <p

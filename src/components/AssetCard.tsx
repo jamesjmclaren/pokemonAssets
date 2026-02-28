@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { clsx } from "clsx";
-import { TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, PenLine } from "lucide-react";
 import { formatCurrency, formatPercentage, fixStorageUrl } from "@/lib/format";
 import type { PortfolioAsset } from "@/types";
 
@@ -34,11 +34,14 @@ export default function AssetCard({ asset }: AssetCardProps) {
   const imageUrl = imgSrc;
 
   const stale = !asset.price_updated_at
-    || Date.now() - new Date(asset.price_updated_at).getTime() > 30 * 24 * 60 * 60 * 1000;
+    || Date.now() - new Date(asset.price_updated_at).getTime() > 7 * 24 * 60 * 60 * 1000;
 
   return (
     <Link href={`/asset/${asset.id}`}>
-      <div className="bg-surface border border-border rounded-2xl overflow-hidden hover:border-border-hover hover:bg-surface-hover group cursor-pointer">
+      <div className={clsx(
+        "bg-surface border rounded-2xl overflow-hidden hover:border-border-hover hover:bg-surface-hover group cursor-pointer",
+        stale ? "border-danger/40" : "border-border"
+      )}>
         {/* Mobile: horizontal row layout / Desktop: vertical card layout */}
         <div className="flex md:block">
           {/* Image */}
@@ -82,9 +85,9 @@ export default function AssetCard({ asset }: AssetCardProps) {
                 </span>
               </div>
             )}
-            {stale && (
+            {asset.manual_price && (
               <div className="absolute bottom-2 right-2 hidden md:block">
-                <AlertTriangle className="w-4 h-4 text-danger" />
+                <PenLine className="w-4 h-4 text-warning" />
               </div>
             )}
           </div>
@@ -122,12 +125,27 @@ export default function AssetCard({ asset }: AssetCardProps) {
 
             <div className="flex items-end justify-between mt-2 md:mt-3">
               <div>
-                <p className="text-[10px] md:text-xs text-text-muted">
-                  {qty > 1 ? "Total Value" : "Current Value"}
-                </p>
-                <p className="text-sm md:text-lg font-bold text-text-primary">
-                  {formatCurrency(totalValue)}
-                </p>
+                {asset.manual_price ? (
+                  <div className="flex items-center gap-1">
+                    <PenLine className="w-2.5 h-2.5 text-warning" />
+                    <p className="text-[10px] md:text-xs font-semibold text-warning">Manual Price</p>
+                  </div>
+                ) : (
+                  <p className="text-[10px] md:text-xs text-text-muted">
+                    {qty > 1 ? "Total Value" : "Current Value"}
+                  </p>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <p className={clsx(
+                    "text-sm md:text-lg font-bold",
+                    stale ? "text-danger" : asset.manual_price ? "text-warning" : "text-text-primary"
+                  )}>
+                    {formatCurrency(totalValue)}
+                  </p>
+                  {stale && (
+                    <span className="text-[8px] font-bold text-danger bg-danger/15 px-1 py-0.5 rounded leading-none">STALE</span>
+                  )}
+                </div>
               </div>
               <div
                 className={clsx(

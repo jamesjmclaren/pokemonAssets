@@ -79,25 +79,6 @@ export default function DashboardPage() {
   const profitPercent =
     totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
 
-  const chartData = assets.length > 0
-    ? [
-        {
-          date: new Date(
-            Math.min(...assets.map((a) => new Date(a.purchase_date).getTime()))
-          )
-            .toISOString()
-            .split("T")[0],
-          value: totalInvested,
-          invested: totalInvested,
-        },
-        {
-          date: new Date().toISOString().split("T")[0],
-          value: currentValue,
-          invested: totalInvested,
-        },
-      ]
-    : [];
-
   // Stale price detection (7 days)
   const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
   const staleAssets = assets.filter((a) => {
@@ -254,7 +235,9 @@ export default function DashboardPage() {
       )}
 
       {/* Chart */}
-      <PortfolioChart data={chartData} />
+      {currentPortfolio && (
+        <PortfolioChart portfolioId={currentPortfolio.id} />
+      )}
 
       {/* Top Gainers */}
       {topGainers.length > 0 && (

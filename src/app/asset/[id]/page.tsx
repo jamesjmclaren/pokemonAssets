@@ -25,6 +25,7 @@ import {
   PenLine,
   X,
   Link2,
+  RefreshCw,
 } from "lucide-react";
 import PriceChart from "@/components/PriceChart";
 import { formatCurrency, formatPercentage, formatDate, fixStorageUrl } from "@/lib/format";
@@ -101,6 +102,13 @@ export default function AssetDetailPage({
   const [saving, setSaving] = useState(false);
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshResult, setRefreshResult] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const [chartKey, setChartKey] = useState(0);
+  const [showSnapshots, setShowSnapshots] = useState(false);
+  const [snapshots, setSnapshots] = useState<{ id: string; price: number; source: string; recorded_at: string }[]>([]);
+  const [loadingSnapshots, setLoadingSnapshots] = useState(false);
+  const [deletingSnapshotId, setDeletingSnapshotId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchAsset() {
@@ -231,6 +239,83 @@ export default function AssetDetailPage({
       setSaving(false);
     }
   };
+
+  const handleRefreshPrice = async () => {
+    if (!asset) return;
+    setRefreshing(true);
+    setRefreshResult(null);
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/refresh-price`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to refresh");
+
+      if (data.refreshed) {
+        setAsset(data.asset);
+        setRefreshResult({
+          message: `Updated to ${formatCurrency(data.price)} from ${data.source}`,
+          type: "success",
+        });
+        setChartKey((k) => k + 1);
+      } else {
+        setRefreshResult({
+          message: data.message || "No update needed",
+          type: "info",
+        });
+      }
+    } catch (err) {
+      setRefreshResult({
+        message: err instanceof Error ? err.message : "Failed to refresh price",
+        type: "error",
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const fetchSnapshots = async () => {
+    if (!asset) return;
+    setLoadingSnapshots(true);
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/price-snapshots`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch");
+      setSnapshots(data);
+    } catch {
+      setSnapshots([]);
+    } finally {
+      setLoadingSnapshots(false);
+    }
+  };
+
+  const handleToggleSnapshots = () => {
+    if (!showSnapshots) {
+      fetchSnapshots();
+    }
+    setShowSnapshots((v) => !v);
+  };
+
+  const handleDeleteSnapshot = async (snapshotId: string) => {
+    if (!asset) return;
+    setDeletingSnapshotId(snapshotId);
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/price-snapshots?snapshotId=${snapshotId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete");
+
+      setSnapshots((prev) => prev.filter((s) => s.id !== snapshotId));
+      setChartKey((k) => k + 1);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete snapshot");
+    } finally {
+      setDeletingSnapshotId(null);
+    }
+  };
+
+  const isAdmin = currentPortfolio?.role === "owner" || currentPortfolio?.role === "admin";
 
   if (loading) {
     return (
@@ -719,14 +804,30 @@ export default function AssetDetailPage({
 
             {/* Price summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-4 md:mt-6 pt-4 md:pt-6 border-t border-border">
-              <div>
-                <p className="text-[10px] md:text-xs text-text-muted">
-                  Market Price {asset.manual_price && "(Manual)"}
-                </p>
+              <div className={clsx(
+                "rounded-xl px-2 py-1.5 -mx-2 -my-1.5",
+                stale && "bg-danger/10 ring-1 ring-danger/30"
+              )}>
+                {asset.manual_price ? (
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <PenLine className="w-3 h-3 text-warning" />
+                    <p className="text-[10px] md:text-xs font-semibold text-warning">Manual Price</p>
+                  </div>
+                ) : (
+                  <p className="text-[10px] md:text-xs text-text-muted">
+                    Market Price
+                  </p>
+                )}
                 <div className="flex items-center gap-2 mt-1">
-                  <p className={clsx("text-base md:text-xl font-bold", stale ? "text-danger" : "text-text-primary")}>
+                  <p className={clsx(
+                    "text-base md:text-xl font-bold",
+                    stale ? "text-danger" : asset.manual_price ? "text-warning" : "text-text-primary"
+                  )}>
                     {formatCurrency(currentPrice)}
                   </p>
+                  {stale && (
+                    <span className="text-[9px] font-semibold text-danger bg-danger/15 px-1.5 py-0.5 rounded">STALE</span>
+                  )}
                   {!isReadOnly && (
                     <button
                       onClick={() => {
@@ -737,6 +838,16 @@ export default function AssetDetailPage({
                       title="Override market price"
                     >
                       <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {!isReadOnly && !(asset.manual_price && !asset.pc_url) && (
+                    <button
+                      onClick={handleRefreshPrice}
+                      disabled={refreshing}
+                      className="p-1 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 disabled:opacity-50"
+                      title="Refresh market price now"
+                    >
+                      <RefreshCw className={clsx("w-3.5 h-3.5", refreshing && "animate-spin")} />
                     </button>
                   )}
                 </div>
@@ -826,10 +937,90 @@ export default function AssetDetailPage({
                 </div>
               </div>
             )}
+
+            {/* Refresh result message */}
+            {refreshResult && (
+              <div
+                className={clsx(
+                  "mt-4 flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-medium",
+                  refreshResult.type === "success" && "bg-success/15 text-success border border-success/30",
+                  refreshResult.type === "error" && "bg-danger/15 text-danger border border-danger/30",
+                  refreshResult.type === "info" && "bg-accent/10 text-accent border border-accent/30"
+                )}
+              >
+                <span>{refreshResult.message}</span>
+                <button
+                  onClick={() => setRefreshResult(null)}
+                  className="ml-2 p-0.5 rounded hover:bg-black/10"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* Admin: Manage Price History */}
+          {isAdmin && (
+            <div className="bg-surface border border-border rounded-2xl p-3 md:p-4">
+              <button
+                onClick={handleToggleSnapshots}
+                className="flex items-center justify-between w-full"
+              >
+                <div className="text-left">
+                  <p className="text-xs font-semibold text-text-primary">Price History Management</p>
+                  <p className="text-[10px] text-text-muted mt-0.5">Admin only — view and delete individual price entries</p>
+                </div>
+                <span className="text-text-muted text-xs">{showSnapshots ? "Hide" : "Show"}</span>
+              </button>
+
+              {showSnapshots && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  {loadingSnapshots ? (
+                    <p className="text-xs text-text-muted py-2">Loading snapshots...</p>
+                  ) : snapshots.length === 0 ? (
+                    <p className="text-xs text-text-muted py-2">No price history entries found.</p>
+                  ) : (
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {snapshots.map((snap) => (
+                        <div
+                          key={snap.id}
+                          className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-hover group"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-sm font-medium text-text-primary w-20 flex-shrink-0">
+                              {formatCurrency(snap.price)}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover text-text-muted flex-shrink-0">
+                              {snap.source}
+                            </span>
+                            <span className="text-xs text-text-muted truncate">
+                              {formatDate(snap.recorded_at)}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteSnapshot(snap.id)}
+                            disabled={deletingSnapshotId === snap.id}
+                            className="p-1 rounded text-text-muted hover:text-danger hover:bg-danger-muted opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 flex-shrink-0"
+                            title="Delete this entry"
+                          >
+                            {deletingSnapshotId === snap.id ? (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Price Chart */}
           <PriceChart
+            key={chartKey}
             externalId={asset.external_id}
             assetId={asset.id}
             cardName={asset.name}
