@@ -71,7 +71,7 @@ function isPriceStale(asset: PortfolioAsset): boolean {
 interface EditForm {
   name: string;
   set_name: string;
-  asset_type: "card" | "sealed";
+  asset_type: "card" | "sealed" | "comic";
   purchase_price: string;
   purchase_date: string;
   purchase_location: string;
@@ -431,11 +431,12 @@ export default function AssetDetailPage({
               <label className="block text-sm font-medium text-text-secondary mb-1.5">Asset Type</label>
               <select
                 value={editForm.asset_type}
-                onChange={(e) => setEditForm({ ...editForm, asset_type: e.target.value as "card" | "sealed" })}
+                onChange={(e) => setEditForm({ ...editForm, asset_type: e.target.value as "card" | "sealed" | "comic" })}
                 className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-text-primary text-sm outline-none focus:border-accent"
               >
                 <option value="card">Trading Card</option>
                 <option value="sealed">Sealed Product</option>
+                <option value="comic">Comic Book</option>
               </select>
             </div>
 
@@ -738,12 +739,14 @@ export default function AssetDetailPage({
                   <span
                     className={clsx(
                       "px-2 py-1 rounded-lg text-xs font-semibold",
-                      asset.asset_type === "card"
-                        ? "bg-accent-muted text-accent-hover"
-                        : "bg-warning-muted text-warning"
+                      asset.asset_type === "comic"
+                        ? "bg-emerald-500/15 text-emerald-400"
+                        : asset.asset_type === "card"
+                          ? "bg-accent-muted text-accent-hover"
+                          : "bg-warning-muted text-warning"
                     )}
                   >
-                    {asset.asset_type === "card" ? "Card" : "Sealed"}
+                    {asset.asset_type === "comic" ? "Comic" : asset.asset_type === "card" ? "Card" : "Sealed"}
                   </span>
                   {asset.psa_grade && (
                     <span className="px-2 py-1 rounded-lg text-xs font-semibold bg-gold/10 text-gold">

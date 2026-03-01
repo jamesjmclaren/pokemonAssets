@@ -20,7 +20,24 @@ export interface SealedProduct {
   type: "sealed";
 }
 
-export type PokemonAssetSearchResult = PokemonCard | SealedProduct;
+export interface ComicBook {
+  id: string;
+  name: string;
+  setName: string;
+  imageUrl?: string;
+  url: string;
+  type: "comic";
+  prices: {
+    ungraded?: number;
+    vg4?: number;
+    fine6?: number;
+    vf8?: number;
+    nm92?: number;
+    nm98?: number;
+  };
+}
+
+export type PokemonAssetSearchResult = PokemonCard | SealedProduct | ComicBook;
 
 export interface CardPrices {
   tcgplayer?: {
@@ -52,7 +69,7 @@ export interface PortfolioAsset {
   external_id: string;
   name: string;
   set_name: string;
-  asset_type: "card" | "sealed";
+  asset_type: "card" | "sealed" | "comic";
   image_url: string | null;
   custom_image_url: string | null;
   purchase_price: number;
@@ -91,7 +108,7 @@ export interface PortfolioSummary {
 export interface SearchFilters {
   query: string;
   setId?: string;
-  type?: "card" | "sealed" | "all";
+  type?: "card" | "sealed" | "comic" | "all";
 }
 
 export interface ApiSet {

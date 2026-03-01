@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 interface MiniSparklineProps {
   assetId: string;
   assetName: string;
-  assetType: "card" | "sealed";
+  assetType: "card" | "sealed" | "comic";
   currentPrice: number;
   purchasePrice: number;
 }
