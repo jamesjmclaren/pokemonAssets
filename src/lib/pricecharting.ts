@@ -35,6 +35,14 @@ export interface PriceChartingCard {
   };
 }
 
+/**
+ * Upgrade a PriceCharting thumbnail URL to a higher-resolution version.
+ * Search results serve /60.jpg (tiny); swap to /240.jpg for usable quality.
+ */
+function upgradeImageUrl(url: string): string {
+  return url.replace(/\/60\.jpg$/, "/240.jpg");
+}
+
 function parsePrice(raw: string): number | undefined {
   const cleaned = raw.replace(/[^0-9.]/g, "");
   const val = parseFloat(cleaned);
@@ -65,7 +73,7 @@ function parseDetailPage(html: string, pageUrl: string): PriceChartingCard | nul
   const imgMatch = html.match(
     /src="(https:\/\/storage\.googleapis\.com\/images\.pricecharting\.com\/[^"]+)"/
   );
-  const imageUrl = imgMatch ? imgMatch[1] : undefined;
+  const imageUrl = imgMatch ? upgradeImageUrl(imgMatch[1]) : undefined;
 
   // Extract prices from detail page
   const extractPrice = (id: string): number | undefined => {
@@ -148,7 +156,7 @@ export async function searchPriceCharting(
     const imgMatch = rowHtml.match(
       /src="(https:\/\/storage\.googleapis\.com\/images\.pricecharting\.com\/[^"]+)"/
     );
-    const imageUrl = imgMatch ? imgMatch[1] : undefined;
+    const imageUrl = imgMatch ? upgradeImageUrl(imgMatch[1]) : undefined;
 
     const priceMatches = rowHtml.match(
       /class="js-price"[^>]*>([^<]*)/g
@@ -299,5 +307,233 @@ export function gradeToField(grade: string): keyof PriceChartingCard["prices"] {
   if (g.includes("9")) return "grade9";
   if (g.includes("8")) return "grade8";
   if (g.includes("7")) return "grade7";
+  return "ungraded";
+}
+
+/**
+ * Comic book grade mapping for PriceCharting.
+ * PriceCharting reuses the same HTML IDs but they map to comic grades:
+ *   used_price       → Ungraded
+ *   complete_price   → 4.0 / VG (Very Good)
+ *   new_price        → 6.0 / Fine
+ *   graded_price     → 8.0 / VF (Very Fine)
+ *   box_only_price   → 9.2 / NM- (Near Mint Minus)
+ *   manual_only_price → 9.8
+ */
+
+export interface PriceChartingComic {
+  id: string;
+  name: string;
+  setName: string;
+  url: string;
+  imageUrl?: string;
+  prices: {
+    ungraded?: number;
+    vg4?: number;
+    fine6?: number;
+    vf8?: number;
+    nm92?: number;
+    nm98?: number;
+  };
+}
+
+function parseComicDetailPage(html: string, pageUrl: string): PriceChartingComic | null {
+  const idMatch = html.match(/product_id['":\s]+(\d+)/) ||
+    pageUrl.match(/\/game\/[^/]+\/[^?]+/);
+  const productId = idMatch?.[1] || pageUrl.split("/").pop()?.split("?")[0] || "unknown";
+
+  const h1Match = html.match(/<h1[^>]*id="product_name"[^>]*>([^<]+)/);
+  const titleMatch = html.match(/<title>([^|<]+)/);
+  const name = (h1Match?.[1] || titleMatch?.[1] || "").replace(/ Prices$/, "").trim();
+  if (!name) return null;
+
+  const setMatch = html.match(/href="\/console\/[^"]*"[^>]*>([^<]+)/);
+  const setName = setMatch ? setMatch[1].trim() : "";
+
+  const imgMatch = html.match(
+    /src="(https:\/\/storage\.googleapis\.com\/images\.pricecharting\.com\/[^"]+)"/
+  );
+  const imageUrl = imgMatch ? upgradeImageUrl(imgMatch[1]) : undefined;
+
+  const extractPrice = (id: string): number | undefined => {
+    const regex = new RegExp(
+      `id="${id}"[^>]*>\\s*<span[^>]*class="price[^"]*"[^>]*>([^<]*)`,
+      "s"
+    );
+    const match = html.match(regex);
+    return match ? parsePrice(match[1]) : undefined;
+  };
+
+  return {
+    id: productId,
+    name,
+    setName,
+    url: pageUrl.split("?")[0],
+    imageUrl,
+    prices: {
+      ungraded: extractPrice("used_price"),
+      vg4: extractPrice("complete_price"),
+      fine6: extractPrice("new_price"),
+      vf8: extractPrice("graded_price"),
+      nm92: extractPrice("box_only_price"),
+      nm98: extractPrice("manual_only_price"),
+    },
+  };
+}
+
+export async function searchComicsPriceCharting(
+  query: string
+): Promise<PriceChartingComic[]> {
+  const url = `${PC_BASE}/search-products?q=${encodeURIComponent(query)}&type=prices&category=comic-books`;
+
+  const res = await fetch(url, {
+    headers: { "User-Agent": UA },
+    next: { revalidate: 3600 },
+  });
+
+  if (!res.ok) {
+    throw new Error(`PriceCharting comic search failed: ${res.status}`);
+  }
+
+  const html = await res.text();
+  const finalUrl = res.url;
+
+  // PriceCharting redirects to a detail page on exact match
+  if (html.includes('id="used_price"') || html.includes('id="graded_price"')) {
+    const comic = parseComicDetailPage(html, finalUrl);
+    return comic ? [comic] : [];
+  }
+
+  const comics: PriceChartingComic[] = [];
+  const rowRegex = new RegExp('<tr id="product-(\\d+)"[^>]*>(.*?)</tr>', "gs");
+  let match;
+
+  while ((match = rowRegex.exec(html)) !== null) {
+    const [, productId, rowHtml] = match;
+
+    const anchorRegex = new RegExp(
+      '<a[^>]*href="(https://www\\.pricecharting\\.com/game/[^"]+)"[^>]*>(.*?)</a>',
+      "gs"
+    );
+    let comicUrl = "";
+    let comicName = "";
+    let anchorMatch;
+    while ((anchorMatch = anchorRegex.exec(rowHtml)) !== null) {
+      const href = anchorMatch[1];
+      const text = anchorMatch[2].replace(/<[^>]+>/g, "").trim();
+      if (!comicUrl) comicUrl = href;
+      if (text && !comicName) comicName = text;
+    }
+    if (!comicUrl) continue;
+
+    const setMatch = rowHtml.match(
+      /href="\/console\/[^"]*"[^>]*>([^<]+)/
+    );
+    const setName = setMatch ? setMatch[1].trim() : "";
+
+    const imgMatch = rowHtml.match(
+      /src="(https:\/\/storage\.googleapis\.com\/images\.pricecharting\.com\/[^"]+)"/
+    );
+    const imageUrl = imgMatch ? upgradeImageUrl(imgMatch[1]) : undefined;
+
+    // Search results show: Low (used_price), Mid (cib_price), High (new_price)
+    const priceMatches = rowHtml.match(
+      /class="js-price"[^>]*>([^<]*)/g
+    );
+    const priceValues = (priceMatches || []).map((p) => {
+      const val = p.match(/>([^<]*)/);
+      return val ? val[1].trim() : "";
+    });
+
+    comics.push({
+      id: productId,
+      name: comicName,
+      setName,
+      url: comicUrl,
+      imageUrl,
+      prices: {
+        ungraded: priceValues[0] ? parsePrice(priceValues[0]) : undefined,
+        vg4: priceValues[1] ? parsePrice(priceValues[1]) : undefined,
+        fine6: priceValues[2] ? parsePrice(priceValues[2]) : undefined,
+      },
+    });
+  }
+
+  return comics;
+}
+
+export async function getComicGradedPrices(
+  comicUrl: string
+): Promise<PriceChartingComic["prices"]> {
+  const res = await fetch(comicUrl, {
+    headers: { "User-Agent": UA },
+    next: { revalidate: 3600 },
+  });
+
+  if (!res.ok) {
+    throw new Error(`PriceCharting comic detail page failed: ${res.status}`);
+  }
+
+  const html = await res.text();
+
+  const extractPrice = (id: string): number | undefined => {
+    const regex = new RegExp(
+      `id="${id}"[^>]*>\\s*<span[^>]*class="price[^"]*"[^>]*>([^<]*)`,
+      "s"
+    );
+    const match = html.match(regex);
+    return match ? parsePrice(match[1]) : undefined;
+  };
+
+  return {
+    ungraded: extractPrice("used_price"),
+    vg4: extractPrice("complete_price"),
+    fine6: extractPrice("new_price"),
+    vf8: extractPrice("graded_price"),
+    nm92: extractPrice("box_only_price"),
+    nm98: extractPrice("manual_only_price"),
+  };
+}
+
+export async function searchComicsWithGradedPrices(
+  query: string,
+  limit = 3
+): Promise<PriceChartingComic[]> {
+  const searchResults = await searchComicsPriceCharting(query);
+  const topResults = searchResults.slice(0, limit);
+
+  const hasFullPrices = (comic: PriceChartingComic) =>
+    comic.prices.vf8 !== undefined || comic.prices.nm98 !== undefined;
+
+  const detailed: PriceChartingComic[] = [];
+  for (const comic of topResults) {
+    if (hasFullPrices(comic)) {
+      detailed.push(comic);
+      continue;
+    }
+    try {
+      if (detailed.length > 0) await sleep(500);
+      const prices = await getComicGradedPrices(comic.url);
+      detailed.push({ ...comic, prices });
+    } catch {
+      detailed.push(comic);
+    }
+  }
+
+  return detailed;
+}
+
+/**
+ * Map a CGC/CBCS comic grade to the corresponding PriceCharting price field key.
+ */
+export function comicGradeToField(grade: string): keyof PriceChartingComic["prices"] {
+  const g = grade.replace(/[^0-9.]/g, "");
+  const num = parseFloat(g);
+  if (isNaN(num)) return "ungraded";
+  if (num >= 9.8) return "nm98";
+  if (num >= 9.0) return "nm92";
+  if (num >= 8.0) return "vf8";
+  if (num >= 6.0) return "fine6";
+  if (num >= 4.0) return "vg4";
   return "ungraded";
 }

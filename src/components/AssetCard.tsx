@@ -65,12 +65,14 @@ export default function AssetCard({ asset }: AssetCardProps) {
               <span
                 className={clsx(
                   "px-2 py-1 rounded-lg text-xs font-semibold",
-                  asset.asset_type === "card"
-                    ? "bg-accent-muted text-accent-hover"
-                    : "bg-warning-muted text-warning"
+                  asset.asset_type === "comic"
+                    ? "bg-emerald-500/15 text-emerald-400"
+                    : asset.asset_type === "card"
+                      ? "bg-accent-muted text-accent-hover"
+                      : "bg-warning-muted text-warning"
                 )}
               >
-                {asset.asset_type === "card" ? "Card" : "Sealed"}
+                {asset.asset_type === "comic" ? "Comic" : asset.asset_type === "card" ? "Card" : "Sealed"}
               </span>
               {asset.psa_grade && (
                 <span className="px-2 py-1 rounded-lg text-xs font-semibold bg-gold/20 text-gold">
@@ -108,12 +110,14 @@ export default function AssetCard({ asset }: AssetCardProps) {
                 <span
                   className={clsx(
                     "px-1.5 py-0.5 rounded text-[10px] font-semibold",
-                    asset.asset_type === "card"
-                      ? "bg-accent-muted text-accent-hover"
-                      : "bg-warning-muted text-warning"
+                    asset.asset_type === "comic"
+                      ? "bg-emerald-500/15 text-emerald-400"
+                      : asset.asset_type === "card"
+                        ? "bg-accent-muted text-accent-hover"
+                        : "bg-warning-muted text-warning"
                   )}
                 >
-                  {asset.asset_type === "card" ? "Card" : "Sealed"}
+                  {asset.asset_type === "comic" ? "Comic" : asset.asset_type === "card" ? "Card" : "Sealed"}
                 </span>
                 {qty > 1 && (
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-hover text-text-secondary">

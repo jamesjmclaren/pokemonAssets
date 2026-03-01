@@ -26,7 +26,7 @@ interface SelectedCard {
   rarity?: string;
   setName?: string;
   imageUrl?: string;
-  type: "card" | "sealed";
+  type: "card" | "sealed" | "comic";
   prices?: {
     raw?: number;
     market?: number;
@@ -56,6 +56,33 @@ const PSA_GRADES = [
   { value: "BGS 10", label: "BGS 10 - Pristine" },
   { value: "BGS 9.5", label: "BGS 9.5 - Gem Mint" },
   { value: "BGS 9", label: "BGS 9 - Mint" },
+];
+
+const CGC_COMIC_GRADES = [
+  { value: "", label: "None (Ungraded)" },
+  { value: "CGC 9.8", label: "CGC 9.8 - Near Mint/Mint" },
+  { value: "CGC 9.6", label: "CGC 9.6 - Near Mint+" },
+  { value: "CGC 9.4", label: "CGC 9.4 - Near Mint" },
+  { value: "CGC 9.2", label: "CGC 9.2 - Near Mint-" },
+  { value: "CGC 9.0", label: "CGC 9.0 - Very Fine/Near Mint" },
+  { value: "CGC 8.5", label: "CGC 8.5 - Very Fine+" },
+  { value: "CGC 8.0", label: "CGC 8.0 - Very Fine" },
+  { value: "CGC 7.5", label: "CGC 7.5 - Very Fine-" },
+  { value: "CGC 7.0", label: "CGC 7.0 - Fine/Very Fine" },
+  { value: "CGC 6.5", label: "CGC 6.5 - Fine+" },
+  { value: "CGC 6.0", label: "CGC 6.0 - Fine" },
+  { value: "CGC 5.5", label: "CGC 5.5 - Fine-" },
+  { value: "CGC 5.0", label: "CGC 5.0 - Very Good/Fine" },
+  { value: "CGC 4.5", label: "CGC 4.5 - Very Good+" },
+  { value: "CGC 4.0", label: "CGC 4.0 - Very Good" },
+  { value: "CGC 3.0", label: "CGC 3.0 - Good/Very Good" },
+  { value: "CGC 2.0", label: "CGC 2.0 - Good" },
+  { value: "CGC 1.0", label: "CGC 1.0 - Fair" },
+  { value: "CGC 0.5", label: "CGC 0.5 - Poor" },
+  { value: "CBCS 9.8", label: "CBCS 9.8 - Near Mint/Mint" },
+  { value: "CBCS 9.6", label: "CBCS 9.6 - Near Mint+" },
+  { value: "CBCS 9.4", label: "CBCS 9.4 - Near Mint" },
+  { value: "CBCS 9.2", label: "CBCS 9.2 - Near Mint-" },
 ];
 
 const LANGUAGES = [
@@ -104,6 +131,11 @@ export default function AddAssetForm() {
       grade9?: number;
       grade95?: number;
       psa10?: number;
+      vg4?: number;
+      fine6?: number;
+      vf8?: number;
+      nm92?: number;
+      nm98?: number;
     };
   }
 
@@ -119,7 +151,7 @@ export default function AddAssetForm() {
     purchaseDate: new Date().toISOString().split("T")[0],
     purchaseLocation: "",
     condition: "Near Mint",
-    assetType: "card" as "card" | "sealed",
+    assetType: "card" as "card" | "sealed" | "comic",
     psaGrade: "",
     manualPrice: false,
     manualPriceValue: "",
@@ -138,7 +170,10 @@ export default function AddAssetForm() {
     if (price && !form.purchasePrice) {
       updates.purchasePrice = price.toFixed(2);
     }
-    if (card.type === "sealed") {
+    if (card.type === "comic") {
+      updates.assetType = "comic";
+      updates.condition = "Near Mint";
+    } else if (card.type === "sealed") {
       updates.assetType = "sealed";
       updates.condition = "Sealed";
     } else {
@@ -198,9 +233,10 @@ export default function AddAssetForm() {
     setTetherLoading(true);
     setSelectedTether(null);
     try {
-      const res = await fetch(
-        `/api/pricecharting-search?q=${encodeURIComponent(query)}`
-      );
+      const endpoint = form.assetType === "comic"
+        ? `/api/comic-search?q=${encodeURIComponent(query)}`
+        : `/api/pricecharting-search?q=${encodeURIComponent(query)}`;
+      const res = await fetch(endpoint);
       if (!res.ok) throw new Error("Failed to search PriceCharting");
       const data = await res.json();
       setTetherCandidates(data.candidates || []);
@@ -210,11 +246,21 @@ export default function AddAssetForm() {
     } finally {
       setTetherLoading(false);
     }
-  }, []);
+  }, [form.assetType]);
 
   // Get the price field name for the current grade
   const getTetherGradeField = useCallback((): string => {
     if (!form.psaGrade) return "ungraded";
+    if (form.assetType === "comic") {
+      const num = parseFloat(form.psaGrade.replace(/[^0-9.]/g, ""));
+      if (isNaN(num)) return "ungraded";
+      if (num >= 9.8) return "nm98";
+      if (num >= 9.0) return "nm92";
+      if (num >= 8.0) return "vf8";
+      if (num >= 6.0) return "fine6";
+      if (num >= 4.0) return "vg4";
+      return "ungraded";
+    }
     const g = form.psaGrade.toLowerCase();
     if (g.includes("10")) return "psa10";
     if (g.includes("9.5")) return "grade95";
@@ -222,7 +268,7 @@ export default function AddAssetForm() {
     if (g.includes("8")) return "grade8";
     if (g.includes("7")) return "grade7";
     return "ungraded";
-  }, [form.psaGrade]);
+  }, [form.psaGrade, form.assetType]);
 
   // When user selects a tether candidate, populate the price
   const handleTetherSelect = useCallback((candidate: TetherCandidate) => {
@@ -238,13 +284,13 @@ export default function AddAssetForm() {
     }
   }, [getTetherGradeField]);
 
-  // Auto-search tether when manual name changes or graded card selected
+  // Auto-search tether when manual name changes, graded card selected, or comic selected
   useEffect(() => {
     const name = isManualSubmission ? form.manualName : selectedCard?.name;
-    if (name && (isManualSubmission || form.psaGrade)) {
+    if (name && (isManualSubmission || form.psaGrade || form.assetType === "comic")) {
       setTetherSearchQuery(name);
     }
-  }, [isManualSubmission, form.manualName, form.psaGrade, selectedCard?.name]);
+  }, [isManualSubmission, form.manualName, form.psaGrade, form.assetType, selectedCard?.name]);
 
   // Determine the effective name/id for submission
   const effectiveName = isManualSubmission ? form.manualName : selectedCard?.name || "";
@@ -528,7 +574,7 @@ export default function AddAssetForm() {
                       >
                         {selectedCard
                           ? selectedCard.name
-                          : "Search for a card or product..."}
+                          : "Search for a card, product, or comic..."}
                       </span>
                     </button>
                     {selectedCard && (
@@ -602,34 +648,39 @@ export default function AddAssetForm() {
                 <label className="block text-sm font-medium text-text-secondary mb-2">
                   Asset Type
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {["card", "sealed"].map((type) => (
+                <div className="grid grid-cols-3 gap-3">
+                  {([
+                    { value: "card", label: "Trading Card" },
+                    { value: "sealed", label: "Sealed Product" },
+                    { value: "comic", label: "Comic Book" },
+                  ] as const).map((type) => (
                     <button
-                      key={type}
+                      key={type.value}
                       type="button"
                       onClick={() =>
                         setForm((f) => ({
                           ...f,
-                          assetType: type as "card" | "sealed",
+                          assetType: type.value,
+                          psaGrade: "",
                         }))
                       }
-                      className={`px-4 py-3 rounded-xl border text-sm font-medium capitalize ${
-                        form.assetType === type
+                      className={`px-4 py-3 rounded-xl border text-sm font-medium ${
+                        form.assetType === type.value
                           ? "bg-accent-muted border-accent text-accent-hover"
                           : "bg-surface border-border text-text-secondary hover:border-border-hover"
                       }`}
                     >
-                      {type === "card" ? "Trading Card" : "Sealed Product"}
+                      {type.label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* PSA Grade selector - always show for cards */}
-              {form.assetType === "card" && (
+              {/* Grade selector - show for cards and comics */}
+              {(form.assetType === "card" || form.assetType === "comic") && (
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">
-                    PSA / Grading
+                    {form.assetType === "comic" ? "CGC / CBCS Grading" : "PSA / Grading"}
                   </label>
                   <select
                     value={form.psaGrade}
@@ -638,7 +689,7 @@ export default function AddAssetForm() {
                     }
                     className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
                   >
-                    {PSA_GRADES.map((grade) => (
+                    {(form.assetType === "comic" ? CGC_COMIC_GRADES : PSA_GRADES).map((grade) => (
                       <option key={grade.value} value={grade.value}>
                         {grade.label}
                       </option>
@@ -652,8 +703,8 @@ export default function AddAssetForm() {
                 </div>
               )}
 
-              {/* PriceCharting Tether - show for manual submissions or graded API cards */}
-              {(isManualSubmission || (selectedCard && form.psaGrade)) && (
+              {/* PriceCharting Tether - show for manual submissions, graded API cards, or comics */}
+              {(isManualSubmission || (selectedCard && form.psaGrade) || form.assetType === "comic") && (
                 <div className="bg-surface-hover border border-border rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Link2 className="w-4 h-4 text-accent" />
@@ -776,35 +827,72 @@ export default function AddAssetForm() {
                         </p>
                       </div>
                       <div className="flex gap-3 flex-wrap">
-                        {selectedTether.prices.ungraded != null && (
-                          <span className="text-xs text-text-muted">
-                            Raw: {formatCurrency(selectedTether.prices.ungraded)}
-                          </span>
-                        )}
-                        {selectedTether.prices.grade7 != null && (
-                          <span className="text-xs text-text-secondary">
-                            Grade 7: {formatCurrency(selectedTether.prices.grade7)}
-                          </span>
-                        )}
-                        {selectedTether.prices.grade8 != null && (
-                          <span className="text-xs text-text-secondary">
-                            Grade 8: {formatCurrency(selectedTether.prices.grade8)}
-                          </span>
-                        )}
-                        {selectedTether.prices.grade9 != null && (
-                          <span className="text-xs text-amber-400/70">
-                            Grade 9: {formatCurrency(selectedTether.prices.grade9)}
-                          </span>
-                        )}
-                        {selectedTether.prices.grade95 != null && (
-                          <span className="text-xs text-amber-400/80">
-                            Grade 9.5: {formatCurrency(selectedTether.prices.grade95)}
-                          </span>
-                        )}
-                        {selectedTether.prices.psa10 != null && (
-                          <span className="text-xs text-amber-400">
-                            PSA 10: {formatCurrency(selectedTether.prices.psa10)}
-                          </span>
+                        {form.assetType === "comic" ? (
+                          <>
+                            {selectedTether.prices.ungraded != null && (
+                              <span className="text-xs text-text-muted">
+                                Ungraded: {formatCurrency(selectedTether.prices.ungraded)}
+                              </span>
+                            )}
+                            {selectedTether.prices.vg4 != null && (
+                              <span className="text-xs text-text-secondary">
+                                4.0 VG: {formatCurrency(selectedTether.prices.vg4)}
+                              </span>
+                            )}
+                            {selectedTether.prices.fine6 != null && (
+                              <span className="text-xs text-text-secondary">
+                                6.0 Fine: {formatCurrency(selectedTether.prices.fine6)}
+                              </span>
+                            )}
+                            {selectedTether.prices.vf8 != null && (
+                              <span className="text-xs text-amber-400/70">
+                                8.0 VF: {formatCurrency(selectedTether.prices.vf8)}
+                              </span>
+                            )}
+                            {selectedTether.prices.nm92 != null && (
+                              <span className="text-xs text-amber-400/80">
+                                9.2 NM-: {formatCurrency(selectedTether.prices.nm92)}
+                              </span>
+                            )}
+                            {selectedTether.prices.nm98 != null && (
+                              <span className="text-xs text-amber-400">
+                                9.8: {formatCurrency(selectedTether.prices.nm98)}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {selectedTether.prices.ungraded != null && (
+                              <span className="text-xs text-text-muted">
+                                Raw: {formatCurrency(selectedTether.prices.ungraded)}
+                              </span>
+                            )}
+                            {selectedTether.prices.grade7 != null && (
+                              <span className="text-xs text-text-secondary">
+                                Grade 7: {formatCurrency(selectedTether.prices.grade7)}
+                              </span>
+                            )}
+                            {selectedTether.prices.grade8 != null && (
+                              <span className="text-xs text-text-secondary">
+                                Grade 8: {formatCurrency(selectedTether.prices.grade8)}
+                              </span>
+                            )}
+                            {selectedTether.prices.grade9 != null && (
+                              <span className="text-xs text-amber-400/70">
+                                Grade 9: {formatCurrency(selectedTether.prices.grade9)}
+                              </span>
+                            )}
+                            {selectedTether.prices.grade95 != null && (
+                              <span className="text-xs text-amber-400/80">
+                                Grade 9.5: {formatCurrency(selectedTether.prices.grade95)}
+                              </span>
+                            )}
+                            {selectedTether.prices.psa10 != null && (
+                              <span className="text-xs text-amber-400">
+                                PSA 10: {formatCurrency(selectedTether.prices.psa10)}
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                       <p className="text-[10px] text-text-muted mt-1">
