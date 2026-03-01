@@ -35,6 +35,14 @@ export interface PriceChartingCard {
   };
 }
 
+/**
+ * Upgrade a PriceCharting thumbnail URL to a higher-resolution version.
+ * Search results serve /60.jpg (tiny); swap to /240.jpg for usable quality.
+ */
+function upgradeImageUrl(url: string): string {
+  return url.replace(/\/60\.jpg$/, "/240.jpg");
+}
+
 function parsePrice(raw: string): number | undefined {
   const cleaned = raw.replace(/[^0-9.]/g, "");
   const val = parseFloat(cleaned);
@@ -65,7 +73,7 @@ function parseDetailPage(html: string, pageUrl: string): PriceChartingCard | nul
   const imgMatch = html.match(
     /src="(https:\/\/storage\.googleapis\.com\/images\.pricecharting\.com\/[^"]+)"/
   );
-  const imageUrl = imgMatch ? imgMatch[1] : undefined;
+  const imageUrl = imgMatch ? upgradeImageUrl(imgMatch[1]) : undefined;
 
   // Extract prices from detail page
   const extractPrice = (id: string): number | undefined => {
@@ -148,7 +156,7 @@ export async function searchPriceCharting(
     const imgMatch = rowHtml.match(
       /src="(https:\/\/storage\.googleapis\.com\/images\.pricecharting\.com\/[^"]+)"/
     );
-    const imageUrl = imgMatch ? imgMatch[1] : undefined;
+    const imageUrl = imgMatch ? upgradeImageUrl(imgMatch[1]) : undefined;
 
     const priceMatches = rowHtml.match(
       /class="js-price"[^>]*>([^<]*)/g
@@ -345,7 +353,7 @@ function parseComicDetailPage(html: string, pageUrl: string): PriceChartingComic
   const imgMatch = html.match(
     /src="(https:\/\/storage\.googleapis\.com\/images\.pricecharting\.com\/[^"]+)"/
   );
-  const imageUrl = imgMatch ? imgMatch[1] : undefined;
+  const imageUrl = imgMatch ? upgradeImageUrl(imgMatch[1]) : undefined;
 
   const extractPrice = (id: string): number | undefined => {
     const regex = new RegExp(
@@ -426,7 +434,7 @@ export async function searchComicsPriceCharting(
     const imgMatch = rowHtml.match(
       /src="(https:\/\/storage\.googleapis\.com\/images\.pricecharting\.com\/[^"]+)"/
     );
-    const imageUrl = imgMatch ? imgMatch[1] : undefined;
+    const imageUrl = imgMatch ? upgradeImageUrl(imgMatch[1]) : undefined;
 
     // Search results show: Low (used_price), Mid (cib_price), High (new_price)
     const priceMatches = rowHtml.match(
