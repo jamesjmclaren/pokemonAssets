@@ -388,9 +388,9 @@ export default function LandingPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {[
-                  { name: "Charizard VMAX", set: "Champions Path", type: "Card", grade: "PSA 10", value: "$4,850", invested: "$2,200", pnl: "+120.5%", positive: true, image: "https://images.pokemontcg.io/swsh35/74_hires.png" },
-                  { name: "Umbreon VMAX", set: "Evolving Skies", type: "Card", grade: "PSA 10", value: "$12,400", invested: "$8,500", pnl: "+45.9%", positive: true, image: "https://images.pokemontcg.io/swsh7/215_hires.png" },
-                  { name: "Pikachu VMAX", set: "Vivid Voltage", type: "Card", grade: "PSA 9", value: "$8,200", invested: "$5,800", pnl: "+41.4%", positive: true, image: "https://images.pokemontcg.io/swsh4/188_hires.png" },
+                  { name: "Charizard VMAX", set: "Champions Path", type: "Card", grade: "PSA 10", value: "$4,850", invested: "$2,200", pnl: "+120.5%", positive: true, image: "https://images.pokemontcg.io/swsh35/74.png" },
+                  { name: "Umbreon VMAX", set: "Evolving Skies", type: "Card", grade: "PSA 10", value: "$12,400", invested: "$8,500", pnl: "+45.9%", positive: true, image: "https://images.pokemontcg.io/swsh7/215.png" },
+                  { name: "Pikachu VMAX", set: "Vivid Voltage", type: "Card", grade: "PSA 9", value: "$8,200", invested: "$5,800", pnl: "+41.4%", positive: true, image: "https://images.pokemontcg.io/swsh4/188.png" },
                 ].map((asset) => (
                   <div key={asset.name} className="bg-background border border-border/60 rounded-xl overflow-hidden">
                     {/* Card image */}
@@ -398,6 +398,7 @@ export default function LandingPage() {
                       <img
                         src={asset.image}
                         alt={asset.name}
+                        loading="lazy"
                         className="object-contain p-2 md:p-3 w-full h-full"
                       />
                       <div className="absolute top-2 left-2 flex gap-1">
