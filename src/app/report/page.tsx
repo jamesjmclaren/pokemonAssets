@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import {
   Printer,
@@ -8,6 +8,12 @@ import {
   TrendingUp,
   TrendingDown,
   FileText,
+  Download,
+  Calendar,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Table,
 } from "lucide-react";
 import {
   formatCurrency,
@@ -48,8 +54,8 @@ function getEvidenceLink(asset: PortfolioAsset): {
   if (asset.is_manual_submission) {
     return {
       label: "Manual Entry",
-      url: null,
-      color: "text-text-muted bg-surface-hover",
+      url: (asset as PortfolioAsset & { evidence_url?: string | null }).evidence_url || null,
+      color: "text-warning bg-warning-muted",
     };
   }
 
@@ -72,6 +78,12 @@ export default function ReportPage() {
   const { currentPortfolio, loading: portfolioLoading } = usePortfolio();
   const [assets, setAssets] = useState<PortfolioAsset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
+  const [sortField, setSortField] = useState<"name" | "type" | "date" | "cost" | "value" | "pl" | "roi">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
     async function fetchAssets() {
@@ -101,18 +113,117 @@ export default function ReportPage() {
     }
   }, [currentPortfolio, portfolioLoading]);
 
+  const handleExportPDF = async () => {
+    if (!reportRef.current) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import("html2canvas-pro")).default;
+      const { jsPDF } = await import("jspdf");
+      
+      const element = reportRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#111111",
+      });
+      
+      const imgData = canvas.toDataURL("image/png");
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      const pdf = new jsPDF("p", "mm", "a4");
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      const portfolioName = currentPortfolio?.name || "Portfolio";
+      const dateStr = new Date().toISOString().split("T")[0];
+      pdf.save(`${portfolioName}-Report-${dateStr}.pdf`);
+    } catch (error) {
+      console.error("PDF export failed:", error);
+      alert("Failed to export PDF. Try using Print / Save PDF instead.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const headers = ["#", "Name", "Set", "Type", "Grade", "Purchase Date", "Qty", "Cost", "Current Value", "P/L", "ROI %", "Evidence"];
+    const csvRows = [headers.join(",")];
+    sortedRows.forEach((row, i) => {
+      const evidence = getEvidenceLink(row.asset);
+      const escapeCsv = (s: string) => `"${s.replace(/"/g, '""')}"`;
+      csvRows.push([
+        i + 1,
+        escapeCsv(row.asset.name),
+        escapeCsv(row.asset.set_name || ""),
+        row.asset.asset_type,
+        row.asset.psa_grade || "",
+        row.asset.purchase_date,
+        row.qty,
+        row.cost.toFixed(2),
+        row.value.toFixed(2),
+        row.pl.toFixed(2),
+        row.roi.toFixed(2),
+        evidence.url || evidence.label,
+      ].join(","));
+    });
+    csvRows.push("");
+    csvRows.push(["", "", "", "Totals", "", "", "", totalInvested.toFixed(2), currentValue.toFixed(2), totalProfit.toFixed(2), profitPercent.toFixed(2), ""].join(","));
+
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const portfolioName = currentPortfolio?.name || "Portfolio";
+    const dateStr = new Date().toISOString().split("T")[0];
+    a.download = `${portfolioName}-Report-${dateStr}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir(field === "name" || field === "type" || field === "date" ? "asc" : "desc");
+    }
+  };
+
+  const filteredAssets = useMemo(() => {
+    let result = assets;
+    if (dateFrom) {
+      result = result.filter((a) => a.purchase_date >= dateFrom);
+    }
+    if (dateTo) {
+      result = result.filter((a) => a.purchase_date <= dateTo);
+    }
+    return result;
+  }, [assets, dateFrom, dateTo]);
+
   const totalInvested = useMemo(
-    () => assets.reduce((sum, a) => sum + a.purchase_price * (a.quantity || 1), 0),
-    [assets]
+    () => filteredAssets.reduce((sum, a) => sum + a.purchase_price * (a.quantity || 1), 0),
+    [filteredAssets]
   );
 
   const currentValue = useMemo(
     () =>
-      assets.reduce(
+      filteredAssets.reduce(
         (sum, a) => sum + (a.current_price ?? a.purchase_price) * (a.quantity || 1),
         0
       ),
-    [assets]
+    [filteredAssets]
   );
 
   const totalProfit = currentValue - totalInvested;
@@ -120,17 +231,17 @@ export default function ReportPage() {
 
   const breakdownData = useMemo(() => {
     const map: Record<string, { type: string; count: number; value: number }> = {};
-    assets.forEach((a) => {
+    filteredAssets.forEach((a) => {
       const t = a.asset_type;
       if (!map[t]) map[t] = { type: t, count: 0, value: 0 };
       map[t].count += a.quantity || 1;
       map[t].value += (a.current_price ?? a.purchase_price) * (a.quantity || 1);
     });
     return Object.values(map);
-  }, [assets]);
+  }, [filteredAssets]);
 
   const assetRows = useMemo(() => {
-    return assets.map((a) => {
+    return filteredAssets.map((a) => {
       const qty = a.quantity || 1;
       const cost = a.purchase_price * qty;
       const value = (a.current_price ?? a.purchase_price) * qty;
@@ -138,7 +249,39 @@ export default function ReportPage() {
       const roi = cost > 0 ? (pl / cost) * 100 : 0;
       return { asset: a, qty, cost, value, pl, roi };
     });
-  }, [assets]);
+  }, [filteredAssets]);
+
+  const sortedRows = useMemo(() => {
+    const sorted = [...assetRows];
+    sorted.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case "name":
+          cmp = a.asset.name.localeCompare(b.asset.name);
+          break;
+        case "type":
+          cmp = a.asset.asset_type.localeCompare(b.asset.asset_type);
+          break;
+        case "date":
+          cmp = (a.asset.purchase_date || "").localeCompare(b.asset.purchase_date || "");
+          break;
+        case "cost":
+          cmp = a.cost - b.cost;
+          break;
+        case "value":
+          cmp = a.value - b.value;
+          break;
+        case "pl":
+          cmp = a.pl - b.pl;
+          break;
+        case "roi":
+          cmp = a.roi - b.roi;
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [assetRows, sortField, sortDir]);
 
   const topGainers = useMemo(
     () =>
@@ -253,7 +396,7 @@ export default function ReportPage() {
         }
       `}</style>
 
-      <div className="space-y-6 md:space-y-8">
+      <div ref={reportRef} className="space-y-6 md:space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
           <div>
@@ -266,15 +409,119 @@ export default function ReportPage() {
             </h1>
             <p className="text-text-muted text-sm mt-1">
               Generated {generatedDate}
+              {(dateFrom || dateTo) && (
+                <span className="ml-2">
+                  · {dateFrom || "All"} to {dateTo || "Present"}
+                </span>
+              )}
             </p>
           </div>
-          <button
-            onClick={() => window.print()}
-            className="print:hidden flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-hover text-black font-semibold rounded-xl text-sm"
-          >
-            <Printer className="w-4 h-4" />
-            Print / Save PDF
-          </button>
+          <div className="print:hidden flex items-center gap-2">
+            <button
+              onClick={handleExportCSV}
+              disabled={assetRows.length === 0}
+              className="flex items-center gap-2 px-4 py-2.5 bg-surface border border-border hover:border-border-hover text-text-secondary hover:text-text-primary disabled:opacity-50 font-medium rounded-xl text-sm"
+            >
+              <Table className="w-4 h-4" />
+              CSV
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-4 py-2.5 bg-surface border border-border hover:border-border-hover text-text-secondary hover:text-text-primary font-medium rounded-xl text-sm"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+            <button
+              onClick={handleExportPDF}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-hover disabled:opacity-50 text-black font-semibold rounded-xl text-sm"
+            >
+              {exporting ? (
+                <>
+                  <Download className="w-4 h-4 animate-pulse" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Export PDF
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Date Range Filter */}
+        <div className="print:hidden bg-surface border border-border rounded-2xl p-4">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
+            <div className="flex items-center gap-2 text-text-secondary">
+              <Calendar className="w-4 h-4" />
+              <span className="text-sm font-medium">Date Range</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="px-3 py-2 bg-background border border-border rounded-xl text-text-primary text-sm outline-none focus:border-accent"
+              />
+              <span className="text-text-muted text-sm">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="px-3 py-2 bg-background border border-border rounded-xl text-text-primary text-sm outline-none focus:border-accent"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const now = new Date();
+                  const ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                  setDateFrom(ago.toISOString().split("T")[0]);
+                  setDateTo(now.toISOString().split("T")[0]);
+                }}
+                className="px-3 py-2 bg-surface-hover border border-border rounded-xl text-text-secondary hover:text-text-primary text-xs font-medium"
+              >
+                30 Days
+              </button>
+              <button
+                onClick={() => {
+                  const now = new Date();
+                  const ago = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+                  setDateFrom(ago.toISOString().split("T")[0]);
+                  setDateTo(now.toISOString().split("T")[0]);
+                }}
+                className="px-3 py-2 bg-surface-hover border border-border rounded-xl text-text-secondary hover:text-text-primary text-xs font-medium"
+              >
+                90 Days
+              </button>
+              <button
+                onClick={() => {
+                  const now = new Date();
+                  setDateFrom(`${now.getFullYear()}-01-01`);
+                  setDateTo(now.toISOString().split("T")[0]);
+                }}
+                className="px-3 py-2 bg-surface-hover border border-border rounded-xl text-text-secondary hover:text-text-primary text-xs font-medium"
+              >
+                YTD
+              </button>
+              {(dateFrom || dateTo) && (
+                <button
+                  onClick={() => { setDateFrom(""); setDateTo(""); }}
+                  className="px-3 py-2 bg-danger-muted border border-danger/30 rounded-xl text-danger text-xs font-medium"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+          {(dateFrom || dateTo) && (
+            <p className="text-xs text-text-muted mt-2">
+              Showing {filteredAssets.length} of {assets.length} assets purchased in this date range
+            </p>
+          )}
         </div>
 
         {/* Summary Cards */}
@@ -284,8 +531,11 @@ export default function ReportPage() {
               Total Assets
             </p>
             <p className="text-3xl font-bold text-text-primary mt-1">
-              {assets.length}
+              {filteredAssets.length}
             </p>
+            {filteredAssets.length !== assets.length && (
+              <p className="text-xs text-text-muted mt-1">of {assets.length} total</p>
+            )}
           </div>
           <div className="bg-surface border border-border rounded-2xl p-4 md:p-5">
             <p className="text-text-muted text-xs font-medium uppercase tracking-wider">
@@ -445,24 +695,76 @@ export default function ReportPage() {
                 <thead>
                   <tr className="border-b border-border text-text-secondary">
                     <th className="text-left px-4 py-3 font-medium">#</th>
-                    <th className="text-left px-4 py-3 font-medium">Asset</th>
-                    <th className="text-left px-4 py-3 font-medium">Type</th>
-                    <th className="text-left px-4 py-3 font-medium">
-                      Purchase Date
+                    <th
+                      className="text-left px-4 py-3 font-medium cursor-pointer hover:text-text-primary select-none"
+                      onClick={() => handleSort("name")}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Asset
+                        {sortField === "name" ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                      </span>
                     </th>
-                    <th className="text-right px-4 py-3 font-medium">Cost</th>
-                    <th className="text-right px-4 py-3 font-medium">
-                      Current Value
+                    <th
+                      className="text-left px-4 py-3 font-medium cursor-pointer hover:text-text-primary select-none"
+                      onClick={() => handleSort("type")}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Type
+                        {sortField === "type" ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                      </span>
                     </th>
-                    <th className="text-right px-4 py-3 font-medium">P/L</th>
-                    <th className="text-right px-4 py-3 font-medium">ROI %</th>
+                    <th
+                      className="text-left px-4 py-3 font-medium cursor-pointer hover:text-text-primary select-none"
+                      onClick={() => handleSort("date")}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Purchase Date
+                        {sortField === "date" ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                      </span>
+                    </th>
+                    <th
+                      className="text-right px-4 py-3 font-medium cursor-pointer hover:text-text-primary select-none"
+                      onClick={() => handleSort("cost")}
+                    >
+                      <span className="inline-flex items-center gap-1 justify-end">
+                        Cost
+                        {sortField === "cost" ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                      </span>
+                    </th>
+                    <th
+                      className="text-right px-4 py-3 font-medium cursor-pointer hover:text-text-primary select-none"
+                      onClick={() => handleSort("value")}
+                    >
+                      <span className="inline-flex items-center gap-1 justify-end">
+                        Current Value
+                        {sortField === "value" ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                      </span>
+                    </th>
+                    <th
+                      className="text-right px-4 py-3 font-medium cursor-pointer hover:text-text-primary select-none"
+                      onClick={() => handleSort("pl")}
+                    >
+                      <span className="inline-flex items-center gap-1 justify-end">
+                        P/L
+                        {sortField === "pl" ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                      </span>
+                    </th>
+                    <th
+                      className="text-right px-4 py-3 font-medium cursor-pointer hover:text-text-primary select-none"
+                      onClick={() => handleSort("roi")}
+                    >
+                      <span className="inline-flex items-center gap-1 justify-end">
+                        ROI %
+                        {sortField === "roi" ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                      </span>
+                    </th>
                     <th className="text-left px-4 py-3 font-medium">
                       Evidence
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {assetRows.map((row, i) => {
+                  {sortedRows.map((row, i) => {
                     const evidence = getEvidenceLink(row.asset);
                     const imgUrl =
                       fixStorageUrl(row.asset.custom_image_url) ||
