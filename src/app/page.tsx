@@ -388,21 +388,18 @@ export default function LandingPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {[
-                  { name: "Charizard VMAX", set: "Champions Path", type: "Card", grade: "PSA 10", value: "$4,850", invested: "$2,200", pnl: "+120.5%", positive: true },
-                  { name: "Base Set Booster Box", set: "Base Set", type: "Sealed", grade: null, value: "$12,400", invested: "$8,500", pnl: "+45.9%", positive: true },
-                  { name: "Pikachu Illustrator", set: "Promo", type: "Card", grade: "PSA 9", value: "$8,200", invested: "$5,800", pnl: "+41.4%", positive: true },
+                  { name: "Charizard VMAX", set: "Champions Path", type: "Card", grade: "PSA 10", value: "$4,850", invested: "$2,200", pnl: "+120.5%", positive: true, image: "https://images.pokemontcg.io/swsh35/74_hires.png" },
+                  { name: "Umbreon VMAX", set: "Evolving Skies", type: "Card", grade: "PSA 10", value: "$12,400", invested: "$8,500", pnl: "+45.9%", positive: true, image: "https://images.pokemontcg.io/swsh7/215_hires.png" },
+                  { name: "Pikachu VMAX", set: "Vivid Voltage", type: "Card", grade: "PSA 9", value: "$8,200", invested: "$5,800", pnl: "+41.4%", positive: true, image: "https://images.pokemontcg.io/swsh4/188_hires.png" },
                 ].map((asset) => (
                   <div key={asset.name} className="bg-background border border-border/60 rounded-xl overflow-hidden">
-                    {/* Image placeholder */}
-                    <div className="aspect-[4/3] bg-surface-hover/30 flex items-center justify-center relative">
-                      <div className="text-text-muted/30 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
-                        <svg viewBox="0 0 80 80" className="w-12 h-12 opacity-30">
-                          <rect x="10" y="5" width="60" height="70" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
-                          <circle cx="40" cy="35" r="12" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                          <line x1="20" y1="55" x2="60" y2="55" stroke="currentColor" strokeWidth="1" />
-                          <line x1="25" y1="62" x2="55" y2="62" stroke="currentColor" strokeWidth="1" />
-                        </svg>
-                      </div>
+                    {/* Card image */}
+                    <div className="aspect-[4/3] bg-background overflow-hidden flex items-center justify-center relative">
+                      <img
+                        src={asset.image}
+                        alt={asset.name}
+                        className="object-contain p-2 md:p-3 w-full h-full"
+                      />
                       <div className="absolute top-2 left-2 flex gap-1">
                         <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${asset.type === "Card" ? "bg-accent-muted text-accent" : "bg-warning-muted text-warning"}`}>
                           {asset.type}
