@@ -268,6 +268,184 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Platform Preview Section */}
+      <section
+        id="preview"
+        ref={setRef("preview")}
+        className="py-32 md:py-40 border-t border-border/30 relative overflow-hidden"
+      >
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] rounded-full" style={{ background: "radial-gradient(ellipse, rgba(212,175,55,0.05) 0%, transparent 70%)" }} />
+        </div>
+        <div className="max-w-7xl mx-auto px-6 md:px-12 relative">
+          <div className="text-center mb-16">
+            <p
+              className={`text-text-muted tracking-widest uppercase mb-6 ${isVisible("preview") ? "landing-fade-up" : "opacity-0"}`}
+              style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.3em", animationDelay: "0.1s" }}
+            >
+              The Platform
+            </p>
+            <h2
+              className={`${isVisible("preview") ? "landing-fade-up" : "opacity-0"}`}
+              style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: "clamp(2rem, 4vw, 3.5rem)",
+                fontWeight: 400,
+                lineHeight: 1.1,
+                color: "var(--color-text-primary)",
+                animationDelay: "0.2s",
+              }}
+            >
+              Your portfolio,
+              <br />
+              <span className="text-accent">at a glance</span>
+            </h2>
+          </div>
+
+          {/* Dashboard Mockup */}
+          <div
+            className={`rounded-2xl border border-border/60 bg-surface/80 p-4 md:p-6 shadow-2xl shadow-black/40 ${isVisible("preview") ? "landing-fade-up" : "opacity-0"}`}
+            style={{ animationDelay: "0.3s" }}
+          >
+            {/* Mockup header bar */}
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className="text-sm font-semibold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>Dashboard</div>
+                <div className="text-xs text-text-muted mt-0.5" style={{ fontFamily: "Inter, sans-serif" }}>Track your investment portfolio</div>
+              </div>
+              <div className="flex gap-2">
+                <div className="px-3 py-1.5 rounded-lg bg-surface border border-border text-xs text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>Refresh Prices</div>
+                <div className="px-3 py-1.5 rounded-lg bg-accent text-background text-xs font-semibold" style={{ fontFamily: "Inter, sans-serif" }}>Add Asset</div>
+              </div>
+            </div>
+
+            {/* Stat cards row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+              {[
+                { label: "Total Value", value: "$47,820", change: "+$8,240 (20.8%)", positive: true },
+                { label: "Total Invested", value: "$39,580", change: null, positive: true },
+                { label: "Total P/L", value: "$8,240", change: "+20.8%", positive: true },
+                { label: "Total Assets", value: "34", change: null, positive: true },
+              ].map((stat) => (
+                <div key={stat.label} className="bg-background border border-border/60 rounded-xl p-3 md:p-4">
+                  <p className="text-[10px] md:text-xs text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>{stat.label}</p>
+                  <p className="text-sm md:text-lg font-bold text-text-primary mt-1" style={{ fontFamily: "Inter, sans-serif" }}>{stat.value}</p>
+                  {stat.change && (
+                    <p className={`text-[10px] md:text-xs font-medium mt-1 ${stat.positive ? "text-success" : "text-danger"}`} style={{ fontFamily: "Inter, sans-serif" }}>
+                      {stat.change}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Chart mockup */}
+            <div className="bg-background border border-border/60 rounded-xl p-4 md:p-5 mb-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="text-xs font-semibold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>Portfolio Value</div>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-lg font-bold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>$47,820</span>
+                    <span className="text-xs font-medium text-success" style={{ fontFamily: "Inter, sans-serif" }}>+$8,240</span>
+                  </div>
+                </div>
+                <div className="flex rounded-md border border-border overflow-hidden">
+                  {["1M", "3M", "1Y", "All"].map((r) => (
+                    <div key={r} className={`px-2.5 py-1 text-[10px] font-semibold ${r === "3M" ? "bg-accent text-background" : "text-text-muted"}`} style={{ fontFamily: "Inter, sans-serif" }}>
+                      {r}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* SVG chart lines */}
+              <div className="relative h-32 md:h-44">
+                <svg viewBox="0 0 400 120" className="w-full h-full" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="preview-grad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.3" />
+                      <stop offset="100%" stopColor="#a78bfa" stopOpacity="0.02" />
+                    </linearGradient>
+                  </defs>
+                  {/* Grid lines */}
+                  {[30, 60, 90].map((y) => (
+                    <line key={y} x1="0" y1={y} x2="400" y2={y} stroke="#2a2a2a" strokeWidth="0.5" />
+                  ))}
+                  {/* Area fill */}
+                  <path d="M0,95 C30,90 60,85 100,80 C140,75 160,60 200,55 C240,50 260,45 300,35 C330,28 360,22 400,18 L400,120 L0,120 Z" fill="url(#preview-grad)" />
+                  {/* Main line */}
+                  <path d="M0,95 C30,90 60,85 100,80 C140,75 160,60 200,55 C240,50 260,45 300,35 C330,28 360,22 400,18" fill="none" stroke="#a78bfa" strokeWidth="2" />
+                  {/* Cost basis dashed line */}
+                  <line x1="0" y1="75" x2="400" y2="65" stroke="#9090a8" strokeWidth="1" strokeDasharray="6 4" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Asset cards mockup */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-xs font-semibold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>Top Performers</div>
+                <div className="text-xs text-accent" style={{ fontFamily: "Inter, sans-serif" }}>View All</div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {[
+                  { name: "Charizard VMAX", set: "Champions Path", type: "Card", grade: "PSA 10", value: "$4,850", invested: "$2,200", pnl: "+120.5%", positive: true },
+                  { name: "Base Set Booster Box", set: "Base Set", type: "Sealed", grade: null, value: "$12,400", invested: "$8,500", pnl: "+45.9%", positive: true },
+                  { name: "Pikachu Illustrator", set: "Promo", type: "Card", grade: "PSA 9", value: "$8,200", invested: "$5,800", pnl: "+41.4%", positive: true },
+                ].map((asset) => (
+                  <div key={asset.name} className="bg-background border border-border/60 rounded-xl overflow-hidden">
+                    {/* Image placeholder */}
+                    <div className="aspect-[4/3] bg-surface-hover/30 flex items-center justify-center relative">
+                      <div className="text-text-muted/30 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
+                        <svg viewBox="0 0 80 80" className="w-12 h-12 opacity-30">
+                          <rect x="10" y="5" width="60" height="70" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
+                          <circle cx="40" cy="35" r="12" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                          <line x1="20" y1="55" x2="60" y2="55" stroke="currentColor" strokeWidth="1" />
+                          <line x1="25" y1="62" x2="55" y2="62" stroke="currentColor" strokeWidth="1" />
+                        </svg>
+                      </div>
+                      <div className="absolute top-2 left-2 flex gap-1">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${asset.type === "Card" ? "bg-accent-muted text-accent" : "bg-warning-muted text-warning"}`}>
+                          {asset.type}
+                        </span>
+                        {asset.grade && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-gold/20 text-gold">
+                            {asset.grade}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <h4 className="text-xs font-semibold text-text-primary truncate" style={{ fontFamily: "Inter, sans-serif" }}>{asset.name}</h4>
+                      <p className="text-[10px] text-text-muted mt-0.5" style={{ fontFamily: "Inter, sans-serif" }}>{asset.set}</p>
+                      <div className="flex items-end justify-between mt-2">
+                        <div>
+                          <p className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>Current Value</p>
+                          <p className="text-sm font-bold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>{asset.value}</p>
+                        </div>
+                        <div className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${asset.positive ? "bg-success-muted text-success" : "bg-danger-muted text-danger"}`}>
+                          {asset.pnl}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-border/40">
+                        <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>Invested {asset.invested}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Subtle caption */}
+          <p
+            className={`text-center text-text-muted mt-6 text-xs ${isVisible("preview") ? "landing-fade-up" : "opacity-0"}`}
+            style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.05em", animationDelay: "0.5s" }}
+          >
+            Real-time portfolio tracking with live pricing, P&amp;L analytics, and performance charts
+          </p>
+        </div>
+      </section>
+
       {/* Values / Philosophy Section */}
       <section
         id="values"
