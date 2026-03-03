@@ -54,12 +54,19 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-6 flex items-center justify-between">
           <img src="/logo.png" alt="West Investments" className="h-10 md:h-12 object-contain" />
           <div className="flex items-center gap-8">
-            <a href="#approach" className="hidden md:block text-sm text-text-secondary hover:text-text-primary tracking-wide uppercase" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em", fontSize: "11px" }}>
-              Our Approach
+            <a href="#about" className="hidden md:block text-sm text-text-secondary hover:text-text-primary tracking-wide uppercase" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em", fontSize: "11px" }}>
+              About
             </a>
-            <a href="#strategies" className="hidden md:block text-sm text-text-secondary hover:text-text-primary tracking-wide uppercase" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em", fontSize: "11px" }}>
-              Strategies
+            <a href="#what-we-do" className="hidden md:block text-sm text-text-secondary hover:text-text-primary tracking-wide uppercase" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em", fontSize: "11px" }}>
+              What We Do
             </a>
+            <button
+              onClick={() => router.push("/sign-in")}
+              className="hidden md:block text-sm text-text-secondary hover:text-text-primary tracking-wide uppercase cursor-pointer bg-transparent border-none"
+              style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em", fontSize: "11px" }}
+            >
+              Portfolios
+            </button>
             <button
               onClick={() => router.push("/sign-in")}
               className="text-xs tracking-widest uppercase border border-accent/40 text-accent px-6 py-2.5 hover:bg-accent hover:text-background cursor-pointer"
@@ -84,7 +91,7 @@ export default function LandingPage() {
             className="text-text-muted tracking-widest uppercase mb-8 landing-fade-up"
             style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.3em", animationDelay: "0.4s" }}
           >
-            West Investments Ltd
+            Alternative Investments
           </p>
 
           {/* Main heading */}
@@ -92,7 +99,7 @@ export default function LandingPage() {
             className="landing-fade-up"
             style={{
               fontFamily: "'Playfair Display', serif",
-              fontSize: "clamp(3.5rem, 10vw, 9rem)",
+              fontSize: "clamp(3rem, 8vw, 7.5rem)",
               fontWeight: 400,
               lineHeight: 0.95,
               letterSpacing: "-0.02em",
@@ -100,7 +107,9 @@ export default function LandingPage() {
               animationDelay: "0.6s",
             }}
           >
-            Portfolios
+            Preserving &amp;
+            <br />
+            Growing <span className="text-accent">Capital</span>
           </h1>
 
           {/* Gold divider */}
@@ -114,7 +123,7 @@ export default function LandingPage() {
             className="max-w-lg text-text-secondary leading-relaxed landing-fade-up"
             style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.15rem", fontWeight: 400, animationDelay: "1.1s" }}
           >
-            A disciplined approach to alternative investments — preserving and growing capital through curated collectible portfolios.
+            West Investments is a specialist alternative investment firm focused on identifying, acquiring, and managing high-conviction positions across non-traditional asset classes.
           </p>
 
           {/* CTA */}
@@ -127,7 +136,7 @@ export default function LandingPage() {
               className="text-accent tracking-widest uppercase hover:text-accent-hover"
               style={{ fontFamily: "Inter, sans-serif", fontSize: "12px", letterSpacing: "0.25em" }}
             >
-              Enter Dashboard
+              View Portfolios
             </span>
             <ArrowRight className="w-4 h-4 text-accent group-hover:translate-x-1 transition-transform" />
           </button>
@@ -139,23 +148,23 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Our Approach Section */}
+      {/* About Section */}
       <section
-        id="approach"
-        ref={setRef("approach")}
+        id="about"
+        ref={setRef("about")}
         className="py-32 md:py-40 border-t border-border/30"
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="grid md:grid-cols-2 gap-16 md:gap-24">
             <div>
               <p
-                className={`text-text-muted tracking-widest uppercase mb-6 ${isVisible("approach") ? "landing-fade-up" : "opacity-0"}`}
+                className={`text-text-muted tracking-widest uppercase mb-6 ${isVisible("about") ? "landing-fade-up" : "opacity-0"}`}
                 style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.3em", animationDelay: "0.1s" }}
               >
-                Our Approach
+                The Company
               </p>
               <h2
-                className={`${isVisible("approach") ? "landing-fade-up" : "opacity-0"}`}
+                className={`${isVisible("about") ? "landing-fade-up" : "opacity-0"}`}
                 style={{
                   fontFamily: "'Playfair Display', serif",
                   fontSize: "clamp(2rem, 4vw, 3.5rem)",
@@ -165,38 +174,38 @@ export default function LandingPage() {
                   animationDelay: "0.2s",
                 }}
               >
-                Long-term value
+                Built on conviction,
                 <br />
-                <span className="text-accent">in alternatives</span>
+                <span className="text-accent">driven by data</span>
               </h2>
             </div>
-            <div className={`flex flex-col justify-center ${isVisible("approach") ? "landing-fade-up" : "opacity-0"}`} style={{ animationDelay: "0.4s" }}>
+            <div className={`flex flex-col justify-center ${isVisible("about") ? "landing-fade-up" : "opacity-0"}`} style={{ animationDelay: "0.4s" }}>
               <p className="text-text-secondary leading-relaxed text-base" style={{ fontFamily: "'Playfair Display', serif" }}>
-                We take a patient, research-driven approach to alternative asset investing. From rare collectibles to emerging market categories, our platform empowers investors to build, track, and optimise portfolios with institutional-grade tools.
+                West Investments was founded with a singular belief: that alternative assets — from rare collectibles to emerging tangible markets — represent one of the most compelling opportunities for long-term capital growth.
               </p>
               <p className="text-text-muted leading-relaxed text-base mt-6" style={{ fontFamily: "'Playfair Display', serif" }}>
-                Our commitment is simple — provide the infrastructure and insight needed to make informed decisions in markets where traditional data is scarce.
+                We combine deep market expertise with institutional-grade infrastructure, providing our investors with the tools, transparency, and insight needed to navigate markets where traditional data is scarce and conviction matters most.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Strategies / Features Section */}
+      {/* What We Do Section */}
       <section
-        id="strategies"
-        ref={setRef("strategies")}
+        id="what-we-do"
+        ref={setRef("what-we-do")}
         className="py-32 md:py-40 border-t border-border/30"
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <p
-            className={`text-text-muted tracking-widest uppercase mb-6 ${isVisible("strategies") ? "landing-fade-up" : "opacity-0"}`}
+            className={`text-text-muted tracking-widest uppercase mb-6 ${isVisible("what-we-do") ? "landing-fade-up" : "opacity-0"}`}
             style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.3em", animationDelay: "0.1s" }}
           >
-            Investment Strategies
+            What We Do
           </p>
           <h2
-            className={`mb-20 ${isVisible("strategies") ? "landing-fade-up" : "opacity-0"}`}
+            className={`mb-20 ${isVisible("what-we-do") ? "landing-fade-up" : "opacity-0"}`}
             style={{
               fontFamily: "'Playfair Display', serif",
               fontSize: "clamp(2rem, 4vw, 3.5rem)",
@@ -206,41 +215,41 @@ export default function LandingPage() {
               animationDelay: "0.2s",
             }}
           >
-            Built for the
+            Alternative assets,
             <br />
-            <span className="text-accent">discerning investor</span>
+            <span className="text-accent">institutional approach</span>
           </h2>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-px bg-border/30">
             {[
               {
-                icon: TrendingUp,
-                title: "Real-Time Pricing",
-                description: "Live market data across alternative asset classes, updated continuously from leading pricing sources.",
+                icon: Gem,
+                title: "Asset Acquisition",
+                description: "We identify and acquire high-conviction positions across collectibles, rare items, and emerging alternative asset categories.",
                 delay: "0.3s",
               },
               {
                 icon: BarChart3,
-                title: "Portfolio Analytics",
-                description: "Comprehensive P&L tracking, performance charts, and detailed breakdowns across your holdings.",
+                title: "Portfolio Management",
+                description: "Real-time valuation tracking, P&L analytics, and comprehensive performance reporting across all holdings.",
                 delay: "0.45s",
               },
               {
-                icon: Shield,
-                title: "Team Collaboration",
-                description: "Role-based access controls and team management for institutional-grade portfolio oversight.",
+                icon: TrendingUp,
+                title: "Market Intelligence",
+                description: "Proprietary pricing data and market insights sourced from leading platforms to inform investment decisions.",
                 delay: "0.6s",
               },
               {
-                icon: Gem,
-                title: "Curated Collections",
-                description: "Organise assets into thematic collections with provenance tracking and evidence management.",
+                icon: Shield,
+                title: "Risk & Governance",
+                description: "Structured oversight with role-based access, provenance tracking, and evidence management for every position.",
                 delay: "0.75s",
               },
             ].map(({ icon: Icon, title, description, delay }) => (
               <div
                 key={title}
-                className={`bg-surface/50 p-8 md:p-10 group hover:bg-surface-hover/50 ${isVisible("strategies") ? "landing-fade-up" : "opacity-0"}`}
+                className={`bg-surface/50 p-8 md:p-10 group hover:bg-surface-hover/50 ${isVisible("what-we-do") ? "landing-fade-up" : "opacity-0"}`}
                 style={{ animationDelay: delay }}
               >
                 <Icon className="w-5 h-5 text-accent mb-6" strokeWidth={1.5} />
@@ -322,20 +331,20 @@ export default function LandingPage() {
               animationDelay: "0.1s",
             }}
           >
-            Ready to begin?
+            Access Your Portfolios
           </h2>
           <p
             className={`text-text-secondary max-w-md mx-auto mb-12 ${isVisible("cta") ? "landing-fade-up" : "opacity-0"}`}
             style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.05rem", animationDelay: "0.25s" }}
           >
-            Access your portfolios and start tracking your alternative investments with precision.
+            Sign in to view your portfolios, track performance, and manage your alternative investment positions.
           </p>
           <button
             onClick={() => router.push("/sign-in")}
             className={`inline-flex items-center gap-3 border border-accent text-accent px-10 py-4 hover:bg-accent hover:text-background tracking-widest uppercase cursor-pointer ${isVisible("cta") ? "landing-fade-up" : "opacity-0"}`}
             style={{ fontFamily: "Inter, sans-serif", fontSize: "12px", letterSpacing: "0.25em", animationDelay: "0.4s" }}
           >
-            Enter Dashboard
+            View Portfolios
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
