@@ -17,7 +17,11 @@ export default function LandingPage() {
     }
   }, [isLoaded, isSignedIn, router]);
 
+  const showPage = isLoaded && !isSignedIn;
+
   useEffect(() => {
+    if (!showPage) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -31,7 +35,7 @@ export default function LandingPage() {
 
     sectionRefs.current.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, []);
+  }, [showPage]);
 
   const setRef = (id: string) => (el: HTMLElement | null) => {
     if (el) sectionRefs.current.set(id, el);
