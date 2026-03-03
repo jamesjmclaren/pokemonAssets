@@ -123,6 +123,7 @@ export default function AddAssetForm() {
     psaGrade: "",
     manualPrice: false,
     manualPriceValue: "",
+    evidenceUrl: "",
     quantity: "1",
     notes: "",
     language: "English",
@@ -249,8 +250,8 @@ export default function AddAssetForm() {
   // Determine the effective name/id for submission
   const effectiveName = isManualSubmission ? form.manualName : selectedCard?.name || "";
   const canSubmit = isManualSubmission
-    ? form.manualName.trim().length > 0 && !!form.purchasePrice && !!currentPortfolio
-    : !!selectedCard && !!form.purchasePrice && !!currentPortfolio;
+    ? form.manualName.trim().length > 0 && !!form.purchasePrice && !!currentPortfolio && !!form.evidenceUrl.trim()
+    : !!selectedCard && !!form.purchasePrice && !!currentPortfolio && (!form.manualPrice || !!form.evidenceUrl.trim());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -315,6 +316,7 @@ export default function AddAssetForm() {
           purchase_location: form.purchaseLocation,
           condition: form.condition,
           notes: form.notes || null,
+          evidence_url: form.evidenceUrl.trim() || null,
           current_price: currentPrice,
           rarity: isManualSubmission ? null : (selectedCard!.rarity || null),
           card_number: isManualSubmission ? null : (selectedCard!.number || null),
@@ -1014,6 +1016,24 @@ export default function AddAssetForm() {
                           placeholder="Enter current market value..."
                         />
                       </div>
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-text-secondary mb-2">
+                      Evidence URL *
+                    </label>
+                    <input
+                      type="url"
+                      required
+                      value={form.evidenceUrl}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, evidenceUrl: e.target.value }))
+                      }
+                      className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                      placeholder="e.g. https://www.ebay.com/itm/..."
+                    />
+                    <p className="text-xs text-text-muted mt-1">
+                      Provide a link to an eBay listing, TCGPlayer sale, or other evidence for this price
+                    </p>
+                  </div>
                     </div>
                   )}
                 </div>
@@ -1047,9 +1067,27 @@ export default function AddAssetForm() {
                       className="w-full pl-8 pr-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
                       placeholder="Enter current market value..."
                     />
+                    </div>
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-text-secondary mb-2">
+                        Evidence URL *
+                      </label>
+                      <input
+                        type="url"
+                        required
+                        value={form.evidenceUrl}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, evidenceUrl: e.target.value }))
+                        }
+                        className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                        placeholder="e.g. https://www.ebay.com/itm/..."
+                      />
+                      <p className="text-xs text-text-muted mt-1">
+                        Provide a link to an eBay listing, TCGPlayer sale, or other evidence for this price
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-2">

@@ -75,6 +75,7 @@ export interface PortfolioAsset {
   pc_product_id?: string | null;
   pc_url?: string | null;
   pc_grade_field?: string | null;
+  evidence_url?: string | null;
 }
 
 export interface PortfolioSummary {

@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
       pc_product_id,
       pc_url,
       pc_grade_field,
+      evidence_url,
     } = body;
 
     if (!portfolio_id || !external_id || !name || !purchase_price || !purchase_date) {
@@ -167,6 +168,7 @@ export async function POST(request: NextRequest) {
         pc_product_id: pc_product_id || null,
         pc_url: pc_url || null,
         pc_grade_field: pc_grade_field || null,
+        evidence_url: evidence_url || null,
       })
       .select()
       .single();
@@ -219,6 +221,7 @@ export async function PATCH(request: NextRequest) {
       pc_product_id,
       pc_url,
       pc_grade_field,
+      evidence_url,
     } = body;
 
     if (!id) {
@@ -278,6 +281,7 @@ export async function PATCH(request: NextRequest) {
     if (pc_product_id !== undefined) updates.pc_product_id = pc_product_id || null;
     if (pc_url !== undefined) updates.pc_url = pc_url || null;
     if (pc_grade_field !== undefined) updates.pc_grade_field = pc_grade_field || null;
+    if (evidence_url !== undefined) updates.evidence_url = evidence_url || null;
 
     const { data, error } = await supabase
       .from("assets")
