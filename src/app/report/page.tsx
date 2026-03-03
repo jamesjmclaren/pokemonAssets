@@ -273,38 +273,45 @@ export default function ReportPage() {
         pdf.text("Assets Detail", margin, y + 5);
         y += 10;
 
+        const evidenceData = sortedRows.map((row) => getEvidenceLink(row.asset));
+
         autoTable(pdf, {
           startY: y,
           margin: { left: margin, right: margin },
-          head: [["#", "Asset", "Type", "Grade", "Date", "Cost", "Value", "P/L", "ROI %"]],
-          body: sortedRows.map((row, i) => [
-            String(i + 1),
-            row.asset.name + (row.qty > 1 ? ` (×${row.qty})` : ""),
-            row.asset.asset_type,
-            row.asset.psa_grade || "—",
-            row.asset.purchase_date,
-            formatCurrency(row.cost),
-            formatCurrency(row.value),
-            formatCurrency(row.pl),
-            formatPercentage(row.roi),
-          ]),
-          foot: [["", "Totals", "", "", "", formatCurrency(totalInvested), formatCurrency(currentValue), formatCurrency(totalProfit), formatPercentage(profitPercent)]],
+          head: [["#", "Asset", "Type", "Grade", "Date", "Cost", "Value", "P/L", "ROI %", "Evidence"]],
+          body: sortedRows.map((row, i) => {
+            const ev = evidenceData[i];
+            return [
+              String(i + 1),
+              row.asset.name + (row.qty > 1 ? ` (×${row.qty})` : ""),
+              row.asset.asset_type,
+              row.asset.psa_grade || "—",
+              row.asset.purchase_date,
+              formatCurrency(row.cost),
+              formatCurrency(row.value),
+              formatCurrency(row.pl),
+              formatPercentage(row.roi),
+              ev.url ? ev.label : ev.label,
+            ];
+          }),
+          foot: [["", "Totals", "", "", "", formatCurrency(totalInvested), formatCurrency(currentValue), formatCurrency(totalProfit), formatPercentage(profitPercent), ""]],
           theme: "plain",
-          styles: { fontSize: 8, textColor: white, cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 }, overflow: "ellipsize" },
-          headStyles: { fillColor: headerBg, textColor: gold, fontStyle: "bold", fontSize: 7.5 },
-          footStyles: { fillColor: headerBg, textColor: gold, fontStyle: "bold", fontSize: 8 },
+          styles: { fontSize: 7.5, textColor: white, cellPadding: { top: 2.5, bottom: 2.5, left: 2.5, right: 2.5 }, overflow: "ellipsize" },
+          headStyles: { fillColor: headerBg, textColor: gold, fontStyle: "bold", fontSize: 7 },
+          footStyles: { fillColor: headerBg, textColor: gold, fontStyle: "bold", fontSize: 7.5 },
           alternateRowStyles: { fillColor: rowAlt },
           bodyStyles: { fillColor: dark },
           columnStyles: {
-            0: { cellWidth: 8, halign: "center" },
-            1: { cellWidth: 48 },
-            2: { cellWidth: 14 },
-            3: { cellWidth: 16 },
-            4: { cellWidth: 22 },
+            0: { cellWidth: 7, halign: "center" },
+            1: { cellWidth: 40 },
+            2: { cellWidth: 12 },
+            3: { cellWidth: 14 },
+            4: { cellWidth: 20 },
             5: { halign: "right" },
             6: { halign: "right" },
             7: { halign: "right" },
             8: { halign: "right" },
+            9: { cellWidth: 24 },
           },
           didParseCell: (data) => {
             if (data.section === "body") {
@@ -313,10 +320,28 @@ export default function ReportPage() {
               if (data.column.index === 7 || data.column.index === 8) {
                 data.cell.styles.textColor = row.pl >= 0 ? green : red;
               }
+              // Color evidence column based on source
+              if (data.column.index === 9) {
+                const ev = evidenceData[data.row.index];
+                if (ev.url) {
+                  data.cell.styles.textColor = [100, 180, 255];
+                } else {
+                  data.cell.styles.textColor = grey;
+                }
+              }
             }
             if (data.section === "foot") {
               if (data.column.index === 7 || data.column.index === 8) {
                 data.cell.styles.textColor = totalProfit >= 0 ? green : red;
+              }
+            }
+          },
+          didDrawCell: (data) => {
+            // Add clickable link on evidence cells
+            if (data.section === "body" && data.column.index === 9) {
+              const ev = evidenceData[data.row.index];
+              if (ev.url) {
+                pdf.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: ev.url });
               }
             }
           },
