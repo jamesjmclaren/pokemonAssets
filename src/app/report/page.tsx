@@ -135,12 +135,20 @@ export default function ReportPage() {
       const headerBg: [number, number, number] = [30, 30, 30];
       const rowAlt: [number, number, number] = [22, 22, 22];
 
-      // -- Full-page dark background --
+      // -- Full-page dark background on every page --
       const addPageBg = () => {
         pdf.setFillColor(...dark);
         pdf.rect(0, 0, 210, 297, "F");
       };
       addPageBg();
+
+      // Hook into addPage so new pages automatically get the dark background
+      const origAddPage = pdf.addPage.bind(pdf);
+      pdf.addPage = function (...args: Parameters<typeof origAddPage>) {
+        const result = origAddPage(...args);
+        addPageBg();
+        return result;
+      } as typeof pdf.addPage;
 
       // -- Logo --
       try {
@@ -312,7 +320,6 @@ export default function ReportPage() {
               }
             }
           },
-          didDrawPage: () => addPageBg(),
         });
         y = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
       }
@@ -321,7 +328,6 @@ export default function ReportPage() {
       const drawTopList = (title: string, rows: typeof topGainers, color: [number, number, number], icon: string) => {
         if (y > 250) {
           pdf.addPage();
-          addPageBg();
           y = margin;
         }
         pdf.setFontSize(12);
@@ -359,7 +365,6 @@ export default function ReportPage() {
             2: { halign: "right", textColor: color },
             3: { halign: "right", textColor: color },
           },
-          didDrawPage: () => addPageBg(),
         });
         y = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
       };
