@@ -114,44 +114,272 @@ export default function ReportPage() {
   }, [currentPortfolio, portfolioLoading]);
 
   const handleExportPDF = async () => {
-    if (!reportRef.current) return;
     setExporting(true);
     try {
-      const html2canvas = (await import("html2canvas-pro")).default;
       const { jsPDF } = await import("jspdf");
-      
-      const element = reportRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#111111",
-      });
-      
-      const imgData = canvas.toDataURL("image/png");
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 297; // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
+      const autoTable = (await import("jspdf-autotable")).default;
+
       const pdf = new jsPDF("p", "mm", "a4");
-      let heightLeft = imgHeight;
-      let position = 0;
-      
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      const pageW = 210;
+      const margin = 14;
+      const contentW = pageW - margin * 2;
+      let y = margin;
+
+      // -- Colours --
+      const dark: [number, number, number] = [17, 17, 17];
+      const gold: [number, number, number] = [212, 175, 55];
+      const white: [number, number, number] = [255, 255, 255];
+      const grey: [number, number, number] = [160, 160, 160];
+      const green: [number, number, number] = [34, 197, 94];
+      const red: [number, number, number] = [239, 68, 68];
+      const headerBg: [number, number, number] = [30, 30, 30];
+      const rowAlt: [number, number, number] = [22, 22, 22];
+
+      // -- Full-page dark background --
+      const addPageBg = () => {
+        pdf.setFillColor(...dark);
+        pdf.rect(0, 0, 210, 297, "F");
+      };
+      addPageBg();
+
+      // -- Logo --
+      try {
+        const logoRes = await fetch("/logo.png");
+        const logoBlob = await logoRes.blob();
+        const logoDataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(logoBlob);
+        });
+        const logoW = 40;
+        const logoH = (332 / 968) * logoW;
+        pdf.addImage(logoDataUrl, "PNG", margin, y, logoW, logoH);
+        y += logoH + 4;
+      } catch {
+        // Skip logo if unavailable
       }
-      
+
+      // -- Title --
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(20);
+      pdf.setTextColor(...white);
+      pdf.text("Portfolio Report", margin, y + 6);
+      y += 10;
+
+      // -- Subtitle --
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.setTextColor(...grey);
       const portfolioName = currentPortfolio?.name || "Portfolio";
+      let subtitle = `${portfolioName}  ·  Generated ${generatedDate}`;
+      if (dateFrom || dateTo) {
+        subtitle += `  ·  ${dateFrom || "All"} to ${dateTo || "Present"}`;
+      }
+      pdf.text(subtitle, margin, y + 5);
+      y += 10;
+
+      // -- Gold divider --
+      pdf.setDrawColor(...gold);
+      pdf.setLineWidth(0.6);
+      pdf.line(margin, y, pageW - margin, y);
+      y += 8;
+
+      // -- Summary boxes --
+      const summaryItems = [
+        { label: "Total Assets", value: String(filteredAssets.length) },
+        { label: "Total Invested", value: formatCurrency(totalInvested) },
+        { label: "Current Value", value: formatCurrency(currentValue) },
+        { label: "Total P/L", value: formatCurrency(totalProfit), color: totalProfit >= 0 ? green : red },
+      ];
+      const boxW = (contentW - 6) / 4;
+      const boxH = 18;
+      summaryItems.forEach((item, i) => {
+        const x = margin + i * (boxW + 2);
+        pdf.setFillColor(...headerBg);
+        pdf.roundedRect(x, y, boxW, boxH, 2, 2, "F");
+        pdf.setFontSize(7);
+        pdf.setTextColor(...grey);
+        pdf.text(item.label.toUpperCase(), x + 4, y + 6);
+        pdf.setFontSize(13);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(...(item.color || white));
+        pdf.text(item.value, x + 4, y + 14);
+        pdf.setFont("helvetica", "normal");
+      });
+      y += boxH + 4;
+
+      if (totalInvested > 0) {
+        pdf.setFontSize(9);
+        pdf.setTextColor(...(totalProfit >= 0 ? green : red));
+        pdf.text(`ROI: ${formatPercentage(profitPercent)}`, margin, y + 3);
+        y += 7;
+      }
+
+      // -- Breakdown by Type --
+      if (breakdownData.length > 0) {
+        y += 3;
+        pdf.setFontSize(13);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(...white);
+        pdf.text("Breakdown by Type", margin, y + 5);
+        y += 10;
+
+        const typeColors: Record<string, [number, number, number]> = {
+          card: gold,
+          sealed: [245, 158, 11],
+          comic: green,
+        };
+
+        autoTable(pdf, {
+          startY: y,
+          margin: { left: margin, right: margin },
+          head: [["Type", "Count", "Value", "% of Portfolio"]],
+          body: breakdownData.map((d) => [
+            d.type.charAt(0).toUpperCase() + d.type.slice(1),
+            String(d.count),
+            formatCurrency(d.value),
+            currentValue > 0 ? `${((d.value / currentValue) * 100).toFixed(1)}%` : "—",
+          ]),
+          theme: "plain",
+          styles: { fontSize: 9, textColor: white, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 } },
+          headStyles: { fillColor: headerBg, textColor: gold, fontStyle: "bold", fontSize: 8 },
+          alternateRowStyles: { fillColor: rowAlt },
+          bodyStyles: { fillColor: dark },
+          didParseCell: (data) => {
+            if (data.section === "body" && data.column.index === 0) {
+              const type = breakdownData[data.row.index]?.type;
+              if (type && typeColors[type]) {
+                data.cell.styles.textColor = typeColors[type];
+              }
+            }
+          },
+        });
+        y = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+      }
+
+      // -- Assets Detail Table --
+      if (sortedRows.length > 0) {
+        pdf.setFontSize(13);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(...white);
+        pdf.text("Assets Detail", margin, y + 5);
+        y += 10;
+
+        autoTable(pdf, {
+          startY: y,
+          margin: { left: margin, right: margin },
+          head: [["#", "Asset", "Type", "Grade", "Date", "Cost", "Value", "P/L", "ROI %"]],
+          body: sortedRows.map((row, i) => [
+            String(i + 1),
+            row.asset.name + (row.qty > 1 ? ` (×${row.qty})` : ""),
+            row.asset.asset_type,
+            row.asset.psa_grade || "—",
+            row.asset.purchase_date,
+            formatCurrency(row.cost),
+            formatCurrency(row.value),
+            formatCurrency(row.pl),
+            formatPercentage(row.roi),
+          ]),
+          foot: [["", "Totals", "", "", "", formatCurrency(totalInvested), formatCurrency(currentValue), formatCurrency(totalProfit), formatPercentage(profitPercent)]],
+          theme: "plain",
+          styles: { fontSize: 8, textColor: white, cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 }, overflow: "ellipsize" },
+          headStyles: { fillColor: headerBg, textColor: gold, fontStyle: "bold", fontSize: 7.5 },
+          footStyles: { fillColor: headerBg, textColor: gold, fontStyle: "bold", fontSize: 8 },
+          alternateRowStyles: { fillColor: rowAlt },
+          bodyStyles: { fillColor: dark },
+          columnStyles: {
+            0: { cellWidth: 8, halign: "center" },
+            1: { cellWidth: 48 },
+            2: { cellWidth: 14 },
+            3: { cellWidth: 16 },
+            4: { cellWidth: 22 },
+            5: { halign: "right" },
+            6: { halign: "right" },
+            7: { halign: "right" },
+            8: { halign: "right" },
+          },
+          didParseCell: (data) => {
+            if (data.section === "body") {
+              const row = sortedRows[data.row.index];
+              if (!row) return;
+              if (data.column.index === 7 || data.column.index === 8) {
+                data.cell.styles.textColor = row.pl >= 0 ? green : red;
+              }
+            }
+            if (data.section === "foot") {
+              if (data.column.index === 7 || data.column.index === 8) {
+                data.cell.styles.textColor = totalProfit >= 0 ? green : red;
+              }
+            }
+          },
+          didDrawPage: () => addPageBg(),
+        });
+        y = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+      }
+
+      // -- Top Gainers & Losers --
+      const drawTopList = (title: string, rows: typeof topGainers, color: [number, number, number], icon: string) => {
+        if (y > 250) {
+          pdf.addPage();
+          addPageBg();
+          y = margin;
+        }
+        pdf.setFontSize(12);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(...color);
+        pdf.text(`${icon}  ${title}`, margin, y + 5);
+        y += 9;
+
+        if (rows.length === 0) {
+          pdf.setFontSize(9);
+          pdf.setFont("helvetica", "normal");
+          pdf.setTextColor(...grey);
+          pdf.text("No data available", margin, y + 4);
+          y += 8;
+          return;
+        }
+
+        autoTable(pdf, {
+          startY: y,
+          margin: { left: margin, right: margin },
+          head: [["#", "Asset", "ROI", "P/L"]],
+          body: rows.map((row, i) => [
+            String(i + 1),
+            row.asset.name,
+            formatPercentage(row.roi),
+            formatCurrency(row.pl),
+          ]),
+          theme: "plain",
+          styles: { fontSize: 9, textColor: white, cellPadding: { top: 2, bottom: 2, left: 3, right: 3 } },
+          headStyles: { fillColor: headerBg, textColor: gold, fontStyle: "bold", fontSize: 8 },
+          alternateRowStyles: { fillColor: rowAlt },
+          bodyStyles: { fillColor: dark },
+          columnStyles: {
+            0: { cellWidth: 8, halign: "center" },
+            2: { halign: "right", textColor: color },
+            3: { halign: "right", textColor: color },
+          },
+          didDrawPage: () => addPageBg(),
+        });
+        y = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+      };
+
+      if (topGainers.length > 0 || topLosers.length > 0) {
+        drawTopList("Top 5 Gainers", topGainers, green, "▲");
+        drawTopList("Top 5 Losers", topLosers, red, "▼");
+      }
+
+      // -- Footer on last page --
+      pdf.setFontSize(7);
+      pdf.setTextColor(...grey);
+      pdf.text("West Investments Ltd  ·  Confidential", margin, 290);
+      pdf.text(new Date().toISOString(), pageW - margin, 290, { align: "right" });
+
       const dateStr = new Date().toISOString().split("T")[0];
       pdf.save(`${portfolioName}-Report-${dateStr}.pdf`);
     } catch (error) {
       console.error("PDF export failed:", error);
-      alert("Failed to export PDF. Try using Print / Save PDF instead.");
+      alert("Failed to export PDF. Please try again.");
     } finally {
       setExporting(false);
     }
