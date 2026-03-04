@@ -64,8 +64,8 @@ const CONDITIONS = [
 
 function isPriceStale(asset: PortfolioAsset): boolean {
   if (!asset.price_updated_at) return true;
-  const sevenDays = 7 * 24 * 60 * 60 * 1000;
-  return Date.now() - new Date(asset.price_updated_at).getTime() > sevenDays;
+  const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+  return Date.now() - new Date(asset.price_updated_at).getTime() > thirtyDays;
 }
 
 interface EditForm {
@@ -1011,7 +1011,7 @@ export default function AssetDetailPage({
                 <div>
                   <p className="text-xs font-bold text-danger">Price Update Required</p>
                   <p className="text-xs text-danger/80">
-                    Market price has not been updated in over 7 days. Please update to keep your portfolio accurate.
+                    Market price has not been updated in over 30 days. Please update to keep your portfolio accurate.
                   </p>
                 </div>
               </div>
