@@ -350,6 +350,34 @@ export default function ReportPage() {
       }
 
       // -- Top Gainers & Losers --
+      // Pre-load images for top gainers/losers
+      const loadImageAsBase64 = async (url: string | null | undefined): Promise<string | null> => {
+        if (!url) return null;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return null;
+          const blob = await res.blob();
+          return await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        } catch {
+          return null;
+        }
+      };
+
+      const topListRows = [...topGainers, ...topLosers];
+      const imageMap = new Map<string, string>();
+      await Promise.all(
+        topListRows.map(async (row) => {
+          const url = fixStorageUrl(row.asset.custom_image_url) || fixStorageUrl(row.asset.image_url);
+          const dataUrl = await loadImageAsBase64(url);
+          if (dataUrl) imageMap.set(row.asset.id, dataUrl);
+        })
+      );
+
+      const imgSize = 8;
       const drawTopList = (title: string, rows: typeof topGainers, color: [number, number, number], icon: string) => {
         if (y > 250) {
           pdf.addPage();
@@ -373,22 +401,40 @@ export default function ReportPage() {
         autoTable(pdf, {
           startY: y,
           margin: { left: margin, right: margin },
-          head: [["#", "Asset", "ROI", "P/L"]],
+          head: [["#", "", "Asset", "ROI", "P/L"]],
           body: rows.map((row, i) => [
             String(i + 1),
+            "",
             row.asset.name,
             formatPercentage(row.roi),
             formatCurrency(row.pl),
           ]),
           theme: "plain",
-          styles: { fontSize: 9, textColor: white, cellPadding: { top: 2, bottom: 2, left: 3, right: 3 } },
+          styles: { fontSize: 9, textColor: white, cellPadding: { top: 2, bottom: 2, left: 3, right: 3 }, minCellHeight: imgSize + 2 },
           headStyles: { fillColor: headerBg, textColor: gold, fontStyle: "bold", fontSize: 8 },
           alternateRowStyles: { fillColor: rowAlt },
           bodyStyles: { fillColor: dark },
           columnStyles: {
             0: { cellWidth: 8, halign: "center" },
-            2: { halign: "right", textColor: color },
+            1: { cellWidth: imgSize + 4 },
             3: { halign: "right", textColor: color },
+            4: { halign: "right", textColor: color },
+          },
+          didDrawCell: (data) => {
+            if (data.section === "body" && data.column.index === 1) {
+              const row = rows[data.row.index];
+              if (!row) return;
+              const dataUrl = imageMap.get(row.asset.id);
+              if (dataUrl) {
+                const cx = data.cell.x + (data.cell.width - imgSize) / 2;
+                const cy = data.cell.y + (data.cell.height - imgSize) / 2;
+                try {
+                  pdf.addImage(dataUrl, "PNG", cx, cy, imgSize, imgSize);
+                } catch {
+                  // Skip if image format unsupported
+                }
+              }
+            }
           },
         });
         y = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
