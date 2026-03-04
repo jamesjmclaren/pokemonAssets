@@ -32,8 +32,8 @@ type TypeTab = "all" | "raw" | "graded" | "sealed";
 
 function isPriceStale(asset: PortfolioAsset): boolean {
   if (!asset.price_updated_at) return true;
-  const sevenDays = 7 * 24 * 60 * 60 * 1000;
-  return Date.now() - new Date(asset.price_updated_at).getTime() > sevenDays;
+  const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+  return Date.now() - new Date(asset.price_updated_at).getTime() > thirtyDays;
 }
 
 export default function CollectionPage() {
@@ -233,7 +233,7 @@ export default function CollectionPage() {
             </p>
             <p className="text-sm text-danger/80 mt-0.5">
               <span className="font-semibold">{staleCount} asset{staleCount !== 1 ? "s" : ""}</span>{" "}
-              {staleCount === 1 ? "has" : "have"} not had {staleCount === 1 ? "its" : "their"} price updated in over 7 days.
+              {staleCount === 1 ? "has" : "have"} not had {staleCount === 1 ? "its" : "their"} price updated in over 30 days.
               Update prices to keep your portfolio accurate.
             </p>
           </div>

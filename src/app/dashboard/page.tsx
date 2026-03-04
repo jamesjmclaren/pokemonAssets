@@ -79,11 +79,11 @@ export default function DashboardPage() {
   const profitPercent =
     totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
 
-  // Stale price detection (7 days)
-  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  // Stale price detection (30 days)
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
   const staleAssets = assets.filter((a) => {
     if (!a.price_updated_at) return true;
-    return Date.now() - new Date(a.price_updated_at).getTime() > sevenDaysMs;
+    return Date.now() - new Date(a.price_updated_at).getTime() > thirtyDaysMs;
   });
 
   const topGainers = [...assets]
@@ -207,7 +207,7 @@ export default function DashboardPage() {
               </h3>
               <p className="text-sm text-danger/80 mt-1">
                 {staleAssets.length} asset{staleAssets.length !== 1 ? "s have" : " has"} not had {staleAssets.length === 1 ? "its" : "their"} price
-                updated in over 7 days. Update prices to maintain accurate portfolio valuations.
+                updated in over 30 days. Update prices to maintain accurate portfolio valuations.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {staleAssets.slice(0, 5).map((a) => (

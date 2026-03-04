@@ -34,7 +34,7 @@ export default function AssetCard({ asset }: AssetCardProps) {
   const imageUrl = imgSrc;
 
   const stale = !asset.price_updated_at
-    || Date.now() - new Date(asset.price_updated_at).getTime() > 7 * 24 * 60 * 60 * 1000;
+    || Date.now() - new Date(asset.price_updated_at).getTime() > 30 * 24 * 60 * 60 * 1000;
 
   return (
     <Link href={`/asset/${asset.id}`}>
