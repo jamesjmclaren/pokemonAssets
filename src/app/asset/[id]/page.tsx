@@ -83,7 +83,36 @@ interface EditForm {
   storage_location: string;
   current_price: string;
   manual_price: boolean;
+  pc_product_id: string;
+  pc_url: string;
+  pc_grade_field: string;
 }
+
+interface PriceChartingCandidate {
+  id: string;
+  name: string;
+  setName: string;
+  url: string;
+  imageUrl?: string;
+  currency: string;
+  prices: {
+    ungraded?: number;
+    grade7?: number;
+    grade8?: number;
+    grade9?: number;
+    grade95?: number;
+    psa10?: number;
+  };
+}
+
+const PC_GRADE_OPTIONS = [
+  { value: "ungraded", label: "Ungraded" },
+  { value: "grade7", label: "Grade 7" },
+  { value: "grade8", label: "Grade 8" },
+  { value: "grade9", label: "Grade 9" },
+  { value: "grade95", label: "Grade 9.5" },
+  { value: "psa10", label: "PSA 10 / Grade 10" },
+];
 
 export default function AssetDetailPage({
   params,
@@ -109,6 +138,9 @@ export default function AssetDetailPage({
   const [snapshots, setSnapshots] = useState<{ id: string; price: number; source: string; recorded_at: string }[]>([]);
   const [loadingSnapshots, setLoadingSnapshots] = useState(false);
   const [deletingSnapshotId, setDeletingSnapshotId] = useState<string | null>(null);
+  const [pcSearching, setPcSearching] = useState(false);
+  const [pcCandidates, setPcCandidates] = useState<PriceChartingCandidate[]>([]);
+  const [pcShowSearch, setPcShowSearch] = useState(false);
 
   useEffect(() => {
     async function fetchAsset() {
@@ -148,7 +180,12 @@ export default function AssetDetailPage({
       storage_location: asset.storage_location || "",
       current_price: String(asset.current_price ?? ""),
       manual_price: asset.manual_price || false,
+      pc_product_id: asset.pc_product_id || "",
+      pc_url: asset.pc_url || "",
+      pc_grade_field: asset.pc_grade_field || "ungraded",
     });
+    setPcCandidates([]);
+    setPcShowSearch(false);
     setEditing(true);
   };
 
@@ -180,6 +217,9 @@ export default function AssetDetailPage({
           storage_location: editForm.storage_location,
           current_price: editForm.current_price || undefined,
           manual_price: editForm.manual_price,
+          pc_product_id: editForm.pc_product_id || null,
+          pc_url: editForm.pc_url || null,
+          pc_grade_field: editForm.pc_grade_field || null,
         }),
       });
       if (!res.ok) {
@@ -586,6 +626,201 @@ export default function AssetDetailPage({
                   <p className="text-xs text-text-muted">Price will not auto-refresh from the API</p>
                 </div>
               </label>
+            </div>
+
+            {/* PriceCharting Tether */}
+            <div className="md:col-span-2 border-t border-border pt-4 mt-2">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-accent" />
+                  <span className="text-sm font-medium text-text-primary">PriceCharting Tether</span>
+                </div>
+                {editForm.pc_url && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditForm({ ...editForm, pc_product_id: "", pc_url: "", pc_grade_field: "ungraded" });
+                      setPcCandidates([]);
+                      setPcShowSearch(false);
+                    }}
+                    className="text-xs text-danger hover:text-danger/80 font-medium"
+                  >
+                    Remove Tether
+                  </button>
+                )}
+              </div>
+
+              {editForm.pc_url ? (
+                <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Link2 className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+                    <p className="text-xs text-accent truncate">{editForm.pc_url}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">Price Grade</label>
+                    <select
+                      value={editForm.pc_grade_field}
+                      onChange={(e) => setEditForm({ ...editForm, pc_grade_field: e.target.value })}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-text-primary text-sm outline-none focus:border-accent"
+                    >
+                      {PC_GRADE_OPTIONS.map((g) => (
+                        <option key={g.value} value={g.value}>{g.label}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-text-muted mt-1">Prices auto-refresh daily from eBay sold data (USD)</p>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs text-text-muted mb-2">
+                    Tether this asset to a PriceCharting listing for automatic daily price updates from eBay sold data.
+                  </p>
+                  {!pcShowSearch ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPcShowSearch(true);
+                        setPcCandidates([]);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-sm font-medium"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      Search PriceCharting
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          id="pc-search-input"
+                          defaultValue={editForm.name}
+                          placeholder="Search PriceCharting..."
+                          className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-text-primary text-sm outline-none focus:border-accent"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const input = e.currentTarget;
+                              if (!input.value.trim()) return;
+                              setPcSearching(true);
+                              fetch(`/api/pricecharting-search?q=${encodeURIComponent(input.value.trim())}`)
+                                .then((r) => r.json())
+                                .then((data) => setPcCandidates(data.candidates || []))
+                                .catch(() => setPcCandidates([]))
+                                .finally(() => setPcSearching(false));
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          disabled={pcSearching}
+                          onClick={() => {
+                            const input = document.getElementById("pc-search-input") as HTMLInputElement | null;
+                            const q = input?.value.trim();
+                            if (!q) return;
+                            setPcSearching(true);
+                            fetch(`/api/pricecharting-search?q=${encodeURIComponent(q)}`)
+                              .then((r) => r.json())
+                              .then((data) => setPcCandidates(data.candidates || []))
+                              .catch(() => setPcCandidates([]))
+                              .finally(() => setPcSearching(false));
+                          }}
+                          className="px-3 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-black rounded-lg text-sm font-medium"
+                        >
+                          {pcSearching ? "Searching..." : "Search"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setPcShowSearch(false); setPcCandidates([]); }}
+                          className="px-2 py-2 text-text-muted hover:text-text-primary rounded-lg hover:bg-surface-hover"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {pcSearching && (
+                        <p className="text-xs text-text-muted py-2">Searching PriceCharting...</p>
+                      )}
+
+                      {!pcSearching && pcCandidates.length > 0 && (
+                        <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                          {pcCandidates.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setEditForm({
+                                  ...editForm,
+                                  pc_product_id: c.id,
+                                  pc_url: c.url,
+                                  pc_grade_field: editForm.psa_grade
+                                    ? (() => {
+                                        const g = editForm.psa_grade.toLowerCase();
+                                        if (g.includes("10")) return "psa10";
+                                        if (g.includes("9.5")) return "grade95";
+                                        if (g.includes("9")) return "grade9";
+                                        if (g.includes("8")) return "grade8";
+                                        if (g.includes("7")) return "grade7";
+                                        return "ungraded";
+                                      })()
+                                    : "ungraded",
+                                  manual_price: false,
+                                });
+                                setPcCandidates([]);
+                                setPcShowSearch(false);
+                              }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 bg-background hover:bg-surface-hover border border-border rounded-lg text-left"
+                            >
+                              {c.imageUrl && (
+                                <Image
+                                  src={c.imageUrl}
+                                  alt={c.name}
+                                  width={40}
+                                  height={40}
+                                  className="rounded object-contain flex-shrink-0"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-text-primary truncate">{c.name}</p>
+                                <p className="text-[10px] text-text-muted truncate">{c.setName}</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                {(() => {
+                                  const g = editForm.psa_grade?.toLowerCase() || "";
+                                  const gradeKey = g.includes("10") ? "psa10" : g.includes("9.5") ? "grade95" : g.includes("9") ? "grade9" : g.includes("8") ? "grade8" : g.includes("7") ? "grade7" : "";
+                                  const gradeLabel = g.includes("10") ? "PSA 10" : g.includes("9.5") ? "Grade 9.5" : g.includes("9") ? "Grade 9" : g.includes("8") ? "Grade 8" : g.includes("7") ? "Grade 7" : "";
+                                  const gradePrice = gradeKey ? c.prices[gradeKey as keyof typeof c.prices] : undefined;
+                                  return gradePrice != null ? (
+                                    <>
+                                      <p className="text-xs text-accent font-semibold">${gradePrice.toFixed(2)}</p>
+                                      <p className="text-[10px] text-accent">{gradeLabel}</p>
+                                      {c.prices.ungraded != null && (
+                                        <p className="text-[10px] text-text-muted">${c.prices.ungraded.toFixed(2)} raw</p>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      {c.prices.ungraded != null && (
+                                        <p className="text-xs text-text-primary font-medium">${c.prices.ungraded.toFixed(2)}</p>
+                                      )}
+                                      <p className="text-[10px] text-text-muted">Ungraded</p>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {!pcSearching && pcCandidates.length === 0 && pcShowSearch && (
+                        <p className="text-xs text-text-muted py-1">
+                          Press Search or Enter to find matching products on PriceCharting.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
