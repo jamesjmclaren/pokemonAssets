@@ -784,10 +784,28 @@ export default function AssetDetailPage({
                                 <p className="text-[10px] text-text-muted truncate">{c.setName}</p>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                {c.prices.ungraded != null && (
-                                  <p className="text-xs text-text-primary font-medium">${c.prices.ungraded.toFixed(2)}</p>
-                                )}
-                                <p className="text-[10px] text-text-muted">Ungraded</p>
+                                {(() => {
+                                  const g = editForm.psa_grade?.toLowerCase() || "";
+                                  const gradeKey = g.includes("10") ? "psa10" : g.includes("9.5") ? "grade95" : g.includes("9") ? "grade9" : g.includes("8") ? "grade8" : g.includes("7") ? "grade7" : "";
+                                  const gradeLabel = g.includes("10") ? "PSA 10" : g.includes("9.5") ? "Grade 9.5" : g.includes("9") ? "Grade 9" : g.includes("8") ? "Grade 8" : g.includes("7") ? "Grade 7" : "";
+                                  const gradePrice = gradeKey ? c.prices[gradeKey as keyof typeof c.prices] : undefined;
+                                  return gradePrice != null ? (
+                                    <>
+                                      <p className="text-xs text-accent font-semibold">${gradePrice.toFixed(2)}</p>
+                                      <p className="text-[10px] text-accent">{gradeLabel}</p>
+                                      {c.prices.ungraded != null && (
+                                        <p className="text-[10px] text-text-muted">${c.prices.ungraded.toFixed(2)} raw</p>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      {c.prices.ungraded != null && (
+                                        <p className="text-xs text-text-primary font-medium">${c.prices.ungraded.toFixed(2)}</p>
+                                      )}
+                                      <p className="text-[10px] text-text-muted">Ungraded</p>
+                                    </>
+                                  );
+                                })()}
                               </div>
                             </button>
                           ))}
