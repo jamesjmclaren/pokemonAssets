@@ -39,7 +39,7 @@ export type Database = {
           external_id: string;
           name: string;
           set_name: string;
-          asset_type: "card" | "sealed";
+          asset_type: "card" | "sealed" | "comic";
           image_url: string | null;
           custom_image_url: string | null;
           purchase_price: number;

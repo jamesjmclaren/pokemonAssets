@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Image from "next/image";
-import { Search, X, Loader2, Package, CreditCard, PlusCircle } from "lucide-react";
+import { Search, X, Loader2, Package, CreditCard, PlusCircle, BookOpen } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 
 interface SearchResult {
@@ -12,7 +12,7 @@ interface SearchResult {
   rarity?: string;
   setName?: string;
   imageUrl?: string;
-  type: "card" | "sealed";
+  type: "card" | "sealed" | "comic";
   prices?: {
     raw?: number;
     market?: number;
@@ -44,12 +44,19 @@ export default function SearchModal({
   const [searched, setSearched] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [searchMode, setSearchMode] = useState<"pokemon" | "comic">("pokemon");
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (query.trim().length >= 2) {
+      doSearch(query);
+    }
+  }, [searchMode]);
 
   const doSearch = useCallback(async (q: string) => {
     if (q.trim().length < 2) {
@@ -61,21 +68,43 @@ export default function SearchModal({
     setLoading(true);
     setSearched(true);
     try {
-      const res = await fetch(
-        `/api/search?q=${encodeURIComponent(q.trim())}`
-      );
-      if (!res.ok) throw new Error("Search failed");
-      const json = await res.json();
-      const items: SearchResult[] = Array.isArray(json)
-        ? json
-        : json.data || json.cards || json.results || [];
-      setResults(items);
+      if (searchMode === "comic") {
+        const res = await fetch(
+          `/api/comic-search?q=${encodeURIComponent(q.trim())}`
+        );
+        if (!res.ok) throw new Error("Search failed");
+        const json = await res.json();
+        const candidates = json.candidates || [];
+        const items: SearchResult[] = candidates.map((c: { id: string; name: string; setName: string; imageUrl?: string; url: string; prices: { ungraded?: number; vg4?: number; fine6?: number; vf8?: number; nm92?: number; nm98?: number } }) => ({
+          id: c.id,
+          name: c.name,
+          setName: c.setName,
+          imageUrl: c.imageUrl,
+          type: "comic" as const,
+          prices: {
+            raw: c.prices.ungraded,
+            market: c.prices.vg4,
+          },
+          marketPrice: c.prices.ungraded,
+        }));
+        setResults(items);
+      } else {
+        const res = await fetch(
+          `/api/search?q=${encodeURIComponent(q.trim())}`
+        );
+        if (!res.ok) throw new Error("Search failed");
+        const json = await res.json();
+        const items: SearchResult[] = Array.isArray(json)
+          ? json
+          : json.data || json.cards || json.results || [];
+        setResults(items);
+      }
     } catch {
       setResults([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [searchMode]);
 
   const handleInputChange = (value: string) => {
     setQuery(value);
@@ -105,7 +134,7 @@ export default function SearchModal({
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search cards or sealed products..."
+            placeholder={searchMode === "comic" ? "Search comic books..." : "Search cards or sealed products..."}
             value={query}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -117,6 +146,34 @@ export default function SearchModal({
             className="p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-hover"
           >
             <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Search mode tabs */}
+        <div className="flex border-b border-border px-4">
+          <button
+            type="button"
+            onClick={() => setSearchMode("pokemon")}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 -mb-px ${
+              searchMode === "pokemon"
+                ? "border-accent text-accent"
+                : "border-transparent text-text-muted hover:text-text-secondary"
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            Pokémon
+          </button>
+          <button
+            type="button"
+            onClick={() => setSearchMode("comic")}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 -mb-px ${
+              searchMode === "comic"
+                ? "border-accent text-accent"
+                : "border-transparent text-text-muted hover:text-text-secondary"
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            Comics
           </button>
         </div>
 
@@ -191,7 +248,9 @@ export default function SearchModal({
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-text-muted">
-                      {isCard ? (
+                      {item.type === "comic" ? (
+                        <BookOpen className="w-6 h-6" />
+                      ) : isCard ? (
                         <CreditCard className="w-6 h-6" />
                       ) : (
                         <Package className="w-6 h-6" />
@@ -207,11 +266,13 @@ export default function SearchModal({
                       {item.name}
                     </p>
                     <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      isCard 
-                        ? "bg-blue-500/10 text-blue-400" 
-                        : "bg-purple-500/10 text-purple-400"
+                      item.type === "comic"
+                        ? "bg-emerald-500/10 text-emerald-400"
+                        : isCard 
+                          ? "bg-blue-500/10 text-blue-400" 
+                          : "bg-purple-500/10 text-purple-400"
                     }`}>
-                      {isCard ? "Card" : "Sealed"}
+                      {item.type === "comic" ? "Comic" : isCard ? "Card" : "Sealed"}
                     </span>
                   </div>
                   <p className="text-xs text-text-muted mt-0.5">
@@ -245,7 +306,7 @@ export default function SearchModal({
                     {rawPrice ? formatCurrency(rawPrice) : "N/A"}
                   </p>
                   <p className="text-xs text-text-muted">
-                    {isCard ? "Raw" : "Market"}
+                    {item.type === "comic" ? "Ungraded" : isCard ? "Raw" : "Market"}
                   </p>
                 </div>
               </button>

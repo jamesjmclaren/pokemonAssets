@@ -18,7 +18,7 @@ interface PriceChartProps {
   assetId?: string;
   cardName?: string;
   purchasePrice?: number;
-  assetType?: "card" | "sealed";
+  assetType?: "card" | "sealed" | "comic";
   className?: string;
 }
 

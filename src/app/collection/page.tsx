@@ -28,7 +28,7 @@ import type { PortfolioAsset } from "@/types";
 type SortField = "name" | "purchase_price" | "current_price" | "profit" | "purchase_date" | "performance";
 type SortDir = "asc" | "desc";
 type ViewMode = "grid" | "table";
-type TypeTab = "all" | "raw" | "graded" | "sealed";
+type TypeTab = "all" | "raw" | "graded" | "sealed" | "comic";
 
 function isPriceStale(asset: PortfolioAsset): boolean {
   if (!asset.price_updated_at) return true;
@@ -85,6 +85,7 @@ export default function CollectionPage() {
   const rawCardCount = useMemo(() => assets.filter((a) => a.asset_type === "card" && !a.psa_grade).length, [assets]);
   const gradedCardCount = useMemo(() => assets.filter((a) => a.asset_type === "card" && !!a.psa_grade).length, [assets]);
   const sealedCount = useMemo(() => assets.filter((a) => a.asset_type === "sealed").length, [assets]);
+  const comicCount = useMemo(() => assets.filter((a) => a.asset_type === "comic").length, [assets]);
   const staleCount = useMemo(() => assets.filter(isPriceStale).length, [assets]);
 
   const filtered = useMemo(() => {
@@ -105,6 +106,8 @@ export default function CollectionPage() {
       result = result.filter((a) => a.asset_type === "card" && !!a.psa_grade);
     } else if (typeTab === "sealed") {
       result = result.filter((a) => a.asset_type === "sealed");
+    } else if (typeTab === "comic") {
+      result = result.filter((a) => a.asset_type === "comic");
     }
 
     result.sort((a, b) => {
@@ -248,7 +251,8 @@ export default function CollectionPage() {
             { key: "raw" as TypeTab, label: `Raw Cards (${rawCardCount})` },
             { key: "graded" as TypeTab, label: `Graded (${gradedCardCount})` },
             { key: "sealed" as TypeTab, label: `Sealed (${sealedCount})` },
-          ]).map((tab) => (
+            { key: "comic" as TypeTab, label: `Comics (${comicCount})` },
+            ]).map((tab) => (
             <button
               key={tab.key}
               onClick={() => setTypeTab(tab.key)}
