@@ -631,7 +631,7 @@ export default function LandingPage() {
             Interested in learning more about West Investments and how we can manage your collectible asset portfolio? We would be pleased to hear from you.
           </p>
           <a
-            href="mailto:info@westinvestments.com"
+            href="mailto:info@west.investments"
             className={`inline-flex items-center gap-3 border border-accent/50 text-accent px-10 py-4 hover:bg-accent hover:text-background transition-all ${isVisible("contact") ? "landing-fade-up" : "opacity-0"}`}
             style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.25em", animationDelay: "0.4s", textDecoration: "none", textTransform: "uppercase" }}
           >
