@@ -52,7 +52,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="landing-grain">
+    <div>
       {/* Navigation — Citadel-inspired clean horizontal bar */}
       <nav className="fixed top-0 left-0 right-0 z-50 landing-fade-in border-b border-border/20" style={{ animationDelay: "0.2s", backdropFilter: "blur(16px)", backgroundColor: "rgba(10,10,10,0.9)" }}>
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-5 flex items-center justify-between">
@@ -85,14 +85,26 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section — Steyn Group-inspired centered layout */}
+      {/* Hero Section — Steyn Group-inspired centered layout with video background */}
       <section className="min-h-screen flex flex-col justify-center items-center relative overflow-hidden text-center">
-        {/* Background glow */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] rounded-full" style={{ background: "radial-gradient(circle, rgba(212,175,55,0.03) 0%, transparent 60%)" }} />
+        {/* Video background */}
+        <div className="absolute inset-0 z-0">
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="w-full h-full object-cover"
+            style={{ filter: "brightness(0.3)" }}
+          >
+            {/* Replace this src with your preferred stock video — download from Pexels/Pixabay and place in /public/hero-video.mp4 */}
+            <source src="/hero-video.mp4" type="video/mp4" />
+          </video>
+          {/* Gradient overlay for text readability */}
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(8,8,8,0.6) 0%, rgba(8,8,8,0.4) 50%, rgba(8,8,8,0.85) 100%)" }} />
         </div>
 
-        <div className="max-w-4xl mx-auto px-6 md:px-12 w-full relative">
+        <div className="max-w-4xl mx-auto px-6 md:px-12 w-full relative z-10">
           {/* Overline — like Steyn's "Leading Industry Experts" */}
           <p
             className="text-accent tracking-widest uppercase mb-10 landing-fade-up"
@@ -147,7 +159,7 @@ export default function LandingPage() {
         </div>
 
         {/* Scroll indicator */}
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 landing-fade-in" style={{ animationDelay: "2s" }}>
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10 landing-fade-in" style={{ animationDelay: "2s" }}>
           <div className="w-px h-16 bg-gradient-to-b from-transparent via-accent/30 to-transparent" />
         </div>
       </section>
