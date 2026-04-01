@@ -97,8 +97,7 @@ export default function LandingPage() {
             className="w-full h-full object-cover"
             style={{ filter: "brightness(0.3)" }}
           >
-            {/* Replace this src with your preferred stock video — download from Pexels/Pixabay and place in /public/hero-video.mp4 */}
-            <source src="/hero-video.mp4" type="video/mp4" />
+            <source src="/hero.mp4" type="video/mp4" />
           </video>
           {/* Gradient overlay for text readability */}
           <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(8,8,8,0.6) 0%, rgba(8,8,8,0.4) 50%, rgba(8,8,8,0.85) 100%)" }} />
