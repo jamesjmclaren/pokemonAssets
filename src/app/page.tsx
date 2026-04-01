@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Search, BarChart3, Globe, ShieldCheck } from "lucide-react";
 
 export default function LandingPage() {
   const { isSignedIn, isLoaded } = useUser();
@@ -237,34 +237,41 @@ export default function LandingPage() {
                 title: "Asset Acquisition",
                 description: "We target culturally significant collectibles across trading card games, comics, books, and memorabilia — items where provenance, condition, and rarity underpin long-term value.",
                 delay: "0.3s",
+                icon: Search,
               },
               {
                 title: "Portfolio Management",
                 description: "Real-time valuation tracking, comprehensive P&L analytics, and performance reporting across all holdings. Every position is monitored and managed with institutional rigour.",
                 delay: "0.4s",
+                icon: BarChart3,
               },
               {
                 title: "Market Intelligence",
                 description: "Proprietary pricing data and market insights sourced from leading auction houses and platforms worldwide, informed by over 25 years of specialist experience.",
                 delay: "0.5s",
+                icon: Globe,
               },
               {
                 title: "Governance & Transparency",
                 description: "Structured oversight with provenance tracking, condition evidence, and transparent reporting for every position. Investors receive full visibility across their holdings.",
                 delay: "0.6s",
+                icon: ShieldCheck,
               },
-            ].map(({ title, description, delay }) => (
+            ].map(({ title, description, delay, icon: Icon }) => (
               <div
                 key={title}
                 className={`${isVisible("what-we-do") ? "landing-fade-up" : "opacity-0"}`}
                 style={{ animationDelay: delay }}
               >
-                <h3
-                  className="text-text-primary mb-4"
-                  style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 500 }}
-                >
-                  {title}
-                </h3>
+                <div className="flex items-center gap-3 mb-4">
+                  <Icon className="w-5 h-5 text-accent" />
+                  <h3
+                    className="text-text-primary"
+                    style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 500 }}
+                  >
+                    {title}
+                  </h3>
+                </div>
                 <p className="text-text-muted leading-relaxed" style={{ fontFamily: "Inter, sans-serif", fontSize: "0.9rem", lineHeight: 1.8 }}>
                   {description}
                 </p>
