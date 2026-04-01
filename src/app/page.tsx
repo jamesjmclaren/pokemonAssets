@@ -425,11 +425,11 @@ export default function LandingPage() {
                   { name: "Michael Jordan", set: "1986 Fleer #57", type: "Graded", grade: "PSA 10", value: "$18,500", invested: "$12,000", pnl: "+54.2%", positive: true, image: "/cards/michael-jordan.png" },
                   { name: "Lugia", set: "Neo Genesis", type: "Graded", grade: "PSA 9", value: "$4,800", invested: "$2,200", pnl: "+118.2%", positive: true, image: "https://images.pokemontcg.io/neo1/9.png" },
                   { name: "Umbreon VMAX", set: "Evolving Skies", type: "Raw", grade: null, value: "$6,400", invested: "$3,800", pnl: "+68.4%", positive: true, image: "https://images.pokemontcg.io/swsh7/215.png" },
-                  { name: "Luigi Poncho Box", set: "Special Box", type: "Sealed", grade: null, value: "$3,200", invested: "$1,600", pnl: "+100.0%", positive: true, image: "/cards/luigi-poncho-box.png" },
+                  { name: "Poncho Magikarp & Gyarados", set: "Special Box", type: "Sealed", grade: null, value: "$11,000", invested: "$1,600", pnl: "+587.5%", positive: true, image: "/cards/luigi-poncho-box.png" },
                   { name: "Charizard", set: "Base Set #4", type: "Raw", grade: null, value: "$8,200", invested: "$5,400", pnl: "+51.9%", positive: true, image: "https://images.pokemontcg.io/base1/4.png" },
                 ].map((asset) => (
                   <div key={asset.name} className="bg-background border border-border/60 rounded-xl overflow-hidden">
-                    <div className="aspect-[4/3] bg-background overflow-hidden flex items-center justify-center relative">
+                    <div className="aspect-[4/3] overflow-hidden flex items-center justify-center relative">
                       <img
                         src={asset.image}
                         alt={asset.name}
