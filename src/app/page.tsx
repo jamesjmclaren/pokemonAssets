@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Search, BarChart3, Globe, ShieldCheck } from "lucide-react";
 
 export default function LandingPage() {
   const { isSignedIn, isLoaded } = useUser();
@@ -237,34 +237,41 @@ export default function LandingPage() {
                 title: "Asset Acquisition",
                 description: "We target culturally significant collectibles across trading card games, comics, books, and memorabilia — items where provenance, condition, and rarity underpin long-term value.",
                 delay: "0.3s",
+                icon: Search,
               },
               {
                 title: "Portfolio Management",
                 description: "Real-time valuation tracking, comprehensive P&L analytics, and performance reporting across all holdings. Every position is monitored and managed with institutional rigour.",
                 delay: "0.4s",
+                icon: BarChart3,
               },
               {
                 title: "Market Intelligence",
                 description: "Proprietary pricing data and market insights sourced from leading auction houses and platforms worldwide, informed by over 25 years of specialist experience.",
                 delay: "0.5s",
+                icon: Globe,
               },
               {
                 title: "Governance & Transparency",
                 description: "Structured oversight with provenance tracking, condition evidence, and transparent reporting for every position. Investors receive full visibility across their holdings.",
                 delay: "0.6s",
+                icon: ShieldCheck,
               },
-            ].map(({ title, description, delay }) => (
+            ].map(({ title, description, delay, icon: Icon }) => (
               <div
                 key={title}
                 className={`${isVisible("what-we-do") ? "landing-fade-up" : "opacity-0"}`}
                 style={{ animationDelay: delay }}
               >
-                <h3
-                  className="text-text-primary mb-4"
-                  style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 500 }}
-                >
-                  {title}
-                </h3>
+                <div className="flex items-center gap-3 mb-4">
+                  <Icon className="w-5 h-5 text-accent" />
+                  <h3
+                    className="text-text-primary"
+                    style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 500 }}
+                  >
+                    {title}
+                  </h3>
+                </div>
                 <p className="text-text-muted leading-relaxed" style={{ fontFamily: "Inter, sans-serif", fontSize: "0.9rem", lineHeight: 1.8 }}>
                   {description}
                 </p>
@@ -365,18 +372,51 @@ export default function LandingPage() {
               <div className="relative h-32 md:h-44">
                 <svg viewBox="0 0 400 120" className="w-full h-full" preserveAspectRatio="none">
                   <defs>
-                    <linearGradient id="preview-grad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.3" />
+                    <linearGradient id="preview-grad-graded" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.25" />
                       <stop offset="100%" stopColor="#a78bfa" stopOpacity="0.02" />
+                    </linearGradient>
+                    <linearGradient id="preview-grad-raw" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f97316" stopOpacity="0.2" />
+                      <stop offset="100%" stopColor="#f97316" stopOpacity="0.02" />
+                    </linearGradient>
+                    <linearGradient id="preview-grad-sealed" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#22c55e" stopOpacity="0.2" />
+                      <stop offset="100%" stopColor="#22c55e" stopOpacity="0.02" />
                     </linearGradient>
                   </defs>
                   {[30, 60, 90].map((y) => (
                     <line key={y} x1="0" y1={y} x2="400" y2={y} stroke="#2a2a2a" strokeWidth="0.5" />
                   ))}
-                  <path d="M0,95 C30,90 60,85 100,80 C140,75 160,60 200,55 C240,50 260,45 300,35 C330,28 360,22 400,18 L400,120 L0,120 Z" fill="url(#preview-grad)" />
-                  <path d="M0,95 C30,90 60,85 100,80 C140,75 160,60 200,55 C240,50 260,45 300,35 C330,28 360,22 400,18" fill="none" stroke="#a78bfa" strokeWidth="2" />
-                  <line x1="0" y1="75" x2="400" y2="65" stroke="#9090a8" strokeWidth="1" strokeDasharray="6 4" />
+                  {/* Graded line (purple) */}
+                  <path d="M0,88 C30,84 60,78 100,70 C140,62 160,50 200,42 C240,35 260,28 300,22 C330,18 360,15 400,12 L400,120 L0,120 Z" fill="url(#preview-grad-graded)" />
+                  <path d="M0,88 C30,84 60,78 100,70 C140,62 160,50 200,42 C240,35 260,28 300,22 C330,18 360,15 400,12" fill="none" stroke="#a78bfa" strokeWidth="2" />
+                  {/* Raw line (orange) */}
+                  <path d="M0,98 C30,96 60,92 100,88 C140,84 160,76 200,70 C240,65 260,58 300,52 C330,48 360,44 400,40 L400,120 L0,120 Z" fill="url(#preview-grad-raw)" />
+                  <path d="M0,98 C30,96 60,92 100,88 C140,84 160,76 200,70 C240,65 260,58 300,52 C330,48 360,44 400,40" fill="none" stroke="#f97316" strokeWidth="2" />
+                  {/* Sealed line (green) */}
+                  <path d="M0,105 C30,104 60,102 100,98 C140,95 160,90 200,86 C240,82 260,78 300,74 C330,71 360,68 400,64 L400,120 L0,120 Z" fill="url(#preview-grad-sealed)" />
+                  <path d="M0,105 C30,104 60,102 100,98 C140,95 160,90 200,86 C240,82 260,78 300,74 C330,71 360,68 400,64" fill="none" stroke="#22c55e" strokeWidth="2" />
+                  {/* Cost basis dashed line */}
+                  <line x1="0" y1="85" x2="400" y2="75" stroke="#9090a8" strokeWidth="1" strokeDasharray="6 4" />
                 </svg>
+              </div>
+              {/* Chart legend */}
+              <div className="flex items-center gap-4 mt-3">
+                {[
+                  { color: "#a78bfa", label: "Graded" },
+                  { color: "#f97316", label: "Raw" },
+                  { color: "#22c55e", label: "Sealed" },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>{item.label}</span>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1.5">
+                  <svg width="12" height="2" className="shrink-0"><line x1="0" y1="1" x2="12" y2="1" stroke="#9090a8" strokeWidth="1.5" strokeDasharray="3 2" /></svg>
+                  <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>Cost Basis</span>
+                </div>
               </div>
             </div>
 
@@ -388,12 +428,15 @@ export default function LandingPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {[
-                  { name: "Charizard VMAX", set: "Champions Path", type: "Card", grade: "PSA 10", value: "$4,850", invested: "$2,200", pnl: "+120.5%", positive: true, image: "https://images.pokemontcg.io/swsh35/74.png" },
-                  { name: "Umbreon VMAX", set: "Evolving Skies", type: "Card", grade: "PSA 10", value: "$12,400", invested: "$8,500", pnl: "+45.9%", positive: true, image: "https://images.pokemontcg.io/swsh7/215.png" },
-                  { name: "Pikachu VMAX", set: "Vivid Voltage", type: "Card", grade: "PSA 9", value: "$8,200", invested: "$5,800", pnl: "+41.4%", positive: true, image: "https://images.pokemontcg.io/swsh4/188.png" },
+                  { name: "Mario Poncho Pikachu", set: "Special Box Promo", type: "Graded", grade: "PSA 10", value: "$5,200", invested: "$2,400", pnl: "+116.7%", positive: true, image: "/cards/mario-poncho-pikachu.png" },
+                  { name: "Michael Jordan", set: "1986 Fleer #57", type: "Graded", grade: "PSA 10", value: "$18,500", invested: "$12,000", pnl: "+54.2%", positive: true, image: "/cards/michael-jordan.png" },
+                  { name: "Lugia", set: "Neo Genesis", type: "Graded", grade: "PSA 9", value: "$4,800", invested: "$2,200", pnl: "+118.2%", positive: true, image: "https://images.pokemontcg.io/neo1/9.png" },
+                  { name: "Umbreon VMAX", set: "Evolving Skies", type: "Raw", grade: null, value: "$6,400", invested: "$3,800", pnl: "+68.4%", positive: true, image: "https://images.pokemontcg.io/swsh7/215.png" },
+                  { name: "Poncho Magikarp & Gyarados", set: "Special Box", type: "Sealed", grade: null, value: "$11,000", invested: "$1,600", pnl: "+587.5%", positive: true, image: "/cards/luigi-poncho-box.png" },
+                  { name: "Charizard", set: "Base Set #4", type: "Raw", grade: null, value: "$8,200", invested: "$5,400", pnl: "+51.9%", positive: true, image: "https://images.pokemontcg.io/base1/4.png" },
                 ].map((asset) => (
                   <div key={asset.name} className="bg-background border border-border/60 rounded-xl overflow-hidden">
-                    <div className="aspect-[4/3] bg-background overflow-hidden flex items-center justify-center relative">
+                    <div className="aspect-[4/3] overflow-hidden flex items-center justify-center relative">
                       <img
                         src={asset.image}
                         alt={asset.name}
@@ -401,7 +444,11 @@ export default function LandingPage() {
                         className="object-contain p-2 md:p-3 w-full h-full"
                       />
                       <div className="absolute top-2 left-2 flex gap-1">
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${asset.type === "Card" ? "bg-accent-muted text-accent" : "bg-warning-muted text-warning"}`}>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                          asset.type === "Graded" ? "bg-[#a78bfa]/20 text-[#a78bfa]" :
+                          asset.type === "Raw" ? "bg-[#f97316]/20 text-[#f97316]" :
+                          "bg-[#22c55e]/20 text-[#22c55e]"
+                        }`}>
                           {asset.type}
                         </span>
                         {asset.grade && (
@@ -591,7 +638,7 @@ export default function LandingPage() {
             Interested in learning more about West Investments and how we can manage your collectible asset portfolio? We would be pleased to hear from you.
           </p>
           <a
-            href="mailto:info@westinvestments.com"
+            href="mailto:info@west.investments"
             className={`inline-flex items-center gap-3 border border-accent/50 text-accent px-10 py-4 hover:bg-accent hover:text-background transition-all ${isVisible("contact") ? "landing-fade-up" : "opacity-0"}`}
             style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.25em", animationDelay: "0.4s", textDecoration: "none", textTransform: "uppercase" }}
           >
