@@ -2,6 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Search, BarChart3, Globe, ShieldCheck } from "lucide-react";
 
@@ -167,9 +168,20 @@ export default function LandingPage() {
       <section
         id="about"
         ref={setRef("about")}
-        className="py-32 md:py-44 border-t border-border/20"
+        className="py-32 md:py-44 border-t border-border/20 relative overflow-hidden"
       >
-        <div className="max-w-7xl mx-auto px-6 md:px-12">
+        {/* Background image */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="/about-bg.png"
+            alt=""
+            className="w-full h-full object-cover"
+            style={{ filter: "brightness(0.3)" }}
+          />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(8,8,8,0.6) 0%, rgba(8,8,8,0.4) 50%, rgba(8,8,8,0.85) 100%)" }} />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-6 md:px-12 relative z-10">
           <div className="max-w-3xl">
             <p
               className={`text-accent tracking-widest uppercase mb-8 ${isVisible("about") ? "landing-fade-up" : "opacity-0"}`}
@@ -201,6 +213,40 @@ export default function LandingPage() {
               We invest selectively in culturally significant assets where scarcity and collector demand support enduring investment potential. Our approach combines deep specialist knowledge with institutional-grade infrastructure, providing investors with the tools, transparency, and insight needed to navigate markets where traditional data is scarce and conviction matters most.
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* Ethos Section — Discreet. Trusted. Professional. */}
+      <section
+        id="ethos"
+        ref={setRef("ethos")}
+        className="py-32 md:py-44 border-t border-border/20"
+      >
+        <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
+          <h2
+            className={`mb-10 ${isVisible("ethos") ? "landing-fade-up" : "opacity-0"}`}
+            style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)",
+              fontWeight: 400,
+              lineHeight: 1.25,
+              letterSpacing: "0.02em",
+              color: "var(--color-text-primary)",
+              animationDelay: "0.2s",
+            }}
+          >
+            Discreet. Trusted. Professional.
+          </h2>
+          <div
+            className={`h-px bg-accent/40 mx-auto mb-10 ${isVisible("ethos") ? "landing-line-reveal" : "opacity-0"}`}
+            style={{ maxWidth: "80px", animationDelay: "0.4s" }}
+          />
+          <p
+            className={`max-w-2xl mx-auto text-text-secondary leading-relaxed ${isVisible("ethos") ? "landing-fade-up" : "opacity-0"}`}
+            style={{ fontFamily: "Inter, sans-serif", fontSize: "0.95rem", lineHeight: 1.8, animationDelay: "0.5s" }}
+          >
+            At West Investments, we recognise that our clients value discretion as highly as performance. When handling sensitive information and high-value collectible assets, we operate with the utmost professionalism, confidentiality, and care. Our commitment is to provide a trusted, highly personalised service while safeguarding both your privacy and your interests at every stage.
+          </p>
         </div>
       </section>
 
@@ -648,6 +694,18 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Disclaimer */}
+      <section className="border-t border-border/20 py-12">
+        <div className="max-w-7xl mx-auto px-6 md:px-12">
+          <p className="text-text-muted text-xs leading-relaxed" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.02em" }}>
+            Disclaimer: Portfolio examples shown are for illustrative purposes only. All figures, valuations, prices, returns, and timeframes are hypothetical and do not represent actual product prices, recent sale values, realised performance, or any guarantee of future results.
+          </p>
+          <p className="text-text-muted text-xs leading-relaxed mt-3" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.02em" }}>
+            Collectible asset values may fluctuate and past performance is not a reliable indicator of future results.
+          </p>
+        </div>
+      </section>
+
       {/* Footer — Steyn Group-inspired minimal footer with nav links */}
       <footer className="border-t border-border/20 py-16">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
@@ -670,12 +728,12 @@ export default function LandingPage() {
               &copy; {new Date().getFullYear()} West Investments Ltd. All rights reserved.
             </p>
             <div className="flex items-center gap-6">
-              <span className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.05em" }}>
+              <Link href="/privacy" className="text-text-muted text-xs hover:text-text-secondary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.05em" }}>
                 Privacy Policy
-              </span>
-              <span className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.05em" }}>
+              </Link>
+              <Link href="/terms" className="text-text-muted text-xs hover:text-text-secondary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.05em" }}>
                 Terms
-              </span>
+              </Link>
             </div>
           </div>
         </div>
