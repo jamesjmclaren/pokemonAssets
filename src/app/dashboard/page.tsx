@@ -112,6 +112,35 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* Let us manage your portfolio */}
+      <div
+        className="relative rounded-2xl overflow-hidden"
+        style={{
+          backgroundImage: "url('/portfolio-bg.jpeg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-transparent" />
+        <div className="relative z-10 px-10 py-14 max-w-lg">
+          <h2 className="text-3xl font-bold text-white mb-3">
+            Let us manage your portfolio
+          </h2>
+          <p className="text-white/80 text-base mb-6">
+            Track, analyze, and grow your collectibles investment — from graded
+            cards to sealed products. We handle the data so you can focus on
+            collecting.
+          </p>
+          <Link
+            href="/dashboard/add"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl"
+          >
+            <PlusCircle className="w-5 h-5" />
+            Get Started
+          </Link>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
