@@ -164,6 +164,40 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Ethos Section — Discreet. Trusted. Professional. */}
+      <section
+        id="ethos"
+        ref={setRef("ethos")}
+        className="py-32 md:py-44 border-t border-border/20"
+      >
+        <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
+          <h2
+            className={`mb-10 ${isVisible("ethos") ? "landing-fade-up" : "opacity-0"}`}
+            style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)",
+              fontWeight: 400,
+              lineHeight: 1.25,
+              letterSpacing: "0.02em",
+              color: "var(--color-text-primary)",
+              animationDelay: "0.2s",
+            }}
+          >
+            Discreet. Trusted. Professional.
+          </h2>
+          <div
+            className={`h-px bg-accent/40 mx-auto mb-10 ${isVisible("ethos") ? "landing-line-reveal" : "opacity-0"}`}
+            style={{ maxWidth: "80px", animationDelay: "0.4s" }}
+          />
+          <p
+            className={`max-w-2xl mx-auto text-text-secondary leading-relaxed ${isVisible("ethos") ? "landing-fade-up" : "opacity-0"}`}
+            style={{ fontFamily: "Inter, sans-serif", fontSize: "0.95rem", lineHeight: 1.8, animationDelay: "0.5s" }}
+          >
+            At West Investments, we recognise that our clients value discretion as highly as performance. When handling sensitive information and high-value collectible assets, we operate with the utmost professionalism, confidentiality, and care. Our commitment is to provide a trusted, highly personalised service while safeguarding both your privacy and your interests at every stage.
+          </p>
+        </div>
+      </section>
+
       {/* About Section — Steyn Group "The Group" style, full-width statement */}
       <section
         id="about"
@@ -213,40 +247,6 @@ export default function LandingPage() {
               We invest selectively in culturally significant assets where scarcity and collector demand support enduring investment potential. Our approach combines deep specialist knowledge with institutional-grade infrastructure, providing investors with the tools, transparency, and insight needed to navigate markets where traditional data is scarce and conviction matters most.
             </p>
           </div>
-        </div>
-      </section>
-
-      {/* Ethos Section — Discreet. Trusted. Professional. */}
-      <section
-        id="ethos"
-        ref={setRef("ethos")}
-        className="py-32 md:py-44 border-t border-border/20"
-      >
-        <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
-          <h2
-            className={`mb-10 ${isVisible("ethos") ? "landing-fade-up" : "opacity-0"}`}
-            style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)",
-              fontWeight: 400,
-              lineHeight: 1.25,
-              letterSpacing: "0.02em",
-              color: "var(--color-text-primary)",
-              animationDelay: "0.2s",
-            }}
-          >
-            Discreet. Trusted. Professional.
-          </h2>
-          <div
-            className={`h-px bg-accent/40 mx-auto mb-10 ${isVisible("ethos") ? "landing-line-reveal" : "opacity-0"}`}
-            style={{ maxWidth: "80px", animationDelay: "0.4s" }}
-          />
-          <p
-            className={`max-w-2xl mx-auto text-text-secondary leading-relaxed ${isVisible("ethos") ? "landing-fade-up" : "opacity-0"}`}
-            style={{ fontFamily: "Inter, sans-serif", fontSize: "0.95rem", lineHeight: 1.8, animationDelay: "0.5s" }}
-          >
-            At West Investments, we recognise that our clients value discretion as highly as performance. When handling sensitive information and high-value collectible assets, we operate with the utmost professionalism, confidentiality, and care. Our commitment is to provide a trusted, highly personalised service while safeguarding both your privacy and your interests at every stage.
-          </p>
         </div>
       </section>
 
@@ -379,9 +379,9 @@ export default function LandingPage() {
             {/* Stat cards row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
               {[
-                { label: "Total Value", value: "$47,820", change: "+$8,240 (20.8%)", positive: true },
-                { label: "Total Invested", value: "$39,580", change: null, positive: true },
-                { label: "Total P/L", value: "$8,240", change: "+20.8%", positive: true },
+                { label: "Total Value", value: "$51,164", change: "+$49,474 (2,927%)", positive: true },
+                { label: "Total Invested", value: "$1,690", change: null, positive: true },
+                { label: "Total P/L", value: "$49,474", change: "+2,927%", positive: true },
                 { label: "Total Assets", value: "34", change: null, positive: true },
               ].map((stat) => (
                 <div key={stat.label} className="bg-background border border-border/60 rounded-xl p-3 md:p-4">
@@ -398,12 +398,23 @@ export default function LandingPage() {
 
             {/* Chart mockup */}
             <div className="bg-background border border-border/60 rounded-xl p-4 md:p-5 mb-5">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-2">
                 <div>
                   <div className="text-xs font-semibold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>Portfolio Value</div>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-lg font-bold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>$47,820</span>
-                    <span className="text-xs font-medium text-success" style={{ fontFamily: "Inter, sans-serif" }}>+$8,240</span>
+                    <span className="text-lg font-bold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>$51,164.94</span>
+                    <span className="text-xs font-medium text-success" style={{ fontFamily: "Inter, sans-serif" }}>+$49,474.53</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
+                    <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#a78bfa] mr-1" />Graded Cards: $46,072.47
+                    </span>
+                    <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#f97316] mr-1" />Raw Cards: $4,642.53
+                    </span>
+                    <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#22c55e] mr-1" />Sealed Products: $449.53
+                    </span>
                   </div>
                 </div>
                 <div className="flex rounded-md border border-border overflow-hidden">
@@ -414,45 +425,12 @@ export default function LandingPage() {
                   ))}
                 </div>
               </div>
-              {/* SVG chart lines */}
-              <div className="relative h-32 md:h-44">
-                <svg viewBox="0 0 400 120" className="w-full h-full" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="preview-grad-graded" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#a78bfa" stopOpacity="0.02" />
-                    </linearGradient>
-                    <linearGradient id="preview-grad-raw" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f97316" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="#f97316" stopOpacity="0.02" />
-                    </linearGradient>
-                    <linearGradient id="preview-grad-sealed" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#22c55e" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="#22c55e" stopOpacity="0.02" />
-                    </linearGradient>
-                  </defs>
-                  {[30, 60, 90].map((y) => (
-                    <line key={y} x1="0" y1={y} x2="400" y2={y} stroke="#2a2a2a" strokeWidth="0.5" />
-                  ))}
-                  {/* Graded line (purple) */}
-                  <path d="M0,88 C30,84 60,78 100,70 C140,62 160,50 200,42 C240,35 260,28 300,22 C330,18 360,15 400,12 L400,120 L0,120 Z" fill="url(#preview-grad-graded)" />
-                  <path d="M0,88 C30,84 60,78 100,70 C140,62 160,50 200,42 C240,35 260,28 300,22 C330,18 360,15 400,12" fill="none" stroke="#a78bfa" strokeWidth="2" />
-                  {/* Raw line (orange) */}
-                  <path d="M0,98 C30,96 60,92 100,88 C140,84 160,76 200,70 C240,65 260,58 300,52 C330,48 360,44 400,40 L400,120 L0,120 Z" fill="url(#preview-grad-raw)" />
-                  <path d="M0,98 C30,96 60,92 100,88 C140,84 160,76 200,70 C240,65 260,58 300,52 C330,48 360,44 400,40" fill="none" stroke="#f97316" strokeWidth="2" />
-                  {/* Sealed line (green) */}
-                  <path d="M0,105 C30,104 60,102 100,98 C140,95 160,90 200,86 C240,82 260,78 300,74 C330,71 360,68 400,64 L400,120 L0,120 Z" fill="url(#preview-grad-sealed)" />
-                  <path d="M0,105 C30,104 60,102 100,98 C140,95 160,90 200,86 C240,82 260,78 300,74 C330,71 360,68 400,64" fill="none" stroke="#22c55e" strokeWidth="2" />
-                  {/* Cost basis dashed line */}
-                  <line x1="0" y1="85" x2="400" y2="75" stroke="#9090a8" strokeWidth="1" strokeDasharray="6 4" />
-                </svg>
-              </div>
-              {/* Chart legend */}
-              <div className="flex items-center gap-4 mt-3">
+              {/* Legend row */}
+              <div className="flex items-center gap-4 mb-3">
                 {[
-                  { color: "#a78bfa", label: "Graded" },
-                  { color: "#f97316", label: "Raw" },
-                  { color: "#22c55e", label: "Sealed" },
+                  { color: "#a78bfa", label: "Graded Cards" },
+                  { color: "#f97316", label: "Raw Cards" },
+                  { color: "#22c55e", label: "Sealed Products" },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
@@ -463,6 +441,45 @@ export default function LandingPage() {
                   <svg width="12" height="2" className="shrink-0"><line x1="0" y1="1" x2="12" y2="1" stroke="#9090a8" strokeWidth="1.5" strokeDasharray="3 2" /></svg>
                   <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>Cost Basis</span>
                 </div>
+              </div>
+              {/* SVG chart with axes */}
+              <div className="relative h-40 md:h-52">
+                {/* Y-axis labels */}
+                <div className="absolute left-0 top-0 bottom-4 flex flex-col justify-between pointer-events-none" style={{ width: "40px" }}>
+                  {["$60.0k", "$45.0k", "$30.0k", "$15.0k", "$0"].map((label) => (
+                    <span key={label} className="text-[9px] text-text-muted leading-none" style={{ fontFamily: "Inter, sans-serif" }}>{label}</span>
+                  ))}
+                </div>
+                <div className="absolute left-10 right-0 top-0 bottom-0">
+                  <svg viewBox="0 0 400 140" className="w-full h-full" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="preview-grad-graded" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#a78bfa" stopOpacity="0.02" />
+                      </linearGradient>
+                    </defs>
+                    {/* Grid lines */}
+                    {[14, 42, 70, 98, 126].map((y) => (
+                      <line key={y} x1="0" y1={y} x2="400" y2={y} stroke="#2a2a2a" strokeWidth="0.5" strokeDasharray="4 3" />
+                    ))}
+                    {/* Graded area fill (dominant) */}
+                    <path d="M0,126 L20,126 L40,126 C50,126 55,60 65,42 C75,35 85,32 120,30 C160,28 200,30 240,28 C280,26 300,28 340,26 C370,24 390,22 400,20 L400,126 Z" fill="url(#preview-grad-graded)" />
+                    {/* Graded line (purple — dominant, mirrors real shape) */}
+                    <path d="M0,126 L20,126 L40,126 C50,126 55,60 65,42 C75,35 85,32 120,30 C160,28 200,30 240,28 C280,26 300,28 340,26 C370,24 390,22 400,20" fill="none" stroke="#a78bfa" strokeWidth="2" />
+                    {/* Raw line (orange — low, slight bump then flat) */}
+                    <path d="M0,126 L40,126 C50,126 55,118 65,112 C75,110 85,112 120,114 C160,116 200,118 240,120 C280,122 340,124 400,124" fill="none" stroke="#f97316" strokeWidth="1.5" />
+                    {/* Sealed line (green — very low, flat near bottom) */}
+                    <path d="M0,126 L65,126 C80,126 90,124 120,124 C160,124 200,125 240,125 C300,125 360,126 400,126" fill="none" stroke="#22c55e" strokeWidth="1.5" />
+                    {/* Cost basis dashed line */}
+                    <path d="M0,126 L40,126 C50,126 55,120 65,118 C80,118 120,118 200,118 C280,118 360,118 400,118" fill="none" stroke="#9090a8" strokeWidth="1" strokeDasharray="6 4" />
+                  </svg>
+                </div>
+              </div>
+              {/* X-axis date labels */}
+              <div className="flex justify-between pl-10 mt-1">
+                {["Feb 25", "Mar 1", "Mar 7", "Mar 13", "Mar 19", "Mar 25", "Mar 31"].map((d) => (
+                  <span key={d} className="text-[9px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>{d}</span>
+                ))}
               </div>
             </div>
 
