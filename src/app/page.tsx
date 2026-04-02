@@ -379,10 +379,10 @@ export default function LandingPage() {
             {/* Stat cards row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
               {[
-                { label: "Total Value", value: "$51,164", change: "+$49,474 (2,927%)", positive: true },
-                { label: "Total Invested", value: "$1,690", change: null, positive: true },
-                { label: "Total P/L", value: "$49,474", change: "+2,927%", positive: true },
-                { label: "Total Assets", value: "34", change: null, positive: true },
+                { label: "Total Value", value: "$54,100", change: "+$26,700 (97.4%)", positive: true },
+                { label: "Total Invested", value: "$27,400", change: null, positive: true },
+                { label: "Total P/L", value: "$26,700", change: "+97.4%", positive: true },
+                { label: "Total Assets", value: "6", change: null, positive: true },
               ].map((stat) => (
                 <div key={stat.label} className="bg-background border border-border/60 rounded-xl p-3 md:p-4">
                   <p className="text-[10px] md:text-xs text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>{stat.label}</p>
@@ -402,18 +402,18 @@ export default function LandingPage() {
                 <div>
                   <div className="text-xs font-semibold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>Portfolio Value</div>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-lg font-bold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>$51,164.94</span>
-                    <span className="text-xs font-medium text-success" style={{ fontFamily: "Inter, sans-serif" }}>+$49,474.53</span>
+                    <span className="text-lg font-bold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>$54,100</span>
+                    <span className="text-xs font-medium text-success" style={{ fontFamily: "Inter, sans-serif" }}>+$26,700</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
                     <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#a78bfa] mr-1" />Graded Cards: $46,072.47
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#a78bfa] mr-1" />Graded Cards: $28,500
                     </span>
                     <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#f97316] mr-1" />Raw Cards: $4,642.53
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#f97316] mr-1" />Raw Cards: $14,600
                     </span>
                     <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#22c55e] mr-1" />Sealed Products: $449.53
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#22c55e] mr-1" />Sealed Products: $11,000
                     </span>
                   </div>
                 </div>
@@ -462,16 +462,16 @@ export default function LandingPage() {
                     {[14, 42, 70, 98, 126].map((y) => (
                       <line key={y} x1="0" y1={y} x2="400" y2={y} stroke="#2a2a2a" strokeWidth="0.5" strokeDasharray="4 3" />
                     ))}
-                    {/* Graded area fill (dominant) */}
-                    <path d="M0,126 L20,126 L40,126 C50,126 55,60 65,42 C75,35 85,32 120,30 C160,28 200,30 240,28 C280,26 300,28 340,26 C370,24 390,22 400,20 L400,126 Z" fill="url(#preview-grad-graded)" />
-                    {/* Graded line (purple — dominant, mirrors real shape) */}
-                    <path d="M0,126 L20,126 L40,126 C50,126 55,60 65,42 C75,35 85,32 120,30 C160,28 200,30 240,28 C280,26 300,28 340,26 C370,24 390,22 400,20" fill="none" stroke="#a78bfa" strokeWidth="2" />
-                    {/* Raw line (orange — low, slight bump then flat) */}
-                    <path d="M0,126 L40,126 C50,126 55,118 65,112 C75,110 85,112 120,114 C160,116 200,118 240,120 C280,122 340,124 400,124" fill="none" stroke="#f97316" strokeWidth="1.5" />
-                    {/* Sealed line (green — very low, flat near bottom) */}
-                    <path d="M0,126 L65,126 C80,126 90,124 120,124 C160,124 200,125 240,125 C300,125 360,126 400,126" fill="none" stroke="#22c55e" strokeWidth="1.5" />
-                    {/* Cost basis dashed line */}
-                    <path d="M0,126 L40,126 C50,126 55,120 65,118 C80,118 120,118 200,118 C280,118 360,118 400,118" fill="none" stroke="#9090a8" strokeWidth="1" strokeDasharray="6 4" />
+                    {/* Graded area fill — $28,500 of $60k, ending at y≈66 */}
+                    <path d="M0,126 L20,126 L40,126 C55,126 60,90 70,74 C80,70 100,68 140,67 C180,66 220,67 260,66 C300,66 350,66 400,66 L400,126 Z" fill="url(#preview-grad-graded)" />
+                    {/* Graded line (purple) — $28,500 */}
+                    <path d="M0,126 L20,126 L40,126 C55,126 60,90 70,74 C80,70 100,68 140,67 C180,66 220,67 260,66 C300,66 350,66 400,66" fill="none" stroke="#a78bfa" strokeWidth="2" />
+                    {/* Raw line (orange) — $14,600, ending at y≈95 */}
+                    <path d="M0,126 L40,126 C55,126 60,108 70,100 C80,97 100,96 140,95 C180,95 220,96 260,95 C300,95 350,95 400,95" fill="none" stroke="#f97316" strokeWidth="1.5" />
+                    {/* Sealed line (green) — $11,000, ending at y≈103 */}
+                    <path d="M0,126 L40,126 C55,126 60,112 70,107 C80,105 100,104 140,103 C180,103 220,103 260,103 C300,103 350,103 400,103" fill="none" stroke="#22c55e" strokeWidth="1.5" />
+                    {/* Cost basis dashed line — $27,400 total invested, y≈68 */}
+                    <path d="M0,126 L40,126 C55,126 60,92 70,76 C80,72 100,70 140,69 C180,68 220,68 260,68 C300,68 350,68 400,68" fill="none" stroke="#9090a8" strokeWidth="1" strokeDasharray="6 4" />
                   </svg>
                 </div>
               </div>
