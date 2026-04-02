@@ -176,9 +176,9 @@ export default function LandingPage() {
             src="/about-bg.png"
             alt=""
             className="w-full h-full object-cover"
-            style={{ filter: "brightness(0.3)" }}
+            style={{ filter: "brightness(0.55)" }}
           />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(8,8,8,0.6) 0%, rgba(8,8,8,0.4) 50%, rgba(8,8,8,0.85) 100%)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(8,8,8,0.5) 0%, rgba(8,8,8,0.3) 50%, rgba(8,8,8,0.7) 100%)" }} />
         </div>
 
         <div className="max-w-7xl mx-auto px-6 md:px-12 relative z-10">
