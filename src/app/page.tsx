@@ -559,6 +559,8 @@ export default function LandingPage() {
         className="py-32 md:py-44 border-t border-border/20 relative overflow-hidden"
       >
         <div className="absolute inset-0 pointer-events-none">
+          <img src="/manage.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(8,8,8,0.7) 0%, rgba(8,8,8,0.4) 50%, rgba(8,8,8,0.7) 100%)" }} />
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] rounded-full" style={{ background: "radial-gradient(ellipse, rgba(212,175,55,0.04) 0%, transparent 70%)" }} />
         </div>
         <div className="max-w-7xl mx-auto px-6 md:px-12 relative">
