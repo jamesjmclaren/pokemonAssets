@@ -24,7 +24,8 @@ interface ChartPoint {
 }
 
 interface PortfolioChartProps {
-  portfolioId: string;
+  portfolioId?: string;
+  data?: ChartPoint[];
   className?: string;
 }
 
@@ -38,15 +39,16 @@ const STACKED_SERIES: Array<{ key: string; label: string; color: string }> = [
 
 const COST_BASIS = { key: "costBasis", label: "Cost Basis", color: "#9090a8" };
 
-export default function PortfolioChart({ portfolioId, className = "" }: PortfolioChartProps) {
+export default function PortfolioChart({ portfolioId, data: staticData, className = "" }: PortfolioChartProps) {
   const [range, setRange] = useState<TimeRange>("3M");
-  const [data, setData] = useState<ChartPoint[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ChartPoint[]>(staticData ?? []);
+  const [loading, setLoading] = useState(!staticData);
   const [visibleSeries, setVisibleSeries] = useState<Set<string>>(
     new Set(["raw", "graded", "sealed", "costBasis"])
   );
 
   useEffect(() => {
+    if (staticData) return;
     async function fetchChart() {
       setLoading(true);
       try {
@@ -62,7 +64,7 @@ export default function PortfolioChart({ portfolioId, className = "" }: Portfoli
       }
     }
     if (portfolioId) fetchChart();
-  }, [portfolioId, range]);
+  }, [portfolioId, range, staticData]);
 
   const toggleSeries = (key: string) => {
     setVisibleSeries((prev) => {
