@@ -379,9 +379,9 @@ export default function LandingPage() {
             {/* Stat cards row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
               {[
-                { label: "Total Value", value: "$51,164", change: "+$49,474 (2,927%)", positive: true },
-                { label: "Total Invested", value: "$1,690", change: null, positive: true },
-                { label: "Total P/L", value: "$49,474", change: "+2,927%", positive: true },
+                { label: "Total Value", value: "$54,100", change: "+$26,700 (97.3%)", positive: true },
+                { label: "Total Invested", value: "$27,400", change: null, positive: true },
+                { label: "Total P/L", value: "$26,700", change: "+97.3%", positive: true },
                 { label: "Total Assets", value: "34", change: null, positive: true },
               ].map((stat) => (
                 <div key={stat.label} className="bg-background border border-border/60 rounded-xl p-3 md:p-4">
@@ -402,18 +402,18 @@ export default function LandingPage() {
                 <div>
                   <div className="text-xs font-semibold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>Portfolio Value</div>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-lg font-bold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>$51,164.94</span>
-                    <span className="text-xs font-medium text-success" style={{ fontFamily: "Inter, sans-serif" }}>+$49,474.53</span>
+                    <span className="text-lg font-bold text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>$54,100</span>
+                    <span className="text-xs font-medium text-success" style={{ fontFamily: "Inter, sans-serif" }}>+$26,700</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
                     <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#a78bfa] mr-1" />Graded Cards: $46,072.47
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#a78bfa] mr-1" />Graded Cards: $28,500
                     </span>
                     <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#f97316] mr-1" />Raw Cards: $4,642.53
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#f97316] mr-1" />Raw Cards: $14,600
                     </span>
                     <span className="text-[10px] text-text-muted" style={{ fontFamily: "Inter, sans-serif" }}>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#22c55e] mr-1" />Sealed Products: $449.53
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#22c55e] mr-1" />Sealed Products: $11,000
                     </span>
                   </div>
                 </div>
@@ -457,21 +457,33 @@ export default function LandingPage() {
                         <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.3" />
                         <stop offset="100%" stopColor="#a78bfa" stopOpacity="0.02" />
                       </linearGradient>
+                      <linearGradient id="preview-grad-raw" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f97316" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="#f97316" stopOpacity="0.02" />
+                      </linearGradient>
+                      <linearGradient id="preview-grad-sealed" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#22c55e" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="#22c55e" stopOpacity="0.02" />
+                      </linearGradient>
                     </defs>
                     {/* Grid lines */}
                     {[14, 42, 70, 98, 126].map((y) => (
                       <line key={y} x1="0" y1={y} x2="400" y2={y} stroke="#2a2a2a" strokeWidth="0.5" strokeDasharray="4 3" />
                     ))}
-                    {/* Graded area fill (dominant) */}
-                    <path d="M0,126 L20,126 L40,126 C50,126 55,60 65,42 C75,35 85,32 120,30 C160,28 200,30 240,28 C280,26 300,28 340,26 C370,24 390,22 400,20 L400,126 Z" fill="url(#preview-grad-graded)" />
-                    {/* Graded line (purple — dominant, mirrors real shape) */}
-                    <path d="M0,126 L20,126 L40,126 C50,126 55,60 65,42 C75,35 85,32 120,30 C160,28 200,30 240,28 C280,26 300,28 340,26 C370,24 390,22 400,20" fill="none" stroke="#a78bfa" strokeWidth="2" />
-                    {/* Raw line (orange — low, slight bump then flat) */}
-                    <path d="M0,126 L40,126 C50,126 55,118 65,112 C75,110 85,112 120,114 C160,116 200,118 240,120 C280,122 340,124 400,124" fill="none" stroke="#f97316" strokeWidth="1.5" />
-                    {/* Sealed line (green — very low, flat near bottom) */}
-                    <path d="M0,126 L65,126 C80,126 90,124 120,124 C160,124 200,125 240,125 C300,125 360,126 400,126" fill="none" stroke="#22c55e" strokeWidth="1.5" />
-                    {/* Cost basis dashed line */}
-                    <path d="M0,126 L40,126 C50,126 55,120 65,118 C80,118 120,118 200,118 C280,118 360,118 400,118" fill="none" stroke="#9090a8" strokeWidth="1" strokeDasharray="6 4" />
+                    {/* Sealed area fill (green — $11k, bottom of stack) */}
+                    <path d="M0,126 L40,126 C55,126 60,118 80,112 C120,108 160,107 200,106 C240,105 300,105 360,105 L400,105 L400,126 Z" fill="url(#preview-grad-sealed)" />
+                    {/* Sealed line (green — top of sealed band ~$11k) */}
+                    <path d="M0,126 L40,126 C55,126 60,118 80,112 C120,108 160,107 200,106 C240,105 300,105 360,105 L400,105" fill="none" stroke="#22c55e" strokeWidth="1.5" />
+                    {/* Raw area fill (orange — $14.6k, stacked on sealed) */}
+                    <path d="M0,126 L40,126 C55,126 60,100 80,88 C120,82 160,80 200,79 C240,78 300,78 360,78 L400,78 L400,105 L360,105 C300,105 240,105 200,106 C160,107 120,108 80,112 C60,118 55,126 40,126 Z" fill="url(#preview-grad-raw)" />
+                    {/* Raw line (orange — top of raw band ~$25.6k) */}
+                    <path d="M0,126 L40,126 C55,126 60,100 80,88 C120,82 160,80 200,79 C240,78 300,78 360,78 L400,78" fill="none" stroke="#f97316" strokeWidth="1.5" />
+                    {/* Graded area fill (purple — $28.5k, stacked on raw) */}
+                    <path d="M0,126 L40,126 C55,126 60,58 80,38 C120,28 160,26 200,25 C240,24 300,24 360,25 L400,25 L400,78 L360,78 C300,78 240,78 200,79 C160,80 120,82 80,88 C60,100 55,126 40,126 Z" fill="url(#preview-grad-graded)" />
+                    {/* Graded line (purple — top of stack, total ~$54.1k) */}
+                    <path d="M0,126 L40,126 C55,126 60,58 80,38 C120,28 160,26 200,25 C240,24 300,24 360,25 L400,25" fill="none" stroke="#a78bfa" strokeWidth="2" />
+                    {/* Cost basis dashed line (~$27.4k ≈ y:75) */}
+                    <path d="M0,126 L40,126 C55,126 60,80 80,75 C120,75 160,75 200,75 C240,75 300,75 360,75 L400,75" fill="none" stroke="#9090a8" strokeWidth="1" strokeDasharray="6 4" />
                   </svg>
                 </div>
               </div>
