@@ -65,13 +65,6 @@ export default function LandingPage() {
             <a href="#what-we-do" className="hidden md:block text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
               What We Do
             </a>
-            <button
-              onClick={() => router.push("/sign-in")}
-              className="hidden md:block text-text-secondary hover:text-text-primary transition-colors cursor-pointer bg-transparent border-none"
-              style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}
-            >
-              Portfolio
-            </button>
             <a href="#contact" className="hidden md:block text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
               Contact Us
             </a>
