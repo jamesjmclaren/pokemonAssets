@@ -161,7 +161,7 @@ export default function LandingPage() {
       <section
         id="ethos"
         ref={setRef("ethos")}
-        className="py-32 md:py-44 border-t border-border/20"
+        className="py-12 md:py-16 border-t border-border/20"
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
           <h2
@@ -211,7 +211,7 @@ export default function LandingPage() {
       <section
         id="about"
         ref={setRef("about")}
-        className="py-32 md:py-44 border-t border-border/20 relative overflow-hidden"
+        className="py-12 md:py-16 border-t border-border/20 relative overflow-hidden"
       >
         {/* Background image */}
         <div className="absolute inset-0 z-0">
@@ -263,7 +263,7 @@ export default function LandingPage() {
       <section
         id="what-we-do"
         ref={setRef("what-we-do")}
-        className="py-32 md:py-44 border-t border-border/20"
+        className="py-12 md:py-16 border-t border-border/20"
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <p
@@ -273,7 +273,7 @@ export default function LandingPage() {
             What We Do
           </p>
           <h2
-            className={`max-w-2xl mb-20 ${isVisible("what-we-do") ? "landing-fade-up" : "opacity-0"}`}
+            className={`max-w-2xl mb-14 ${isVisible("what-we-do") ? "landing-fade-up" : "opacity-0"}`}
             style={{
               fontFamily: "'Playfair Display', serif",
               fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)",
@@ -286,7 +286,7 @@ export default function LandingPage() {
             We identify, acquire, and manage high-conviction positions across non-traditional asset classes.
           </h2>
 
-          <div className="grid md:grid-cols-2 gap-16 md:gap-20">
+          <div className="grid md:grid-cols-2 gap-12 md:gap-14">
             {[
               {
                 title: "Asset Acquisition",
@@ -340,13 +340,13 @@ export default function LandingPage() {
       <section
         id="preview"
         ref={setRef("preview")}
-        className="py-32 md:py-44 border-t border-border/20 relative overflow-hidden"
+        className="py-12 md:py-16 border-t border-border/20 relative overflow-hidden"
       >
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] rounded-full" style={{ background: "radial-gradient(ellipse, rgba(212,175,55,0.04) 0%, transparent 70%)" }} />
         </div>
         <div className="max-w-7xl mx-auto px-6 md:px-12 relative">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12">
             <p
               className={`text-accent tracking-widest uppercase mb-8 ${isVisible("preview") ? "landing-fade-up" : "opacity-0"}`}
               style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.3em", animationDelay: "0.1s" }}
@@ -577,7 +577,7 @@ export default function LandingPage() {
       <section
         id="how-it-works"
         ref={setRef("how-it-works")}
-        className="py-32 md:py-44 border-t border-border/20 relative overflow-hidden"
+        className="py-12 md:py-16 border-t border-border/20 relative overflow-hidden"
       >
         <div className="absolute inset-0 pointer-events-none">
           <img src="/manage.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
@@ -585,7 +585,7 @@ export default function LandingPage() {
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] rounded-full" style={{ background: "radial-gradient(ellipse, rgba(212,175,55,0.04) 0%, transparent 70%)" }} />
         </div>
         <div className="max-w-7xl mx-auto px-6 md:px-12 relative">
-          <div className="max-w-3xl mx-auto text-center mb-20">
+          <div className="max-w-3xl mx-auto text-center mb-14">
             <p
               className={`text-accent tracking-widest uppercase mb-8 ${isVisible("how-it-works") ? "landing-fade-up" : "opacity-0"}`}
               style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.3em", animationDelay: "0.1s" }}
@@ -607,7 +607,7 @@ export default function LandingPage() {
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-12 md:gap-16">
+          <div className="grid md:grid-cols-3 gap-10 md:gap-12">
             {[
               {
                 step: "01",
@@ -655,7 +655,7 @@ export default function LandingPage() {
       <section
         id="values"
         ref={setRef("values")}
-        className="py-32 md:py-44 border-t border-border/20 relative"
+        className="py-12 md:py-16 border-t border-border/20 relative"
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12 relative">
           <div className="max-w-3xl mx-auto text-center">
@@ -695,7 +695,7 @@ export default function LandingPage() {
       <section
         id="contact"
         ref={setRef("contact")}
-        className="py-32 md:py-44 border-t border-border/20 relative overflow-hidden"
+        className="py-12 md:py-16 border-t border-border/20 relative overflow-hidden"
       >
         <div className="absolute inset-0 pointer-events-none">
           <img src="/getintouch.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
