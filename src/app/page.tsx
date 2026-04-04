@@ -655,12 +655,8 @@ export default function LandingPage() {
       <section
         id="values"
         ref={setRef("values")}
-        className="py-32 md:py-44 border-t border-border/20 relative overflow-hidden"
+        className="py-32 md:py-44 border-t border-border/20 relative"
       >
-        <div className="absolute inset-0 pointer-events-none">
-          <img src="/webelieve.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-15" />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(8,8,8,0.7) 0%, rgba(8,8,8,0.4) 50%, rgba(8,8,8,0.7) 100%)" }} />
-        </div>
         <div className="max-w-7xl mx-auto px-6 md:px-12 relative">
           <div className="max-w-3xl mx-auto text-center">
             <div
