@@ -1455,7 +1455,7 @@ export default function AssetDetailPage({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                        Sell Price (total) <span className="text-danger">*</span>
+                        Sell Price {qty > 1 ? "(per unit)" : ""} <span className="text-danger">*</span>
                       </label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">$</span>
@@ -1471,7 +1471,7 @@ export default function AssetDetailPage({
                       </div>
                       {qty > 1 && sellPrice && (
                         <p className="text-[10px] text-text-muted mt-1">
-                          {formatCurrency(parseFloat(sellPrice) / qty)} per unit
+                          Total: {formatCurrency(parseFloat(sellPrice) * qty)}
                         </p>
                       )}
                     </div>
@@ -1489,7 +1489,7 @@ export default function AssetDetailPage({
                     <div className="mt-3 p-3 bg-surface-hover rounded-xl text-xs text-text-secondary">
                       Realised P/L:{" "}
                       {(() => {
-                        const sp = parseFloat(sellPrice);
+                        const sp = parseFloat(sellPrice) * qty;
                         const pnl = sp - totalInvested;
                         const pct = totalInvested > 0 ? (pnl / totalInvested) * 100 : 0;
                         return (
