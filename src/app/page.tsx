@@ -4,7 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Search, BarChart3, Globe, ShieldCheck } from "lucide-react";
+import { ArrowRight, Search, BarChart3, Globe, ShieldCheck, MapPin } from "lucide-react";
 
 export default function LandingPage() {
   const { isSignedIn, isLoaded } = useUser();
@@ -65,13 +65,6 @@ export default function LandingPage() {
             <a href="#what-we-do" className="hidden md:block text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
               What We Do
             </a>
-            <button
-              onClick={() => router.push("/sign-in")}
-              className="hidden md:block text-text-secondary hover:text-text-primary transition-colors cursor-pointer bg-transparent border-none"
-              style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}
-            >
-              Portfolio
-            </button>
             <a href="#contact" className="hidden md:block text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
               Contact Us
             </a>
@@ -195,6 +188,22 @@ export default function LandingPage() {
           >
             At West Investments, we recognise that our clients value discretion as highly as performance. When handling sensitive information and high-value collectible assets, we operate with the utmost professionalism, confidentiality, and care. Our commitment is to provide a trusted, highly personalised service while safeguarding both your privacy and your interests at every stage.
           </p>
+          <div
+            className={`flex items-center justify-center gap-8 md:gap-14 flex-wrap mt-14 ${isVisible("ethos") ? "landing-fade-up" : "opacity-0"}`}
+            style={{ animationDelay: "0.7s" }}
+          >
+            {["London", "New York", "Tokyo"].map((city) => (
+              <div key={city} className="flex items-center gap-2.5">
+                <MapPin className="w-4 h-4 text-accent" />
+                <span
+                  className="text-text-secondary"
+                  style={{ fontFamily: "Inter, sans-serif", fontSize: "0.85rem", letterSpacing: "0.1em" }}
+                >
+                  {city}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -646,8 +655,12 @@ export default function LandingPage() {
       <section
         id="values"
         ref={setRef("values")}
-        className="py-32 md:py-44 border-t border-border/20 relative"
+        className="py-32 md:py-44 border-t border-border/20 relative overflow-hidden"
       >
+        <div className="absolute inset-0 pointer-events-none">
+          <img src="/webelieve.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-15" />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(8,8,8,0.7) 0%, rgba(8,8,8,0.4) 50%, rgba(8,8,8,0.7) 100%)" }} />
+        </div>
         <div className="max-w-7xl mx-auto px-6 md:px-12 relative">
           <div className="max-w-3xl mx-auto text-center">
             <div
