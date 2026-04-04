@@ -4,7 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Search, BarChart3, Globe, ShieldCheck } from "lucide-react";
+import { ArrowRight, Search, BarChart3, Globe, ShieldCheck, MapPin } from "lucide-react";
 
 export default function LandingPage() {
   const { isSignedIn, isLoaded } = useUser();
@@ -636,6 +636,62 @@ export default function LandingPage() {
                 <p className="text-text-muted leading-relaxed" style={{ fontFamily: "Inter, sans-serif", fontSize: "0.9rem", lineHeight: 1.8 }}>
                   {description}
                 </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Locations */}
+      <section
+        id="locations"
+        ref={setRef("locations")}
+        className="py-32 md:py-44 border-t border-border/20 relative"
+      >
+        <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
+          <p
+            className={`text-accent tracking-widest uppercase mb-8 ${isVisible("locations") ? "landing-fade-up" : "opacity-0"}`}
+            style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.3em", animationDelay: "0.1s" }}
+          >
+            Our Locations
+          </p>
+          <h2
+            className={`mb-8 ${isVisible("locations") ? "landing-fade-up" : "opacity-0"}`}
+            style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)",
+              fontWeight: 400,
+              lineHeight: 1.25,
+              color: "var(--color-text-primary)",
+              animationDelay: "0.2s",
+            }}
+          >
+            Operating Worldwide
+          </h2>
+          <p
+            className={`text-text-secondary max-w-2xl mx-auto mb-16 ${isVisible("locations") ? "landing-fade-up" : "opacity-0"}`}
+            style={{ fontFamily: "Inter, sans-serif", fontSize: "0.95rem", lineHeight: 1.8, animationDelay: "0.3s" }}
+          >
+            West Investments operates across the following locations, working directly with private sellers, vendors, and retailers. We pride ourselves on authenticity, trust, and the strength of our relationships.
+          </p>
+          <div className="flex items-center justify-center gap-8 md:gap-16 flex-wrap">
+            {[
+              { city: "London", delay: "0.4s" },
+              { city: "New York", delay: "0.5s" },
+              { city: "Tokyo", delay: "0.6s" },
+            ].map(({ city, delay }) => (
+              <div
+                key={city}
+                className={`flex items-center gap-2.5 ${isVisible("locations") ? "landing-fade-up" : "opacity-0"}`}
+                style={{ animationDelay: delay }}
+              >
+                <MapPin className="w-4 h-4 text-accent" />
+                <span
+                  className="text-text-primary"
+                  style={{ fontFamily: "Inter, sans-serif", fontSize: "0.9rem", letterSpacing: "0.08em" }}
+                >
+                  {city}
+                </span>
               </div>
             ))}
           </div>
