@@ -161,7 +161,7 @@ export default function LandingPage() {
       <section
         id="ethos"
         ref={setRef("ethos")}
-        className="py-20 md:py-28 border-t border-border/20"
+        className="py-12 md:py-16 border-t border-border/20"
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
           <h2
@@ -211,7 +211,7 @@ export default function LandingPage() {
       <section
         id="about"
         ref={setRef("about")}
-        className="py-20 md:py-28 border-t border-border/20 relative overflow-hidden"
+        className="py-12 md:py-16 border-t border-border/20 relative overflow-hidden"
       >
         {/* Background image */}
         <div className="absolute inset-0 z-0">
@@ -263,7 +263,7 @@ export default function LandingPage() {
       <section
         id="what-we-do"
         ref={setRef("what-we-do")}
-        className="py-20 md:py-28 border-t border-border/20"
+        className="py-12 md:py-16 border-t border-border/20"
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <p
@@ -340,7 +340,7 @@ export default function LandingPage() {
       <section
         id="preview"
         ref={setRef("preview")}
-        className="py-20 md:py-28 border-t border-border/20 relative overflow-hidden"
+        className="py-12 md:py-16 border-t border-border/20 relative overflow-hidden"
       >
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] rounded-full" style={{ background: "radial-gradient(ellipse, rgba(212,175,55,0.04) 0%, transparent 70%)" }} />
@@ -577,7 +577,7 @@ export default function LandingPage() {
       <section
         id="how-it-works"
         ref={setRef("how-it-works")}
-        className="py-20 md:py-28 border-t border-border/20 relative overflow-hidden"
+        className="py-12 md:py-16 border-t border-border/20 relative overflow-hidden"
       >
         <div className="absolute inset-0 pointer-events-none">
           <img src="/manage.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
@@ -655,7 +655,7 @@ export default function LandingPage() {
       <section
         id="values"
         ref={setRef("values")}
-        className="py-20 md:py-28 border-t border-border/20 relative"
+        className="py-12 md:py-16 border-t border-border/20 relative"
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12 relative">
           <div className="max-w-3xl mx-auto text-center">
@@ -695,7 +695,7 @@ export default function LandingPage() {
       <section
         id="contact"
         ref={setRef("contact")}
-        className="py-20 md:py-28 border-t border-border/20 relative overflow-hidden"
+        className="py-12 md:py-16 border-t border-border/20 relative overflow-hidden"
       >
         <div className="absolute inset-0 pointer-events-none">
           <img src="/getintouch.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
