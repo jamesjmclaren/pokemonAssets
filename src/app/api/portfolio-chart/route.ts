@@ -48,11 +48,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get all assets in this portfolio
+    // Get all ACTIVE assets in this portfolio (exclude sold)
     const { data: assets, error: assetsErr } = await supabase
       .from("assets")
       .select("id, asset_type, psa_grade, purchase_price, purchase_date, quantity, current_price")
-      .eq("portfolio_id", portfolioId);
+      .eq("portfolio_id", portfolioId)
+      .neq("status", "SOLD");
 
     if (assetsErr) throw assetsErr;
     if (!assets || assets.length === 0) {

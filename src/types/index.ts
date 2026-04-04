@@ -76,6 +76,9 @@ export interface PortfolioAsset {
   pc_url?: string | null;
   pc_grade_field?: string | null;
   evidence_url?: string | null;
+  status?: 'ACTIVE' | 'SOLD';
+  sell_price?: number | null;
+  sell_date?: string | null;
 }
 
 export interface PortfolioSummary {

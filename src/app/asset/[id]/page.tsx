@@ -141,6 +141,9 @@ export default function AssetDetailPage({
   const [pcSearching, setPcSearching] = useState(false);
   const [pcCandidates, setPcCandidates] = useState<PriceChartingCandidate[]>([]);
   const [pcShowSearch, setPcShowSearch] = useState(false);
+  const [sellPrice, setSellPrice] = useState("");
+  const [sellDate, setSellDate] = useState("");
+  const [savingSell, setSavingSell] = useState(false);
 
   useEffect(() => {
     async function fetchAsset() {
@@ -352,6 +355,63 @@ export default function AssetDetailPage({
       alert(err instanceof Error ? err.message : "Failed to delete snapshot");
     } finally {
       setDeletingSnapshotId(null);
+    }
+  };
+
+  const handleMarkAsSold = async () => {
+    if (!asset || !sellPrice) return;
+    setSavingSell(true);
+    try {
+      const res = await fetch("/api/assets", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: asset.id,
+          status: "SOLD",
+          sell_price: sellPrice,
+          sell_date: sellDate || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to update");
+      }
+      const updated = await res.json();
+      setAsset(updated);
+      setSellPrice("");
+      setSellDate("");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to mark as sold");
+    } finally {
+      setSavingSell(false);
+    }
+  };
+
+  const handleReactivate = async () => {
+    if (!asset) return;
+    if (!confirm("Reactivate this asset? It will be moved back to your active collection and the sale proceeds will be removed from your cash balance.")) return;
+    setSavingSell(true);
+    try {
+      const res = await fetch("/api/assets", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: asset.id,
+          status: "ACTIVE",
+          sell_price: null,
+          sell_date: null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to update");
+      }
+      const updated = await res.json();
+      setAsset(updated);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to reactivate");
+    } finally {
+      setSavingSell(false);
     }
   };
 
@@ -1323,6 +1383,136 @@ export default function AssetDetailPage({
               )}
             </div>
           </div>
+
+          {/* Sell / Sold section */}
+          {!isReadOnly && (
+            <div className={clsx(
+              "border rounded-2xl p-4 md:p-6",
+              asset.status === "SOLD"
+                ? "bg-surface-hover/40 border-border"
+                : "bg-surface border border-border"
+            )}>
+              {asset.status === "SOLD" ? (
+                /* Already sold — show summary + reactivate */
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-surface-hover text-text-muted border border-border">SOLD</span>
+                      Sale Record
+                    </h3>
+                    <button
+                      onClick={handleReactivate}
+                      disabled={savingSell}
+                      className="text-xs text-accent hover:text-accent-hover font-medium disabled:opacity-50"
+                    >
+                      {savingSell ? "Updating..." : "Reactivate"}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <p className="text-[10px] text-text-muted">Sell Price</p>
+                      <p className="text-base font-bold text-text-primary mt-0.5">
+                        {asset.sell_price != null ? formatCurrency(asset.sell_price * qty) : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-text-muted">Sell Date</p>
+                      <p className="text-base font-bold text-text-primary mt-0.5">
+                        {asset.sell_date ? formatDate(asset.sell_date) : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-text-muted">Realised P/L</p>
+                      {(() => {
+                        const sellTotal = (asset.sell_price ?? asset.purchase_price) * qty;
+                        const pnl = sellTotal - totalInvested;
+                        return (
+                          <p className={clsx("text-base font-bold mt-0.5", pnl > 0 ? "text-success" : pnl < 0 ? "text-danger" : "text-text-secondary")}>
+                            {pnl >= 0 ? "+" : ""}{formatCurrency(pnl)}
+                          </p>
+                        );
+                      })()}
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-text-muted">Realised %</p>
+                      {(() => {
+                        const sellTotal = (asset.sell_price ?? asset.purchase_price) * qty;
+                        const pnl = sellTotal - totalInvested;
+                        const pct = totalInvested > 0 ? (pnl / totalInvested) * 100 : 0;
+                        return (
+                          <p className={clsx("text-base font-bold mt-0.5", pnl > 0 ? "text-success" : pnl < 0 ? "text-danger" : "text-text-secondary")}>
+                            {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
+                          </p>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Active — show sell form */
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary mb-4">Mark as Sold</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                        Sell Price (total) <span className="text-danger">*</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={sellPrice}
+                          onChange={(e) => setSellPrice(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full pl-8 pr-4 py-2.5 bg-background border border-border rounded-xl text-text-primary text-sm outline-none focus:border-accent"
+                        />
+                      </div>
+                      {qty > 1 && sellPrice && (
+                        <p className="text-[10px] text-text-muted mt-1">
+                          {formatCurrency(parseFloat(sellPrice) / qty)} per unit
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">Sell Date</label>
+                      <input
+                        type="date"
+                        value={sellDate}
+                        onChange={(e) => setSellDate(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-text-primary text-sm outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+                  {sellPrice && (
+                    <div className="mt-3 p-3 bg-surface-hover rounded-xl text-xs text-text-secondary">
+                      Realised P/L:{" "}
+                      {(() => {
+                        const sp = parseFloat(sellPrice);
+                        const pnl = sp - totalInvested;
+                        const pct = totalInvested > 0 ? (pnl / totalInvested) * 100 : 0;
+                        return (
+                          <span className={clsx("font-semibold", pnl > 0 ? "text-success" : pnl < 0 ? "text-danger" : "text-text-secondary")}>
+                            {pnl >= 0 ? "+" : ""}{formatCurrency(pnl)} ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}%)
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 mt-4">
+                    <button
+                      onClick={handleMarkAsSold}
+                      disabled={savingSell || !sellPrice}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-surface border border-border hover:border-border-hover text-text-primary disabled:opacity-50 font-semibold rounded-xl text-sm"
+                    >
+                      {savingSell ? "Saving..." : "Mark as Sold"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

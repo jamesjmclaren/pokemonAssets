@@ -222,6 +222,9 @@ export async function PATCH(request: NextRequest) {
       pc_url,
       pc_grade_field,
       evidence_url,
+      status,
+      sell_price,
+      sell_date,
     } = body;
 
     if (!id) {
@@ -282,6 +285,16 @@ export async function PATCH(request: NextRequest) {
     if (pc_url !== undefined) updates.pc_url = pc_url || null;
     if (pc_grade_field !== undefined) updates.pc_grade_field = pc_grade_field || null;
     if (evidence_url !== undefined) updates.evidence_url = evidence_url || null;
+    if (status !== undefined) updates.status = status;
+    if (sell_price !== undefined) updates.sell_price = sell_price ? parseFloat(sell_price) : null;
+    if (sell_date !== undefined) updates.sell_date = sell_date || null;
+
+    // Fetch old asset state before update (needed for cash_balance adjustment)
+    const { data: oldAsset } = await supabase
+      .from("assets")
+      .select("status, sell_price, quantity, portfolio_id")
+      .eq("id", id)
+      .single();
 
     const { data, error } = await supabase
       .from("assets")
@@ -291,6 +304,36 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Adjust cash_balance when status changes
+    if (data && status !== undefined && oldAsset) {
+      const wasActive = !oldAsset.status || oldAsset.status === "ACTIVE";
+      const wasSOLD = oldAsset.status === "SOLD";
+      const nowSOLD = status === "SOLD";
+      const nowActive = status === "ACTIVE";
+      const qty = data.quantity || 1;
+
+      if (wasActive && nowSOLD && sell_price) {
+        // Selling: add sell proceeds to cash balance
+        const { data: portfolio } = await supabase
+          .from("portfolios")
+          .select("cash_balance")
+          .eq("id", data.portfolio_id)
+          .single();
+        const newBalance = (portfolio?.cash_balance || 0) + parseFloat(sell_price) * qty;
+        await supabase.from("portfolios").update({ cash_balance: newBalance }).eq("id", data.portfolio_id);
+      } else if (wasSOLD && nowActive) {
+        // Reactivating: subtract old sell proceeds from cash balance
+        const oldSellTotal = (oldAsset.sell_price || 0) * qty;
+        const { data: portfolio } = await supabase
+          .from("portfolios")
+          .select("cash_balance")
+          .eq("id", data.portfolio_id)
+          .single();
+        const newBalance = Math.max(0, (portfolio?.cash_balance || 0) - oldSellTotal);
+        await supabase.from("portfolios").update({ cash_balance: newBalance }).eq("id", data.portfolio_id);
+      }
+    }
 
     // Record a price snapshot when the price is manually updated
     if (data && current_price !== undefined && data.current_price != null) {
