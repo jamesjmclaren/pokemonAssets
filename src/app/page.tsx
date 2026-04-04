@@ -686,9 +686,14 @@ export default function LandingPage() {
       <section
         id="contact"
         ref={setRef("contact")}
-        className="py-32 md:py-44 border-t border-border/20"
+        className="py-32 md:py-44 border-t border-border/20 relative overflow-hidden"
       >
-        <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
+        <div className="absolute inset-0 pointer-events-none">
+          <img src="/getintouch.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(8,8,8,0.7) 0%, rgba(8,8,8,0.4) 50%, rgba(8,8,8,0.7) 100%)" }} />
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] rounded-full" style={{ background: "radial-gradient(ellipse, rgba(212,175,55,0.04) 0%, transparent 70%)" }} />
+        </div>
+        <div className="max-w-7xl mx-auto px-6 md:px-12 text-center relative">
           <p
             className={`text-accent tracking-widest uppercase mb-8 ${isVisible("contact") ? "landing-fade-up" : "opacity-0"}`}
             style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.3em", animationDelay: "0.1s" }}
