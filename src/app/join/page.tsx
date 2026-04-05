@@ -152,15 +152,32 @@ export default function JoinPage() {
   const [whatsapp, setWhatsapp] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim() || !whatsapp.trim()) return;
     setSubmitting(true);
-    // Simulate submission — replace with actual API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setSubmitting(false);
-    setSubmitted(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: formName.trim(), whatsapp: whatsapp.trim() }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Something went wrong.");
+      }
+
+      setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -362,6 +379,9 @@ export default function JoinPage() {
                     className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
                   />
                 </div>
+                {error && (
+                  <p className="text-danger text-sm text-center">{error}</p>
+                )}
                 <button
                   type="submit"
                   disabled={submitting}
