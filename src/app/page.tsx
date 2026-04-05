@@ -4,12 +4,13 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Search, BarChart3, Globe, ShieldCheck, MapPin } from "lucide-react";
+import { ArrowRight, Search, BarChart3, Globe, ShieldCheck, MapPin, Menu, X } from "lucide-react";
 
 export default function LandingPage() {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   useEffect(() => {
@@ -54,20 +55,25 @@ export default function LandingPage() {
 
   return (
     <div>
-      {/* Navigation — Citadel-inspired clean horizontal bar */}
+      {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 landing-fade-in border-b border-border/20" style={{ animationDelay: "0.2s", backdropFilter: "blur(16px)", backgroundColor: "rgba(10,10,10,0.9)" }}>
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-5 flex items-center justify-between">
           <img src="/logo.png" alt="West Investments" className="h-10 md:h-12 object-contain" />
-          <div className="flex items-center gap-10">
-            <a href="#about" className="hidden md:block text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+
+          {/* Desktop nav */}
+          <div className="hidden md:flex items-center gap-10">
+            <a href="#about" className="text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
               About Us
             </a>
-            <a href="#what-we-do" className="hidden md:block text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+            <a href="#what-we-do" className="text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
               What We Do
             </a>
-            <a href="#contact" className="hidden md:block text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+            <a href="#contact" className="text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
               Contact Us
             </a>
+            <Link href="/join" className="text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+              Join
+            </Link>
             <button
               onClick={() => router.push("/sign-in")}
               className="text-xs tracking-widest uppercase border border-accent/40 text-accent px-6 py-2.5 hover:bg-accent hover:text-background transition-all cursor-pointer"
@@ -76,7 +82,41 @@ export default function LandingPage() {
               Client Login
             </button>
           </div>
+
+          {/* Mobile hamburger */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 -mr-2 text-text-secondary hover:text-text-primary"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
+
+        {/* Mobile menu dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-border/20 px-6 py-4 space-y-1" style={{ backgroundColor: "rgba(10,10,10,0.95)" }}>
+            <a href="#about" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+              About Us
+            </a>
+            <a href="#what-we-do" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+              What We Do
+            </a>
+            <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+              Contact Us
+            </a>
+            <Link href="/join" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+              Join
+            </Link>
+            <button
+              onClick={() => { setMobileMenuOpen(false); router.push("/sign-in"); }}
+              className="w-full mt-2 text-xs tracking-widest uppercase border border-accent/40 text-accent px-6 py-2.5 hover:bg-accent hover:text-background transition-all cursor-pointer"
+              style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.2em" }}
+            >
+              Client Login
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section — Steyn Group-inspired centered layout with video background */}
