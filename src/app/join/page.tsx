@@ -19,6 +19,8 @@ import {
   BadgeCheck,
   Crown,
   ArrowRight,
+  Send,
+  CheckCircle,
 } from "lucide-react";
 
 const TOTAL_SPACES = 1000;
@@ -149,6 +151,20 @@ function FeatureCard({ feature }: { feature: Feature }) {
 export default function JoinPage() {
   const router = useRouter();
   const spacesRemaining = TOTAL_SPACES - MEMBERS_FILLED;
+  const [formName, setFormName] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName.trim() || !whatsapp.trim()) return;
+    setSubmitting(true);
+    // Simulate submission — replace with actual API call
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    setSubmitting(false);
+    setSubmitted(true);
+  };
 
   return (
     <div className="min-h-screen landing-grain">
@@ -308,27 +324,82 @@ export default function JoinPage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="pb-24 px-6 md:px-12">
-        <div className="max-w-2xl mx-auto text-center">
+      {/* Application Form */}
+      <section className="pb-24 px-6 md:px-12" id="apply">
+        <div className="max-w-xl mx-auto">
           <div className="bg-surface border border-accent/20 rounded-2xl p-10">
-            <h3
-              className="text-2xl md:text-3xl font-light text-text-primary mb-4"
-              style={{ fontFamily: "Inter, sans-serif" }}
-            >
-              Ready to Join?
-            </h3>
-            <p className="text-text-secondary mb-8">
-              Create your account to begin your membership application.
-            </p>
-            <button
-              onClick={() => router.push("/sign-up")}
-              className="inline-flex items-center gap-3 px-8 py-3.5 bg-accent text-background text-sm font-medium tracking-widest uppercase hover:bg-accent-hover transition-colors cursor-pointer"
-              style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em" }}
-            >
-              Apply Now
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="text-center mb-8">
+              <h3
+                className="text-2xl md:text-3xl font-light text-text-primary mb-3"
+                style={{ fontFamily: "Inter, sans-serif" }}
+              >
+                Apply to Join
+              </h3>
+              <p className="text-text-secondary text-sm">
+                Submit your details below and we will be in touch.
+              </p>
+            </div>
+
+            {submitted ? (
+              <div className="text-center py-8">
+                <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
+                <h4 className="text-xl font-medium text-text-primary mb-2">
+                  Application Received
+                </h4>
+                <p className="text-text-secondary text-sm">
+                  Thank you for your interest. We will review your application
+                  and be in touch shortly via WhatsApp.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label
+                    htmlFor="name"
+                    className="block text-xs text-text-muted uppercase tracking-widest mb-2"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    Full Name
+                  </label>
+                  <input
+                    id="name"
+                    type="text"
+                    required
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="whatsapp"
+                    className="block text-xs text-text-muted uppercase tracking-widest mb-2"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    WhatsApp Number
+                  </label>
+                  <input
+                    id="whatsapp"
+                    type="tel"
+                    required
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    placeholder="+44 7700 000000"
+                    className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full inline-flex items-center justify-center gap-3 px-8 py-3.5 bg-accent text-background text-sm font-medium tracking-widest uppercase hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em" }}
+                >
+                  {submitting ? "Submitting..." : "Submit Application"}
+                  {!submitting && <Send className="w-4 h-4" />}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </section>
