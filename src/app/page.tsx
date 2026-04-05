@@ -59,24 +59,24 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-5 flex items-center justify-between">
           <img src="/logo.png" alt="West Investments" className="h-10 md:h-12 object-contain" />
           <div className="flex items-center gap-4 md:gap-10">
-            <a href="#about" className="hidden md:block text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
-              About Us
+            <a href="#about" className="text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.08em", fontSize: "10px", textTransform: "uppercase" }}>
+              About
             </a>
-            <a href="#what-we-do" className="hidden md:block text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
-              What We Do
+            <a href="#what-we-do" className="text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.08em", fontSize: "10px", textTransform: "uppercase" }}>
+              Services
             </a>
-            <a href="#contact" className="hidden md:block text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
-              Contact Us
+            <a href="#contact" className="text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.08em", fontSize: "10px", textTransform: "uppercase" }}>
+              Contact
             </a>
-            <Link href="/join" className="text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+            <Link href="/join" className="text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.08em", fontSize: "10px", textTransform: "uppercase" }}>
               Join
             </Link>
             <button
               onClick={() => router.push("/sign-in")}
-              className="text-xs tracking-widest uppercase border border-accent/40 text-accent px-6 py-2.5 hover:bg-accent hover:text-background transition-all cursor-pointer"
-              style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.2em" }}
+              className="text-[10px] md:text-xs tracking-widest uppercase border border-accent/40 text-accent px-3 md:px-6 py-2 md:py-2.5 hover:bg-accent hover:text-background transition-all cursor-pointer"
+              style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em" }}
             >
-              Client Login
+              Login
             </button>
           </div>
         </div>

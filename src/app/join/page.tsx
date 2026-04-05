@@ -33,7 +33,21 @@ interface Feature {
   comingSoon: boolean;
 }
 
-const currentFeatures: Feature[] = [
+const features: Feature[] = [
+  {
+    icon: MessageCircle,
+    title: "Private WhatsApp Trading Group",
+    description:
+      "Gain access to a curated private group of quality investors, buyers, and sellers.",
+    comingSoon: false,
+  },
+  {
+    icon: Calendar,
+    title: "Private Trade Events",
+    description:
+      "Receive access to exclusive trade events and private opportunities. Subject to availability.",
+    comingSoon: false,
+  },
   {
     icon: TrendingUp,
     title: "Portfolio Tracking",
@@ -55,23 +69,6 @@ const currentFeatures: Feature[] = [
       "Quickly view comparable pricing across online listings and recent market activity.",
     comingSoon: true,
   },
-  {
-    icon: MessageCircle,
-    title: "Private WhatsApp Trading Group",
-    description:
-      "Gain access to a curated private group of quality investors, buyers, and sellers.",
-    comingSoon: false,
-  },
-  {
-    icon: Calendar,
-    title: "Private Trade Events",
-    description:
-      "Receive access to exclusive trade events and private opportunities. Subject to availability.",
-    comingSoon: false,
-  },
-];
-
-const upcomingFeatures: Feature[] = [
   {
     icon: Zap,
     title: "Advanced Portfolio Tracking",
@@ -293,31 +290,7 @@ export default function JoinPage() {
             <div className="w-16 h-px bg-accent mx-auto" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {currentFeatures.map((feature) => (
-              <FeatureCard key={feature.title} feature={feature} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Coming Soon */}
-      <section className="pb-20 px-6 md:px-12">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2
-              className="text-3xl md:text-4xl font-light text-text-primary mb-4"
-              style={{ fontFamily: "Inter, sans-serif" }}
-            >
-              Coming Soon
-            </h2>
-            <div className="w-16 h-px bg-accent mx-auto mb-4" />
-            <p className="text-text-secondary text-sm max-w-xl mx-auto">
-              We are actively building the next generation of tools for serious
-              collectors and investors.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {upcomingFeatures.map((feature) => (
+            {features.map((feature) => (
               <FeatureCard key={feature.title} feature={feature} />
             ))}
           </div>
