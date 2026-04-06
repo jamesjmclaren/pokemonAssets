@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,17 +11,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await resend.emails.send({
-      from: "West Investments <onboarding@resend.dev>",
-      to: "info@west.investments",
-      subject: `New Membership Application: ${name}`,
-      html: `
-        <h2>New Membership Application</h2>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>WhatsApp:</strong> ${whatsapp}</p>
-        <p><strong>Submitted:</strong> ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</p>
-      `,
+    const res = await fetch("https://smtp.maileroo.com/v1/email/send", {
+      method: "POST",
+      headers: {
+        "X-API-Key": process.env.MAILEROO_API_KEY!,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: `West Investments <noreply@${process.env.MAILEROO_DOMAIN || "west.investments"}>`,
+        to: "info@west.investments",
+        subject: `New Membership Application: ${name}`,
+        html: `
+          <h2>New Membership Application</h2>
+          <p><strong>Name:</strong> ${name}</p>
+          <p><strong>WhatsApp:</strong> ${whatsapp}</p>
+          <p><strong>Submitted:</strong> ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</p>
+        `,
+      }),
     });
+
+    if (!res.ok) {
+      const data = await res.json();
+      console.error("Maileroo error:", data);
+      throw new Error("Email send failed");
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
