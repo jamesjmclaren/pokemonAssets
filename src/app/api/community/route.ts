@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, whatsapp } = await req.json();
+    const { name, phone, dob, profile, interests } = await req.json();
 
-    if (!name?.trim() || !whatsapp?.trim()) {
+    if (!name?.trim() || !phone?.trim() || !dob) {
       return NextResponse.json(
-        { error: "Name and WhatsApp number are required." },
+        { error: "Name, number, and date of birth are required." },
         { status: 400 }
       );
     }
@@ -26,11 +26,14 @@ export async function POST(req: NextRequest) {
           address: "info@west.investments",
           display_name: "West Investments",
         },
-        subject: `New Membership Application: ${name}`,
+        subject: `New Subscription: ${name}`,
         html: `
-          <h2>New Membership Application</h2>
+          <h2>New Community Subscription</h2>
           <p><strong>Name:</strong> ${name}</p>
-          <p><strong>WhatsApp:</strong> ${whatsapp}</p>
+          <p><strong>Number:</strong> ${phone}</p>
+          <p><strong>Date of Birth:</strong> ${dob}</p>
+          <p><strong>Profile:</strong> ${profile || "Not provided"}</p>
+          <p><strong>Interests:</strong> ${interests || "Not provided"}</p>
           <p><strong>Submitted:</strong> ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</p>
         `,
       }),
@@ -44,9 +47,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Join application error:", error);
+    console.error("Subscription error:", error);
     return NextResponse.json(
-      { error: "Failed to submit application. Please try again." },
+      { error: "Failed to process subscription. Please try again." },
       { status: 500 }
     );
   }

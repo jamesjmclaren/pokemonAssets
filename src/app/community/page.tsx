@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   TrendingUp,
   FileBarChart,
@@ -17,10 +17,9 @@ import {
   Clock,
   Camera,
   BadgeCheck,
-  Crown,
-  ArrowRight,
-  Send,
+  CreditCard,
   CheckCircle,
+  Shield,
 } from "lucide-react";
 
 const TOTAL_SPACES = 1000;
@@ -33,7 +32,7 @@ interface Feature {
   comingSoon: boolean;
 }
 
-const features: Feature[] = [
+const includedNow: Feature[] = [
   {
     icon: MessageCircle,
     title: "Private WhatsApp Trading Group",
@@ -48,6 +47,9 @@ const features: Feature[] = [
       "Receive access to exclusive trade events and private opportunities. Subject to availability.",
     comingSoon: false,
   },
+];
+
+const comingSoon: Feature[] = [
   {
     icon: TrendingUp,
     title: "Portfolio Tracking",
@@ -134,6 +136,11 @@ function FeatureCard({ feature }: { feature: Feature }) {
           Coming Soon
         </span>
       )}
+      {!feature.comingSoon && (
+        <span className="absolute top-4 right-4 px-2.5 py-1 rounded-full bg-success/10 text-success text-[10px] font-bold uppercase tracking-widest">
+          Included
+        </span>
+      )}
       <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center mb-4">
         <Icon className="w-5 h-5 text-accent" />
       </div>
@@ -145,18 +152,22 @@ function FeatureCard({ feature }: { feature: Feature }) {
   );
 }
 
-export default function JoinPage() {
+export default function CommunityPage() {
   const router = useRouter();
   const spacesRemaining = TOTAL_SPACES - MEMBERS_FILLED;
   const [formName, setFormName] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
+  const [phone, setPhone] = useState("");
+  const [dob, setDob] = useState("");
+  const [profile, setProfile] = useState("");
+  const [interests, setInterests] = useState("");
+  const [gdprConsent, setGdprConsent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim() || !whatsapp.trim()) return;
+    if (!formName.trim() || !phone.trim() || !dob || !gdprConsent) return;
     setSubmitting(true);
     setError("");
 
@@ -164,7 +175,13 @@ export default function JoinPage() {
       const res = await fetch("/api/community", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: formName.trim(), whatsapp: whatsapp.trim() }),
+        body: JSON.stringify({
+          name: formName.trim(),
+          phone: phone.trim(),
+          dob,
+          profile: profile.trim(),
+          interests: interests.trim(),
+        }),
       });
 
       if (!res.ok) {
@@ -224,15 +241,21 @@ export default function JoinPage() {
       </nav>
 
       {/* Hero */}
-      <section className="pt-36 pb-20 px-6 md:px-12 text-center">
+      <section className="pt-36 pb-16 px-6 md:px-12 text-center">
         <div className="max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20 mb-8 landing-fade-up">
-            <Crown className="w-4 h-4 text-accent" />
+          <div className="landing-fade-up mb-6">
+            <img
+              src="/logo.png"
+              alt="West Investments"
+              className="h-20 md:h-24 object-contain mx-auto"
+            />
+          </div>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20 mb-8 landing-fade-up" style={{ animationDelay: "0.05s" }}>
             <span
               className="text-accent text-xs font-medium uppercase tracking-widest"
               style={{ fontFamily: "Inter, sans-serif" }}
             >
-              Exclusive Membership
+              Exclusive Community
             </span>
           </div>
           <h1
@@ -242,7 +265,7 @@ export default function JoinPage() {
               fontFamily: "Inter, sans-serif",
             }}
           >
-            Join West Investments
+            Join Our Collectibles Club
           </h1>
           <p
             className="text-text-secondary text-lg md:text-xl leading-relaxed max-w-2xl mx-auto landing-fade-up"
@@ -260,7 +283,7 @@ export default function JoinPage() {
       </section>
 
       {/* Counter */}
-      <section className="pb-20 px-6 md:px-12">
+      <section className="pb-16 px-6 md:px-12">
         <div
           className="max-w-md mx-auto text-center landing-fade-up"
           style={{ animationDelay: "0.3s" }}
@@ -288,13 +311,36 @@ export default function JoinPage() {
               />
             </div>
             <p className="text-text-muted text-xs mt-3">
-              Counter refreshed annually
+              Updated per subscription. Subscriptions are reviewed annually.
             </p>
           </div>
         </div>
       </section>
 
-      {/* What You Get */}
+      {/* Included Now */}
+      <section className="pb-16 px-6 md:px-12">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2
+              className="text-3xl md:text-4xl font-light text-text-primary mb-4"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              Included With Your Subscription
+            </h2>
+            <div className="w-16 h-px bg-accent mx-auto mb-4" />
+            <p className="text-text-secondary text-sm max-w-xl mx-auto">
+              Available immediately when you subscribe.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            {includedNow.map((feature) => (
+              <FeatureCard key={feature.title} feature={feature} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Coming Soon */}
       <section className="pb-20 px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
@@ -302,31 +348,56 @@ export default function JoinPage() {
               className="text-3xl md:text-4xl font-light text-text-primary mb-4"
               style={{ fontFamily: "Inter, sans-serif" }}
             >
-              What You Get
+              Coming Soon
             </h2>
-            <div className="w-16 h-px bg-accent mx-auto" />
+            <div className="w-16 h-px bg-accent mx-auto mb-4" />
+            <p className="text-text-secondary text-sm max-w-xl mx-auto">
+              We are actively building the next generation of tools for serious
+              collectors and investors. These features will be included with your
+              subscription at no extra cost.
+            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature) => (
+            {comingSoon.map((feature) => (
               <FeatureCard key={feature.title} feature={feature} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* Application Form */}
-      <section className="pb-24 px-6 md:px-12" id="apply">
+      {/* What Happens After You Subscribe */}
+      <section className="pb-20 px-6 md:px-12">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="bg-surface border border-border rounded-2xl p-8 md:p-10">
+            <h3
+              className="text-2xl md:text-3xl font-light text-text-primary mb-6"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              What Happens Next?
+            </h3>
+            <p className="text-text-secondary leading-relaxed">
+              Once subscribed, clients will be verified and added to the private
+              West Investments WhatsApp group within 72 hours. During this time,
+              an email will also be sent containing login details for the West
+              Investments portal.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Subscribe Form */}
+      <section className="pb-12 px-6 md:px-12" id="subscribe">
         <div className="max-w-xl mx-auto">
-          <div className="bg-surface border border-accent/20 rounded-2xl p-10">
+          <div className="bg-surface border border-accent/20 rounded-2xl p-8 md:p-10">
             <div className="text-center mb-8">
               <h3
                 className="text-2xl md:text-3xl font-light text-text-primary mb-3"
                 style={{ fontFamily: "Inter, sans-serif" }}
               >
-                Apply to Join
+                Subscribe
               </h3>
               <p className="text-text-secondary text-sm">
-                Submit your details below and we will be in touch.
+                Complete your details below to subscribe.
               </p>
             </div>
 
@@ -334,11 +405,12 @@ export default function JoinPage() {
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
                 <h4 className="text-xl font-medium text-text-primary mb-2">
-                  Application Received
+                  Subscription Received
                 </h4>
-                <p className="text-text-secondary text-sm">
-                  Thank you for your interest. We will review your application
-                  and be in touch shortly via WhatsApp.
+                <p className="text-text-secondary text-sm leading-relaxed">
+                  Thank you for subscribing. You will be verified and added to
+                  the private WhatsApp group within 72 hours. An email with your
+                  portal login details will follow.
                 </p>
               </div>
             ) : (
@@ -363,36 +435,134 @@ export default function JoinPage() {
                 </div>
                 <div>
                   <label
-                    htmlFor="whatsapp"
+                    htmlFor="phone"
                     className="block text-xs text-text-muted uppercase tracking-widest mb-2"
                     style={{ fontFamily: "Inter, sans-serif" }}
                   >
-                    WhatsApp Number
+                    Number
                   </label>
                   <input
-                    id="whatsapp"
+                    id="phone"
                     type="tel"
                     required
-                    value={whatsapp}
-                    onChange={(e) => setWhatsapp(e.target.value)}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     placeholder="+44 7700 000000"
                     className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
                   />
                 </div>
+                <div>
+                  <label
+                    htmlFor="dob"
+                    className="block text-xs text-text-muted uppercase tracking-widest mb-2"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    Date of Birth
+                  </label>
+                  <input
+                    id="dob"
+                    type="date"
+                    required
+                    value={dob}
+                    onChange={(e) => setDob(e.target.value)}
+                    className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="profile"
+                    className="block text-xs text-text-muted uppercase tracking-widest mb-2"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    Profile
+                  </label>
+                  <textarea
+                    id="profile"
+                    value={profile}
+                    onChange={(e) => setProfile(e.target.value)}
+                    placeholder="Tell us a bit about yourself"
+                    rows={3}
+                    className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 resize-none"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="interests"
+                    className="block text-xs text-text-muted uppercase tracking-widest mb-2"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    Interests
+                  </label>
+                  <textarea
+                    id="interests"
+                    value={interests}
+                    onChange={(e) => setInterests(e.target.value)}
+                    placeholder="e.g. Pokemon, Sports Cards, Comics, Memorabilia"
+                    rows={2}
+                    className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 resize-none"
+                  />
+                </div>
+
+                {/* GDPR Consent */}
+                <div className="flex items-start gap-3 pt-1">
+                  <input
+                    id="gdpr"
+                    type="checkbox"
+                    required
+                    checked={gdprConsent}
+                    onChange={(e) => setGdprConsent(e.target.checked)}
+                    className="mt-1 w-4 h-4 rounded border-border bg-surface-hover accent-accent cursor-pointer"
+                  />
+                  <label htmlFor="gdpr" className="text-xs text-text-muted leading-relaxed cursor-pointer">
+                    I consent to West Investments collecting and processing my personal data
+                    for the purpose of managing my subscription. Your data will be handled in
+                    accordance with our{" "}
+                    <Link href="/privacy" className="text-accent hover:text-accent-hover underline">
+                      Privacy Policy
+                    </Link>
+                    . You can withdraw consent or request data deletion at any time by
+                    contacting us at{" "}
+                    <a href="mailto:info@west.investments" className="text-accent hover:text-accent-hover underline">
+                      info@west.investments
+                    </a>.
+                  </label>
+                </div>
+
                 {error && (
                   <p className="text-danger text-sm text-center">{error}</p>
                 )}
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || !gdprConsent}
                   className="w-full inline-flex items-center justify-center gap-3 px-8 py-3.5 bg-accent text-background text-sm font-medium tracking-widest uppercase hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em" }}
                 >
-                  {submitting ? "Submitting..." : "Submit Application"}
-                  {!submitting && <Send className="w-4 h-4" />}
+                  {submitting ? "Processing..." : "Pay Now"}
+                  {!submitting && <CreditCard className="w-4 h-4" />}
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* GDPR Notice */}
+      <section className="pb-24 px-6 md:px-12">
+        <div className="max-w-xl mx-auto">
+          <div className="flex items-start gap-3 px-6 py-4 rounded-xl bg-surface-hover/50 border border-border/50">
+            <Shield className="w-4 h-4 text-text-muted mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-text-muted leading-relaxed">
+              Your personal data is protected under GDPR. We only collect information
+              necessary to manage your subscription and will never share your details
+              with third parties without your consent. For full details, see our{" "}
+              <Link href="/privacy" className="text-accent hover:text-accent-hover underline">
+                Privacy Policy
+              </Link>{" "}
+              and{" "}
+              <Link href="/terms" className="text-accent hover:text-accent-hover underline">
+                Terms &amp; Conditions
+              </Link>.
+            </p>
           </div>
         </div>
       </section>
