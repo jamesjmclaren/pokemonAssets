@@ -71,8 +71,8 @@ export default function LandingPage() {
             <a href="#contact" className="text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
               Contact Us
             </a>
-            <Link href="/join" className="text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
-              Join
+            <Link href="/community" className="text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+              Community
             </Link>
             <button
               onClick={() => router.push("/sign-in")}
@@ -105,8 +105,8 @@ export default function LandingPage() {
             <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
               Contact Us
             </a>
-            <Link href="/join" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
-              Join
+            <Link href="/community" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+              Community
             </Link>
             <button
               onClick={() => { setMobileMenuOpen(false); router.push("/sign-in"); }}

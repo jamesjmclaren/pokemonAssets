@@ -161,7 +161,7 @@ export default function JoinPage() {
     setError("");
 
     try {
-      const res = await fetch("/api/join", {
+      const res = await fetch("/api/community", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: formName.trim(), whatsapp: whatsapp.trim() }),

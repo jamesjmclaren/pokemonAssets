@@ -25,7 +25,7 @@ const navItems = [
   { href: "/dashboard/add", label: "Add Asset", icon: Search, adminOnly: true },
   { href: "/report", label: "Report", icon: FileText, adminOnly: false },
   { href: "/team", label: "Team", icon: Users, adminOnly: false },
-  { href: "/join", label: "Join", icon: Crown, adminOnly: false },
+  { href: "/community", label: "Community", icon: Crown, adminOnly: false },
 ];
 
 export default function Sidebar() {
