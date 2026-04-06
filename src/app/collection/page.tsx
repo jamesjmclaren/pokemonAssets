@@ -28,12 +28,16 @@ import type { PortfolioAsset } from "@/types";
 type SortField = "name" | "purchase_price" | "current_price" | "profit" | "purchase_date" | "performance";
 type SortDir = "asc" | "desc";
 type ViewMode = "grid" | "table";
-type TypeTab = "all" | "raw" | "graded" | "sealed";
+type TypeTab = "all" | "raw" | "graded" | "sealed" | "sold";
 
 function isPriceStale(asset: PortfolioAsset): boolean {
   if (!asset.price_updated_at) return true;
   const thirtyDays = 30 * 24 * 60 * 60 * 1000;
   return Date.now() - new Date(asset.price_updated_at).getTime() > thirtyDays;
+}
+
+function isActive(asset: PortfolioAsset): boolean {
+  return !asset.status || asset.status === "ACTIVE";
 }
 
 export default function CollectionPage() {
@@ -82,10 +86,13 @@ export default function CollectionPage() {
     return () => document.removeEventListener("click", handler);
   }, [actionMenuId]);
 
-  const rawCardCount = useMemo(() => assets.filter((a) => a.asset_type === "card" && !a.psa_grade).length, [assets]);
-  const gradedCardCount = useMemo(() => assets.filter((a) => a.asset_type === "card" && !!a.psa_grade).length, [assets]);
-  const sealedCount = useMemo(() => assets.filter((a) => a.asset_type === "sealed").length, [assets]);
-  const staleCount = useMemo(() => assets.filter(isPriceStale).length, [assets]);
+  const activeAssets = useMemo(() => assets.filter(isActive), [assets]);
+
+  const rawCardCount = useMemo(() => activeAssets.filter((a) => a.asset_type === "card" && !a.psa_grade).length, [activeAssets]);
+  const gradedCardCount = useMemo(() => activeAssets.filter((a) => a.asset_type === "card" && !!a.psa_grade).length, [activeAssets]);
+  const sealedCount = useMemo(() => activeAssets.filter((a) => a.asset_type === "sealed").length, [activeAssets]);
+  const soldCount = useMemo(() => assets.filter((a) => a.status === "SOLD").length, [assets]);
+  const staleCount = useMemo(() => activeAssets.filter(isPriceStale).length, [activeAssets]);
 
   const filtered = useMemo(() => {
     let result = [...assets];
@@ -99,12 +106,16 @@ export default function CollectionPage() {
       );
     }
 
-    if (typeTab === "raw") {
-      result = result.filter((a) => a.asset_type === "card" && !a.psa_grade);
+    if (typeTab === "all") {
+      // Show all assets (active + sold); sold ones will be greyed in the table
+    } else if (typeTab === "raw") {
+      result = result.filter((a) => isActive(a) && a.asset_type === "card" && !a.psa_grade);
     } else if (typeTab === "graded") {
-      result = result.filter((a) => a.asset_type === "card" && !!a.psa_grade);
+      result = result.filter((a) => isActive(a) && a.asset_type === "card" && !!a.psa_grade);
     } else if (typeTab === "sealed") {
-      result = result.filter((a) => a.asset_type === "sealed");
+      result = result.filter((a) => isActive(a) && a.asset_type === "sealed");
+    } else if (typeTab === "sold") {
+      result = result.filter((a) => a.status === "SOLD");
     }
 
     result.sort((a, b) => {
@@ -149,11 +160,15 @@ export default function CollectionPage() {
     return result;
   }, [assets, search, typeTab, sortField, sortDir]);
 
-  const totalValue = filtered.reduce(
-    (sum, a) => sum + (a.current_price ?? a.purchase_price) * (a.quantity || 1),
-    0
-  );
-  const totalInvested = filtered.reduce(
+  // Footer totals — active assets only (or sold tab uses sell prices)
+  const footerAssets = typeTab === "sold"
+    ? filtered
+    : filtered.filter(isActive);
+
+  const totalValue = typeTab === "sold"
+    ? footerAssets.reduce((sum, a) => sum + (a.sell_price ?? a.purchase_price) * (a.quantity || 1), 0)
+    : footerAssets.reduce((sum, a) => sum + (a.current_price ?? a.purchase_price) * (a.quantity || 1), 0);
+  const totalInvested = footerAssets.reduce(
     (sum, a) => sum + a.purchase_price * (a.quantity || 1),
     0
   );
@@ -186,6 +201,34 @@ export default function CollectionPage() {
     );
   }
 
+  const isSoldTab = typeTab === "sold";
+
+  // Table columns change between active and sold tabs
+  const activeColumns = [
+    { label: "Card", field: "name" as SortField, align: "left" },
+    { label: "Purchase Date", field: "purchase_date" as SortField, align: "left" },
+    { label: "Market Price", field: "current_price" as SortField, align: "left" },
+    { label: "Price Chart", field: null, align: "center" },
+    { label: "Qty", field: null, align: "center" },
+    { label: "Total", field: "current_price" as SortField, align: "right" },
+    { label: "Invested", field: "purchase_price" as SortField, align: "right" },
+    { label: "Profit/Loss", field: "profit" as SortField, align: "right" },
+    { label: "Performance", field: "performance" as SortField, align: "right" },
+  ];
+
+  const soldColumns = [
+    { label: "Card", field: "name" as SortField, align: "left" },
+    { label: "Purchase Date", field: "purchase_date" as SortField, align: "left" },
+    { label: "Sell Date", field: null, align: "left" },
+    { label: "Qty", field: null, align: "center" },
+    { label: "Sell Price", field: null, align: "right" },
+    { label: "Invested", field: "purchase_price" as SortField, align: "right" },
+    { label: "Realised P/L", field: "profit" as SortField, align: "right" },
+    { label: "Realised %", field: "performance" as SortField, align: "right" },
+  ];
+
+  const columns = isSoldTab ? soldColumns : activeColumns;
+
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header */}
@@ -194,7 +237,9 @@ export default function CollectionPage() {
           <h1 className="text-xl md:text-2xl font-bold text-text-primary">Collection</h1>
           <p className="text-text-muted mt-1 text-xs md:text-sm">
             {filtered.length} asset{filtered.length !== 1 ? "s" : ""} &middot;{" "}
-            {formatCurrency(totalValue)} total value
+            {isSoldTab
+              ? `${formatCurrency(totalValue)} sold`
+              : `${formatCurrency(totalValue)} total value`}
           </p>
         </div>
         {!isReadOnly && (
@@ -221,8 +266,8 @@ export default function CollectionPage() {
         />
       </div>
 
-      {/* Stale price warning banner */}
-      {staleCount > 0 && (
+      {/* Stale price warning banner — active assets only */}
+      {staleCount > 0 && !isSoldTab && (
         <div className="flex items-center gap-3 px-5 py-4 bg-danger/15 border-2 border-danger/50 rounded-xl">
           <div className="w-10 h-10 rounded-full bg-danger/20 flex items-center justify-center flex-shrink-0">
             <AlertTriangle className="w-5 h-5 text-danger" />
@@ -240,7 +285,7 @@ export default function CollectionPage() {
         </div>
       )}
 
-      {/* Tabs: All / Raw Cards / Graded Cards / Sealed Products */}
+      {/* Tabs */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex gap-1 border-b border-border overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: "none" }}>
           {([
@@ -248,6 +293,7 @@ export default function CollectionPage() {
             { key: "raw" as TypeTab, label: `Raw Cards (${rawCardCount})` },
             { key: "graded" as TypeTab, label: `Graded (${gradedCardCount})` },
             { key: "sealed" as TypeTab, label: `Sealed (${sealedCount})` },
+            { key: "sold" as TypeTab, label: `Sold (${soldCount})` },
           ]).map((tab) => (
             <button
               key={tab.key}
@@ -263,7 +309,7 @@ export default function CollectionPage() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          {/* Sort (mobile only — desktop uses clickable table headers) */}
+          {/* Sort (mobile only) */}
           <div className="flex md:hidden items-center gap-2">
             <SlidersHorizontal className="w-4 h-4 text-text-muted" />
             <select
@@ -316,7 +362,9 @@ export default function CollectionPage() {
       {view === "grid" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
           {filtered.map((asset) => (
-            <AssetCard key={asset.id} asset={asset} />
+            <div key={asset.id} className={asset.status === "SOLD" ? "opacity-60" : ""}>
+              <AssetCard asset={asset} />
+            </div>
           ))}
         </div>
       )}
@@ -329,17 +377,7 @@ export default function CollectionPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {([
-                    { label: "Card", field: "name" as SortField, align: "left" },
-                    { label: "Purchase Date", field: "purchase_date" as SortField, align: "left" },
-                    { label: "Market Price", field: "current_price" as SortField, align: "left" },
-                    { label: "Price Chart", field: null, align: "center" },
-                    { label: "Qty", field: null, align: "center" },
-                    { label: "Total", field: "current_price" as SortField, align: "right" },
-                    { label: "Invested", field: "purchase_price" as SortField, align: "right" },
-                    { label: "Profit/Loss", field: "profit" as SortField, align: "right" },
-                    { label: "Performance", field: "performance" as SortField, align: "right" },
-                  ]).map((col, i) => (
+                  {columns.map((col, i) => (
                     <th
                       key={i}
                       className={`px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider ${
@@ -374,6 +412,136 @@ export default function CollectionPage() {
               <tbody className="divide-y divide-border">
                 {filtered.map((asset) => {
                   const qty = asset.quantity || 1;
+                  const sold = asset.status === "SOLD";
+
+                  if (isSoldTab || sold) {
+                    // Sold row rendering
+                    const sellTotal = (asset.sell_price ?? asset.purchase_price) * qty;
+                    const invested = asset.purchase_price * qty;
+                    const realisedPnL = sellTotal - invested;
+                    const realisedPct = invested > 0 ? (realisedPnL / invested) * 100 : 0;
+
+                    return (
+                      <tr
+                        key={asset.id}
+                        className={`hover:bg-surface-hover cursor-pointer group ${sold && !isSoldTab ? "opacity-50" : ""}`}
+                        onClick={() => (window.location.href = `/asset/${asset.id}`)}
+                      >
+                        {/* Product */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-background rounded-lg overflow-hidden flex-shrink-0 relative">
+                              {(asset.custom_image_url || asset.image_url) && (
+                                <img
+                                  src={fixStorageUrl(asset.custom_image_url) || asset.image_url || ""}
+                                  alt=""
+                                  className="w-full h-full object-contain p-0.5"
+                                  onError={(e) => {
+                                    const target = e.currentTarget;
+                                    if (asset.custom_image_url && asset.image_url && target.src !== asset.image_url) {
+                                      target.src = asset.image_url;
+                                    } else {
+                                      target.style.display = "none";
+                                    }
+                                  }}
+                                />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-text-primary truncate max-w-[200px]">
+                                {asset.name}
+                              </p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                {asset.psa_grade && (
+                                  <span className="text-[10px] text-gold font-medium">{asset.psa_grade}</span>
+                                )}
+                                <span className="text-[10px] font-bold text-text-muted bg-surface-hover px-1.5 py-0.5 rounded">SOLD</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Purchase Date */}
+                        <td className="px-4 py-3 text-sm text-text-secondary whitespace-nowrap">
+                          {formatDate(asset.purchase_date)}
+                        </td>
+
+                        {/* Sell Date */}
+                        <td className="px-4 py-3 text-sm text-text-secondary whitespace-nowrap">
+                          {asset.sell_date ? formatDate(asset.sell_date) : <span className="text-text-muted">—</span>}
+                        </td>
+
+                        {/* Qty */}
+                        <td className="px-4 py-3 text-sm text-text-primary text-center font-medium">
+                          {qty}
+                        </td>
+
+                        {/* Sell Price */}
+                        <td className="px-4 py-3 text-sm font-bold text-text-primary text-right whitespace-nowrap">
+                          {asset.sell_price != null ? formatCurrency(asset.sell_price * qty) : <span className="text-text-muted">—</span>}
+                        </td>
+
+                        {/* Invested */}
+                        <td className="px-4 py-3 text-right">
+                          <p className="text-sm font-semibold text-text-primary">
+                            {formatCurrency(invested)}
+                          </p>
+                        </td>
+
+                        {/* Realised P/L */}
+                        <td className="px-4 py-3 text-right">
+                          <span className={`text-sm font-bold ${realisedPnL > 0 ? "text-success" : realisedPnL < 0 ? "text-danger" : "text-text-secondary"}`}>
+                            {formatCurrency(realisedPnL)}
+                          </span>
+                        </td>
+
+                        {/* Realised % */}
+                        <td className="px-4 py-3 text-right">
+                          <span className={`text-sm font-semibold flex items-center justify-end gap-1 ${realisedPct > 0 ? "text-success" : realisedPct < 0 ? "text-danger" : "text-text-secondary"}`}>
+                            {realisedPct > 0 ? "+" : ""}{realisedPct.toFixed(1)}%
+                            {realisedPct !== 0 && <TrendingUp className={`w-3.5 h-3.5 ${realisedPct < 0 ? "rotate-180" : ""}`} />}
+                          </span>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-2 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActionMenuId(actionMenuId === asset.id ? null : asset.id);
+                              }}
+                              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-hover"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                            {actionMenuId === asset.id && (
+                              <div className="absolute right-0 top-full mt-1 bg-surface-elevated border border-border rounded-xl shadow-lg z-20 min-w-[140px]">
+                                <Link
+                                  href={`/asset/${asset.id}`}
+                                  className={`flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary ${isReadOnly ? "rounded-xl" : "rounded-t-xl"}`}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                  {isReadOnly ? "View" : "View / Edit"}
+                                </Link>
+                                {!isReadOnly && (
+                                  <button
+                                    onClick={() => handleDelete(asset.id)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger-muted rounded-b-xl"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  // Active row rendering (default)
                   const marketPrice = asset.current_price ?? asset.purchase_price;
                   const total = marketPrice * qty;
                   const invested = asset.purchase_price * qty;
@@ -536,13 +704,13 @@ export default function CollectionPage() {
                                 {isReadOnly ? "View" : "View / Edit"}
                               </Link>
                               {!isReadOnly && (
-                              <button
-                                onClick={() => handleDelete(asset.id)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger-muted rounded-b-xl"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                Remove
-                              </button>
+                                <button
+                                  onClick={() => handleDelete(asset.id)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger-muted rounded-b-xl"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Remove
+                                </button>
                               )}
                             </div>
                           )}
@@ -554,7 +722,7 @@ export default function CollectionPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-border bg-surface-hover/50">
-                  <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-text-secondary">
+                  <td colSpan={isSoldTab ? 4 : 5} className="px-4 py-3 text-sm font-semibold text-text-secondary">
                     Totals
                   </td>
                   <td className="px-4 py-3 text-sm font-bold text-text-primary text-right">
@@ -591,6 +759,60 @@ export default function CollectionPage() {
           <div className="md:hidden divide-y divide-border">
             {filtered.map((asset) => {
               const qty = asset.quantity || 1;
+              const sold = asset.status === "SOLD";
+
+              if (sold) {
+                const sellTotal = (asset.sell_price ?? asset.purchase_price) * qty;
+                const invested = asset.purchase_price * qty;
+                const realisedPnL = sellTotal - invested;
+                const realisedPct = invested > 0 ? (realisedPnL / invested) * 100 : 0;
+
+                return (
+                  <div
+                    key={asset.id}
+                    className="flex items-center gap-3 p-3 hover:bg-surface-hover cursor-pointer opacity-70"
+                    onClick={() => (window.location.href = `/asset/${asset.id}`)}
+                  >
+                    <div className="w-10 h-10 bg-background rounded-lg overflow-hidden flex-shrink-0 relative">
+                      {(asset.custom_image_url || asset.image_url) && (
+                        <img
+                          src={fixStorageUrl(asset.custom_image_url) || asset.image_url || ""}
+                          alt=""
+                          className="w-full h-full object-contain p-0.5"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (asset.custom_image_url && asset.image_url && target.src !== asset.image_url) {
+                              target.src = asset.image_url;
+                            } else {
+                              target.style.display = "none";
+                            }
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-text-primary truncate">
+                        {asset.name}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] font-bold text-text-muted bg-surface-hover px-1.5 py-0.5 rounded">SOLD</span>
+                        {asset.sell_date && (
+                          <span className="text-[10px] text-text-muted">{formatDate(asset.sell_date)}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-semibold text-text-primary">
+                        {asset.sell_price != null ? formatCurrency(asset.sell_price * qty) : "—"}
+                      </p>
+                      <p className={`text-xs font-medium ${realisedPnL > 0 ? "text-success" : realisedPnL < 0 ? "text-danger" : "text-text-secondary"}`}>
+                        {realisedPnL >= 0 ? "+" : ""}{realisedPct.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
               const marketPrice = asset.current_price ?? asset.purchase_price;
               const total = marketPrice * qty;
               const invested = asset.purchase_price * qty;

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   DollarSign,
   TrendingUp,
+  TrendingDown,
   Package,
   PlusCircle,
   ArrowUpRight,
@@ -12,6 +13,7 @@ import {
   RefreshCw,
   AlertTriangle,
   Bell,
+  Wallet,
 } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import PortfolioChart from "@/components/PortfolioChart";
@@ -23,22 +25,31 @@ import type { PortfolioAsset } from "@/types";
 export default function DashboardPage() {
   const { currentPortfolio, loading: portfolioLoading, isReadOnly } = usePortfolio();
   const [assets, setAssets] = useState<PortfolioAsset[]>([]);
+  const [cashBalance, setCashBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    async function fetchAssets() {
+    async function fetchData() {
       if (!currentPortfolio) {
         setLoading(false);
         return;
       }
       try {
-        const res = await fetch(`/api/assets?portfolioId=${currentPortfolio.id}`);
-        if (!res.ok) throw new Error("Failed to fetch");
-        const data = await res.json();
+        const [assetsRes, portfolioRes] = await Promise.all([
+          fetch(`/api/assets?portfolioId=${currentPortfolio.id}`),
+          fetch(`/api/portfolios/${currentPortfolio.id}`),
+        ]);
+        if (!assetsRes.ok) throw new Error("Failed to fetch assets");
+        const data = await assetsRes.json();
         setAssets(Array.isArray(data) ? data : []);
+
+        if (portfolioRes.ok) {
+          const portfolioData = await portfolioRes.json();
+          setCashBalance(portfolioData.cash_balance || 0);
+        }
       } catch (error) {
-        console.error("Error fetching assets:", error);
+        console.error("Error fetching data:", error);
         setAssets([]);
       } finally {
         setLoading(false);
@@ -46,9 +57,8 @@ export default function DashboardPage() {
     }
     if (currentPortfolio) {
       setLoading(true);
-      fetchAssets();
+      fetchData();
     } else if (!portfolioLoading) {
-      // No portfolio selected and not loading - stop the loading state
       setLoading(false);
     }
   }, [currentPortfolio, portfolioLoading]);
@@ -70,23 +80,37 @@ export default function DashboardPage() {
     }
   }
 
-  const totalInvested = assets.reduce((sum, a) => sum + a.purchase_price * (a.quantity || 1), 0);
-  const currentValue = assets.reduce(
+  const activeAssets = assets.filter((a) => !a.status || a.status === "ACTIVE");
+  const soldAssets = assets.filter((a) => a.status === "SOLD");
+
+  const activeValue = activeAssets.reduce(
     (sum, a) => sum + (a.current_price ?? a.purchase_price) * (a.quantity || 1),
     0
   );
-  const totalProfit = currentValue - totalInvested;
-  const profitPercent =
-    totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
+  const totalPortfolioValue = activeValue + cashBalance;
 
-  // Stale price detection (30 days)
+  const unrealisedPnL = activeAssets.reduce((sum, a) => {
+    const qty = a.quantity || 1;
+    return sum + ((a.current_price ?? a.purchase_price) - a.purchase_price) * qty;
+  }, 0);
+
+  const realisedPnL = soldAssets.reduce((sum, a) => {
+    const qty = a.quantity || 1;
+    return sum + ((a.sell_price ?? a.purchase_price) - a.purchase_price) * qty;
+  }, 0);
+
+  const totalInvested = assets.reduce((sum, a) => sum + a.purchase_price * (a.quantity || 1), 0);
+  const netProfit = unrealisedPnL + realisedPnL;
+  const overallReturnPct = totalInvested > 0 ? (netProfit / totalInvested) * 100 : 0;
+
+  // Stale price detection (30 days) — active assets only
   const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-  const staleAssets = assets.filter((a) => {
+  const staleAssets = activeAssets.filter((a) => {
     if (!a.price_updated_at) return true;
     return Date.now() - new Date(a.price_updated_at).getTime() > thirtyDaysMs;
   });
 
-  const topGainers = [...assets]
+  const topGainers = [...activeAssets]
     .filter((a) => a.current_price != null)
     .sort(
       (a, b) =>
@@ -95,7 +119,7 @@ export default function DashboardPage() {
     )
     .slice(0, 3);
 
-  const recentlyAdded = [...assets].slice(0, 4);
+  const recentlyAdded = [...activeAssets].slice(0, 4);
 
   if (portfolioLoading || loading) {
     return (
@@ -125,7 +149,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 md:gap-3">
-          {assets.length > 0 && !isReadOnly && (
+          {activeAssets.length > 0 && !isReadOnly && (
             <button
               onClick={handleRefreshPrices}
               disabled={refreshing}
@@ -153,45 +177,81 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
         <StatCard
           label="Total Value"
-          value={formatCurrency(currentValue)}
+          value={formatCurrency(totalPortfolioValue)}
           change={
-            totalProfit !== 0
-              ? `${totalProfit >= 0 ? "+" : ""}${formatCurrency(totalProfit)} (${formatPercentage(profitPercent)})`
+            cashBalance > 0
+              ? `${formatCurrency(activeValue)} assets + ${formatCurrency(cashBalance)} cash`
               : undefined
           }
-          changeType={
-            totalProfit > 0
-              ? "positive"
-              : totalProfit < 0
-                ? "negative"
-                : "neutral"
-          }
+          changeType="neutral"
           icon={DollarSign}
         />
         <StatCard
-          label="Total Invested"
-          value={formatCurrency(totalInvested)}
-          icon={TrendingUp}
-        />
-        <StatCard
-          label="Total P/L"
-          value={formatCurrency(totalProfit)}
-          change={formatPercentage(profitPercent)}
-          changeType={
-            totalProfit > 0
-              ? "positive"
-              : totalProfit < 0
-                ? "negative"
-                : "neutral"
+          label="Unrealised P/L"
+          value={formatCurrency(unrealisedPnL)}
+          change={
+            activeAssets.length > 0
+              ? formatPercentage(
+                  activeAssets.reduce((s, a) => s + a.purchase_price * (a.quantity || 1), 0) > 0
+                    ? (unrealisedPnL /
+                        activeAssets.reduce((s, a) => s + a.purchase_price * (a.quantity || 1), 0)) *
+                        100
+                    : 0
+                )
+              : undefined
           }
-          icon={totalProfit >= 0 ? ArrowUpRight : ArrowDownRight}
+          changeType={
+            unrealisedPnL > 0 ? "positive" : unrealisedPnL < 0 ? "negative" : "neutral"
+          }
+          icon={unrealisedPnL >= 0 ? ArrowUpRight : ArrowDownRight}
         />
         <StatCard
-          label="Total Assets"
-          value={String(assets.length)}
-          icon={Package}
+          label="Realised P/L"
+          value={formatCurrency(realisedPnL)}
+          change={soldAssets.length > 0 ? `${soldAssets.length} sale${soldAssets.length !== 1 ? "s" : ""}` : undefined}
+          changeType={
+            realisedPnL > 0 ? "positive" : realisedPnL < 0 ? "negative" : "neutral"
+          }
+          icon={realisedPnL >= 0 ? TrendingUp : TrendingDown}
+        />
+        <StatCard
+          label="Cash Balance"
+          value={formatCurrency(cashBalance)}
+          change={
+            totalInvested > 0
+              ? `Net return: ${overallReturnPct >= 0 ? "+" : ""}${overallReturnPct.toFixed(1)}%`
+              : undefined
+          }
+          changeType={netProfit > 0 ? "positive" : netProfit < 0 ? "negative" : "neutral"}
+          icon={Wallet}
         />
       </div>
+
+      {/* Summary bar */}
+      {assets.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-surface border border-border rounded-2xl p-4">
+          <div className="text-center">
+            <p className="text-xs text-text-muted font-medium uppercase tracking-wider">Total Invested</p>
+            <p className="text-sm font-bold text-text-primary mt-1">{formatCurrency(totalInvested)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-text-muted font-medium uppercase tracking-wider">Active Assets</p>
+            <p className="text-sm font-bold text-text-primary mt-1">{formatCurrency(activeValue)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-text-muted font-medium uppercase tracking-wider">Sales Returned</p>
+            <p className="text-sm font-bold text-text-primary mt-1">
+              {formatCurrency(soldAssets.reduce((s, a) => s + (a.sell_price ?? 0) * (a.quantity || 1), 0))}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-text-muted font-medium uppercase tracking-wider">Overall Return</p>
+            <p className={`text-sm font-bold mt-1 ${netProfit > 0 ? "text-success" : netProfit < 0 ? "text-danger" : "text-text-primary"}`}>
+              {netProfit >= 0 ? "+" : ""}{formatCurrency(netProfit)} ({overallReturnPct >= 0 ? "+" : ""}{overallReturnPct.toFixed(1)}%)
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Stale Price Alert for Admins */}
       {!isReadOnly && staleAssets.length > 0 && (
