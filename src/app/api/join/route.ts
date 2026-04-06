@@ -11,15 +11,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const res = await fetch("https://smtp.maileroo.com/api/v2/send", {
+    const res = await fetch("https://smtp.maileroo.com/api/v2/emails", {
       method: "POST",
       headers: {
-        "X-API-Key": process.env.MAILEROO_API_KEY!,
+        "X-Api-Key": process.env.MAILEROO_API_KEY!,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: `West Investments <noreply@${process.env.MAILEROO_DOMAIN || "west.investments"}>`,
-        to: "info@west.investments",
+        from: {
+          address: `noreply@${process.env.MAILEROO_DOMAIN || "west.investments"}`,
+          display_name: "West Investments",
+        },
+        to: {
+          address: "info@west.investments",
+          display_name: "West Investments",
+        },
         subject: `New Membership Application: ${name}`,
         html: `
           <h2>New Membership Application</h2>
