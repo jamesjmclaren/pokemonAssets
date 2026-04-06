@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const res = await fetch("https://smtp.maileroo.com/v1/email/send", {
+    const res = await fetch("https://smtp.maileroo.com/api/v2/email/send", {
       method: "POST",
       headers: {
         "X-API-Key": process.env.MAILEROO_API_KEY!,
