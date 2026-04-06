@@ -181,7 +181,7 @@ export default function JoinPage() {
   };
 
   return (
-    <div className="min-h-screen landing-grain">
+    <div className="min-h-screen">
       {/* Navigation */}
       <nav
         className="fixed top-0 left-0 right-0 z-50 landing-fade-in border-b border-border/20"
