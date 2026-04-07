@@ -53,6 +53,7 @@ export default function AssetCard({ asset }: AssetCardProps) {
                 fill
                 className="object-contain p-2 md:p-3 group-hover:scale-105 transition-transform duration-300"
                 sizes="(max-width: 768px) 96px, (max-width: 1200px) 33vw, 25vw"
+                unoptimized={imageUrl.includes("tcgplayer-cdn.tcgplayer.com")}
                 onError={handleImageError}
               />
             ) : (

@@ -917,6 +917,7 @@ export default function AssetDetailPage({
                   fill
                   className="object-contain p-3 md:p-4"
                   sizes="(max-width: 768px) 280px, 400px"
+                  unoptimized={imageUrl.includes("tcgplayer-cdn.tcgplayer.com")}
                   onError={() => {
                     if (asset.custom_image_url && asset.image_url && imgSrc !== asset.image_url) {
                       setImgSrc(asset.image_url);
