@@ -32,30 +32,34 @@ export default function ExampleAssetCard({ asset }: { asset: ExampleAsset }) {
             className="object-contain p-2 md:p-3"
             sizes="(max-width: 768px) 96px, (max-width: 1200px) 33vw, 25vw"
           />
-          <div className="absolute top-2 left-2 hidden md:flex gap-1">
-            <span
-              className={
-                asset.asset_type === "card"
-                  ? "px-2 py-1 rounded-lg text-xs font-semibold bg-accent-muted text-accent-hover"
-                  : "px-2 py-1 rounded-lg text-xs font-semibold bg-warning-muted text-warning"
-              }
-            >
-              {asset.asset_type === "card" ? "Card" : "Sealed"}
-            </span>
-            {asset.psa_grade && (
-              <span className="px-2 py-1 rounded-lg text-xs font-semibold bg-gold/20 text-gold">
-                PSA {asset.psa_grade}
-              </span>
-            )}
-          </div>
         </div>
         <div className="p-3 md:p-4 flex-1 min-w-0">
-          <h3 className="text-xs md:text-sm font-semibold text-text-primary truncate">
-            {asset.name}
-          </h3>
-          <p className="text-xs text-text-muted mt-0.5 truncate">
-            {asset.set_name}
-          </p>
+          <div className="flex items-start gap-2 md:block">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xs md:text-sm font-semibold text-text-primary truncate">
+                {asset.name}
+              </h3>
+              <p className="text-xs text-text-muted mt-0.5 truncate">
+                {asset.set_name}
+              </p>
+            </div>
+            <div className="flex gap-1 flex-shrink-0 md:mt-1.5">
+              <span
+                className={
+                  asset.asset_type === "card"
+                    ? "px-1.5 py-0.5 md:px-2 md:py-1 rounded md:rounded-lg text-[10px] md:text-xs font-semibold bg-accent-muted text-accent-hover"
+                    : "px-1.5 py-0.5 md:px-2 md:py-1 rounded md:rounded-lg text-[10px] md:text-xs font-semibold bg-warning-muted text-warning"
+                }
+              >
+                {asset.asset_type === "card" ? "Card" : "Sealed"}
+              </span>
+              {asset.psa_grade && (
+                <span className="px-1.5 py-0.5 md:px-2 md:py-1 rounded md:rounded-lg text-[10px] md:text-xs font-semibold bg-gold/20 text-gold">
+                  PSA {asset.psa_grade}
+                </span>
+              )}
+            </div>
+          </div>
           <div className="flex items-end justify-between mt-2 md:mt-3">
             <div>
               <p className="text-[10px] md:text-xs text-text-muted">
