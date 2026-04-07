@@ -255,6 +255,9 @@ export default function JoinPage() {
             </span>{" "}
             clients worldwide at any one time. To maintain a high level of
             access, discretion, and service, availability is carefully managed.
+            Within our community, we are committed to offering{" "}
+            <span className="text-accent font-medium">100%</span> of fair market
+            value for qualifying assets.
           </p>
         </div>
       </section>
