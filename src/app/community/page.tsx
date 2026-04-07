@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   TrendingUp,
   FileBarChart,
@@ -53,7 +53,7 @@ const features: Feature[] = [
     title: "Portfolio Tracking",
     description:
       "Monitor the value of your collection with daily real-time pricing updates.",
-    comingSoon: true,
+    comingSoon: false,
   },
   {
     icon: FileBarChart,
@@ -150,13 +150,16 @@ export default function JoinPage() {
   const spacesRemaining = TOTAL_SPACES - MEMBERS_FILLED;
   const [formName, setFormName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [dob, setDob] = useState("");
+  const [profile, setProfile] = useState("");
+  const [interests, setInterests] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim() || !whatsapp.trim()) return;
+    if (!formName.trim() || !whatsapp.trim() || !dob.trim()) return;
     setSubmitting(true);
     setError("");
 
@@ -164,7 +167,13 @@ export default function JoinPage() {
       const res = await fetch("/api/community", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: formName.trim(), whatsapp: whatsapp.trim() }),
+        body: JSON.stringify({
+          name: formName.trim(),
+          whatsapp: whatsapp.trim(),
+          dob: dob.trim(),
+          profile: profile.trim(),
+          interests: interests.trim(),
+        }),
       });
 
       if (!res.ok) {
@@ -297,7 +306,27 @@ export default function JoinPage() {
         </div>
       </section>
 
-      {/* What You Get */}
+      {/* Included Now */}
+      <section className="pb-16 px-6 md:px-12">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2
+              className="text-3xl md:text-4xl font-light text-text-primary mb-4"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              Included With Your Membership
+            </h2>
+            <div className="w-16 h-px bg-accent mx-auto" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.filter((f) => !f.comingSoon).map((feature) => (
+              <FeatureCard key={feature.title} feature={feature} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Coming Soon */}
       <section className="pb-20 px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
@@ -305,20 +334,23 @@ export default function JoinPage() {
               className="text-3xl md:text-4xl font-light text-text-primary mb-4"
               style={{ fontFamily: "Inter, sans-serif" }}
             >
-              What You Get
+              Coming Soon
             </h2>
+            <p className="text-text-secondary text-sm max-w-lg mx-auto mb-4">
+              We&apos;re building more tools and features for our members. These are on the roadmap and included in your membership at no extra cost.
+            </p>
             <div className="w-16 h-px bg-accent mx-auto" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature) => (
+            {features.filter((f) => f.comingSoon).map((feature) => (
               <FeatureCard key={feature.title} feature={feature} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* Application Form */}
-      <section className="pb-24 px-6 md:px-12" id="apply">
+      {/* Subscribe Form */}
+      <section className="pb-24 px-6 md:px-12" id="subscribe">
         <div className="max-w-xl mx-auto">
           <div className="bg-surface border border-accent/20 rounded-2xl p-10">
             <div className="text-center mb-8">
@@ -326,10 +358,10 @@ export default function JoinPage() {
                 className="text-2xl md:text-3xl font-light text-text-primary mb-3"
                 style={{ fontFamily: "Inter, sans-serif" }}
               >
-                Apply to Join
+                Subscribe
               </h3>
               <p className="text-text-secondary text-sm">
-                Submit your details below and we will be in touch.
+                Join our collectibles club and get instant access to all membership benefits.
               </p>
             </div>
 
@@ -337,11 +369,10 @@ export default function JoinPage() {
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
                 <h4 className="text-xl font-medium text-text-primary mb-2">
-                  Application Received
+                  Subscription Received
                 </h4>
                 <p className="text-text-secondary text-sm">
-                  Thank you for your interest. We will review your application
-                  and be in touch shortly via WhatsApp.
+                  Thank you for subscribing. We will be in touch shortly via WhatsApp to confirm your membership.
                 </p>
               </div>
             ) : (
@@ -370,7 +401,7 @@ export default function JoinPage() {
                     className="block text-xs text-text-muted uppercase tracking-widest mb-2"
                     style={{ fontFamily: "Inter, sans-serif" }}
                   >
-                    WhatsApp Number
+                    Number
                   </label>
                   <input
                     id="whatsapp"
@@ -379,6 +410,57 @@ export default function JoinPage() {
                     value={whatsapp}
                     onChange={(e) => setWhatsapp(e.target.value)}
                     placeholder="+44 7700 000000"
+                    className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="dob"
+                    className="block text-xs text-text-muted uppercase tracking-widest mb-2"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    Date of Birth
+                  </label>
+                  <input
+                    id="dob"
+                    type="date"
+                    required
+                    value={dob}
+                    onChange={(e) => setDob(e.target.value)}
+                    className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="profile"
+                    className="block text-xs text-text-muted uppercase tracking-widest mb-2"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    Profile
+                  </label>
+                  <textarea
+                    id="profile"
+                    value={profile}
+                    onChange={(e) => setProfile(e.target.value)}
+                    placeholder="Tell us a bit about yourself"
+                    rows={3}
+                    className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 resize-none"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="interests"
+                    className="block text-xs text-text-muted uppercase tracking-widest mb-2"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    Interests
+                  </label>
+                  <input
+                    id="interests"
+                    type="text"
+                    value={interests}
+                    onChange={(e) => setInterests(e.target.value)}
+                    placeholder="e.g. Pokémon, Comics, Sports Cards"
                     className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
                   />
                 </div>
@@ -391,7 +473,7 @@ export default function JoinPage() {
                   className="w-full inline-flex items-center justify-center gap-3 px-8 py-3.5 bg-accent text-background text-sm font-medium tracking-widest uppercase hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em" }}
                 >
-                  {submitting ? "Submitting..." : "Submit Application"}
+                  {submitting ? "Processing..." : "Pay Now"}
                   {!submitting && <Send className="w-4 h-4" />}
                 </button>
               </form>
