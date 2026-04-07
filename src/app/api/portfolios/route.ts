@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
+import { isAdminEmail } from "@/lib/admin";
 
 export async function GET() {
   const { userId } = await auth();
@@ -93,12 +94,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const user = await currentUser();
   const body = await request.json();
-  const { name, description } = body;
+  const { name, description, is_managed } = body;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
+
+  const userEmail = user?.emailAddresses?.[0]?.emailAddress;
+  const canSetManaged = isAdminEmail(userEmail);
 
   const { data, error } = await supabase
     .from("portfolios")
@@ -106,6 +111,7 @@ export async function POST(request: Request) {
       name: name.trim(),
       description: description?.trim() || null,
       owner_id: userId,
+      ...(canSetManaged && is_managed ? { is_managed: true } : {}),
     })
     .select()
     .single();

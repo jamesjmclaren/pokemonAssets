@@ -6,6 +6,7 @@ import { useEffect, useState, Suspense } from "react";
 import { Plus, Briefcase, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { usePortfolio } from "@/lib/portfolio-context";
+import { isAdminEmail } from "@/lib/admin";
 
 function OnboardingContent() {
   const { user, isLoaded } = useUser();
@@ -16,7 +17,11 @@ function OnboardingContent() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [portfolioName, setPortfolioName] = useState("");
   const [portfolioDescription, setPortfolioDescription] = useState("");
+  const [isManaged, setIsManaged] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  const userEmail = user?.emailAddresses?.[0]?.emailAddress;
+  const isAdmin = isAdminEmail(userEmail);
 
   const isNewPortfolio = searchParams.get("new") === "true";
   const hasExistingPortfolios = portfolios.length > 0;
@@ -43,6 +48,7 @@ function OnboardingContent() {
         body: JSON.stringify({
           name: portfolioName,
           description: portfolioDescription,
+          ...(isAdmin && isManaged ? { is_managed: true } : {}),
         }),
       });
 
@@ -143,6 +149,20 @@ function OnboardingContent() {
                   className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-accent resize-none"
                 />
               </div>
+
+              {isAdmin && (
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isManaged}
+                    onChange={(e) => setIsManaged(e.target.checked)}
+                    className="w-4 h-4 rounded border-zinc-600 bg-zinc-900 text-accent focus:ring-accent"
+                  />
+                  <span className="text-sm text-zinc-300">
+                    Managed portfolio (client account)
+                  </span>
+                </label>
+              )}
             </div>
 
             <div className="flex gap-3 mt-6">

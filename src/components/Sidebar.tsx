@@ -15,9 +15,11 @@ import {
   Plus,
   FileText,
   Crown,
+  Shield,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { usePortfolio, Portfolio } from "@/lib/portfolio-context";
+import { isAdminEmail } from "@/lib/admin";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
@@ -30,8 +32,10 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
   const { portfolios, currentPortfolio, setCurrentPortfolio, isReadOnly } = usePortfolio();
+  const userEmail = user?.emailAddresses?.[0]?.emailAddress;
+  const isAdmin = isAdminEmail(userEmail);
   const [open, setOpen] = useState(false);
   const [portfolioDropdownOpen, setPortfolioDropdownOpen] = useState(false);
 
@@ -125,6 +129,20 @@ export default function Sidebar() {
                 </Link>
               );
             })}
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className={clsx(
+                "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium",
+                pathname === "/admin"
+                  ? "bg-accent-muted text-accent-hover"
+                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+              )}
+            >
+              <Shield className="w-5 h-5" />
+              Admin
+            </Link>
+          )}
         </nav>
 
         {/* Portfolio Switcher */}

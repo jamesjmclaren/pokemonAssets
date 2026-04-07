@@ -151,7 +151,6 @@ export default function JoinPage() {
   const [formName, setFormName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [dob, setDob] = useState("");
-  const [profile, setProfile] = useState("");
   const [interests, setInterests] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -171,7 +170,6 @@ export default function JoinPage() {
           name: formName.trim(),
           whatsapp: whatsapp.trim(),
           dob: dob.trim(),
-          profile: profile.trim(),
           interests: interests.trim(),
         }),
       });
@@ -428,23 +426,6 @@ export default function JoinPage() {
                     value={dob}
                     onChange={(e) => setDob(e.target.value)}
                     className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="profile"
-                    className="block text-xs text-text-muted uppercase tracking-widest mb-2"
-                    style={{ fontFamily: "Inter, sans-serif" }}
-                  >
-                    Profile
-                  </label>
-                  <textarea
-                    id="profile"
-                    value={profile}
-                    onChange={(e) => setProfile(e.target.value)}
-                    placeholder="Tell us a bit about yourself"
-                    rows={3}
-                    className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 resize-none"
                   />
                 </div>
                 <div>
