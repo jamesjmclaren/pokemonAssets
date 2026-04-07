@@ -61,10 +61,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data || []);
   } catch (error) {
     console.error("Assets fetch error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch assets" },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Failed to fetch assets";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -140,38 +143,55 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data, error } = await supabase
+    // Build the insert payload with required fields
+    const insertPayload: Record<string, unknown> = {
+      portfolio_id,
+      external_id,
+      name,
+      set_name: set_name || "",
+      asset_type: asset_type || "card",
+      image_url: image_url || null,
+      custom_image_url: custom_image_url || null,
+      purchase_price: parseFloat(purchase_price),
+      purchase_date,
+      purchase_location: purchase_location || "",
+      condition: condition || "Near Mint",
+      notes: notes || null,
+      current_price: current_price ? parseFloat(current_price) : null,
+      price_updated_at: current_price ? new Date().toISOString() : null,
+      rarity: rarity || null,
+      card_number: card_number || null,
+      psa_grade: psa_grade || null,
+      manual_price: manual_price || false,
+      quantity: quantity ? parseInt(quantity) : 1,
+      language: language || "English",
+      storage_location: storage_location || "",
+      is_manual_submission: is_manual_submission || false,
+      pc_product_id: pc_product_id || null,
+      pc_url: pc_url || null,
+      pc_grade_field: pc_grade_field || null,
+      evidence_url: evidence_url || null,
+    };
+
+    let { data, error } = await supabase
       .from("assets")
-      .insert({
-        portfolio_id,
-        external_id,
-        name,
-        set_name: set_name || "",
-        asset_type: asset_type || "card",
-        image_url: image_url || null,
-        custom_image_url: custom_image_url || null,
-        purchase_price: parseFloat(purchase_price),
-        purchase_date,
-        purchase_location: purchase_location || "",
-        condition: condition || "Near Mint",
-        notes: notes || null,
-        current_price: current_price ? parseFloat(current_price) : null,
-        price_updated_at: current_price ? new Date().toISOString() : null,
-        rarity: rarity || null,
-        card_number: card_number || null,
-        psa_grade: psa_grade || null,
-        manual_price: manual_price || false,
-        quantity: quantity ? parseInt(quantity) : 1,
-        language: language || "English",
-        storage_location: storage_location || "",
-        is_manual_submission: is_manual_submission || false,
-        pc_product_id: pc_product_id || null,
-        pc_url: pc_url || null,
-        pc_grade_field: pc_grade_field || null,
-        evidence_url: evidence_url || null,
-      })
+      .insert(insertPayload)
       .select()
       .single();
+
+    // If a column doesn't exist yet (migration not applied), retry without it
+    if (error && error.code === "PGRST204" && error.message) {
+      const match = error.message.match(/Could not find the '(\w+)' column/);
+      if (match) {
+        const missingCol = match[1];
+        delete insertPayload[missingCol];
+        ({ data, error } = await supabase
+          .from("assets")
+          .insert(insertPayload)
+          .select()
+          .single());
+      }
+    }
 
     if (error) throw error;
 
@@ -187,10 +207,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
     console.error("Asset creation error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create asset" },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Failed to create asset";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -347,10 +370,13 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Asset update error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update asset" },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Failed to update asset";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -368,9 +394,12 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Asset deletion error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete asset" },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Failed to delete asset";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
