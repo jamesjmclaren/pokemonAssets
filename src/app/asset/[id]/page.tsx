@@ -1114,7 +1114,7 @@ export default function AssetDetailPage({
                     Market Price
                   </p>
                 )}
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <p className={clsx(
                     "text-base md:text-xl font-bold",
                     stale ? "text-danger" : asset.manual_price ? "text-warning" : "text-text-primary"
@@ -1172,10 +1172,10 @@ export default function AssetDetailPage({
                   ) : (
                     <Minus className="w-4 h-4 md:w-5 md:h-5 text-text-secondary flex-shrink-0" />
                   )}
-                  <div>
-                    <span
+                  <div className="min-w-0">
+                    <p
                       className={clsx(
-                        "text-base md:text-xl font-bold",
+                        "text-base md:text-xl font-bold truncate",
                         profit > 0 && "text-success",
                         profit < 0 && "text-danger",
                         profit === 0 && "text-text-secondary"
@@ -1183,17 +1183,17 @@ export default function AssetDetailPage({
                     >
                       {profit >= 0 ? "+" : ""}
                       {formatCurrency(profit)}
-                    </span>
-                    <span
+                    </p>
+                    <p
                       className={clsx(
-                        "text-xs md:text-sm ml-1",
+                        "text-xs md:text-sm",
                         profit > 0 && "text-success",
                         profit < 0 && "text-danger",
                         profit === 0 && "text-text-secondary"
                       )}
                     >
                       ({formatPercentage(profitPercent)})
-                    </span>
+                    </p>
                   </div>
                 </div>
               </div>
