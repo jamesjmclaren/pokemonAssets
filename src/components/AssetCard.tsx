@@ -60,31 +60,7 @@ export default function AssetCard({ asset }: AssetCardProps) {
                 <div className="text-text-muted text-xs md:text-sm">No Image</div>
               </div>
             )}
-            {/* Badges - hidden on mobile row, shown on desktop */}
-            <div className="absolute top-2 left-2 hidden md:flex gap-1">
-              <span
-                className={clsx(
-                  "px-2 py-1 rounded-lg text-xs font-semibold",
-                  asset.asset_type === "card"
-                    ? "bg-accent-muted text-accent-hover"
-                    : "bg-warning-muted text-warning"
-                )}
-              >
-                {asset.asset_type === "card" ? "Card" : "Sealed"}
-              </span>
-              {asset.psa_grade && (
-                <span className="px-2 py-1 rounded-lg text-xs font-semibold bg-gold/20 text-gold">
-                  {asset.psa_grade}
-                </span>
-              )}
-            </div>
-            {qty > 1 && (
-              <div className="absolute top-2 right-2 hidden md:block">
-                <span className="px-2 py-1 rounded-lg text-xs font-bold bg-surface/80 text-text-primary backdrop-blur-sm">
-                  x{qty}
-                </span>
-              </div>
-            )}
+            {/* Badges moved to info section to prevent overlap */}
             {asset.manual_price && (
               <div className="absolute bottom-2 right-2 hidden md:block">
                 <PenLine className="w-4 h-4 text-warning" />
@@ -103,11 +79,11 @@ export default function AssetCard({ asset }: AssetCardProps) {
                   {asset.set_name}
                 </p>
               </div>
-              {/* Mobile badges */}
-              <div className="md:hidden flex gap-1 flex-shrink-0">
+              {/* Badges */}
+              <div className="flex gap-1 flex-shrink-0 md:mt-1.5">
                 <span
                   className={clsx(
-                    "px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                    "px-1.5 py-0.5 md:px-2 md:py-1 rounded md:rounded-lg text-[10px] md:text-xs font-semibold",
                     asset.asset_type === "card"
                       ? "bg-accent-muted text-accent-hover"
                       : "bg-warning-muted text-warning"
@@ -115,8 +91,13 @@ export default function AssetCard({ asset }: AssetCardProps) {
                 >
                   {asset.asset_type === "card" ? "Card" : "Sealed"}
                 </span>
+                {asset.psa_grade && (
+                  <span className="px-1.5 py-0.5 md:px-2 md:py-1 rounded md:rounded-lg text-[10px] md:text-xs font-semibold bg-gold/20 text-gold">
+                    {asset.psa_grade}
+                  </span>
+                )}
                 {qty > 1 && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-hover text-text-secondary">
+                  <span className="px-1.5 py-0.5 md:px-2 md:py-1 rounded md:rounded-lg text-[10px] md:text-xs font-semibold bg-surface-hover text-text-secondary">
                     x{qty}
                   </span>
                 )}
