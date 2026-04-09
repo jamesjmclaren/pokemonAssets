@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, whatsapp, dob, profile, interests } = await req.json();
+    const { name, whatsapp, dob, profile, interests, referral } = await req.json();
 
     if (!name?.trim() || !whatsapp?.trim() || !dob?.trim()) {
       return NextResponse.json(
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
           <p><strong>Date of Birth:</strong> ${dob}</p>
           <p><strong>Profile:</strong> ${profile || "Not provided"}</p>
           <p><strong>Interests:</strong> ${interests || "Not provided"}</p>
+          <p><strong>Referral:</strong> ${referral || "None"}</p>
           <p><strong>Submitted:</strong> ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</p>
         `,
       }),

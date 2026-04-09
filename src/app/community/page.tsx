@@ -153,6 +153,7 @@ export default function JoinPage() {
   const [dob, setDob] = useState("");
   const [profile, setProfile] = useState("");
   const [interests, setInterests] = useState("");
+  const [referral, setReferral] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -173,6 +174,7 @@ export default function JoinPage() {
           dob: dob.trim(),
           profile: profile.trim(),
           interests: interests.trim(),
+          referral: referral.trim(),
         }),
       });
 
@@ -251,7 +253,7 @@ export default function JoinPage() {
               fontFamily: "Inter, sans-serif",
             }}
           >
-            Join West Investments
+            Join the Collectibles Community
           </h1>
           <p
             className="text-text-secondary text-lg md:text-xl leading-relaxed max-w-2xl mx-auto landing-fade-up"
@@ -361,7 +363,10 @@ export default function JoinPage() {
                 Subscribe
               </h3>
               <p className="text-text-secondary text-sm">
-                Join our collectibles club and get instant access to all membership benefits.
+                Join our collectibles community and get instant access to all membership benefits.
+              </p>
+              <p className="text-accent font-medium text-sm mt-2">
+                £270 per year
               </p>
             </div>
 
@@ -461,6 +466,24 @@ export default function JoinPage() {
                     value={interests}
                     onChange={(e) => setInterests(e.target.value)}
                     placeholder="e.g. Pokémon, Comics, Sports Cards"
+                    className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="referral"
+                    className="block text-xs text-text-muted uppercase tracking-widest mb-2"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    Referral Name{" "}
+                    <span className="normal-case tracking-normal text-text-muted/60">(optional)</span>
+                  </label>
+                  <input
+                    id="referral"
+                    type="text"
+                    value={referral}
+                    onChange={(e) => setReferral(e.target.value)}
+                    placeholder="Who referred you?"
                     className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
                   />
                 </div>
