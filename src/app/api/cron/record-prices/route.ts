@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { searchCards, searchSealedProducts } from "@/lib/pokemon-api";
+import { searchCards, searchSealedProducts, fetchPoketracePrice } from "@/lib/pokemon-api";
 import { extractCardPrice } from "@/lib/format";
-import { fetchTetheredPrice } from "@/lib/pricecharting";
 
 // This endpoint is designed to be called by a cron job (e.g., Vercel Cron)
-// It records daily price snapshots for ALL assets and refreshes stale API prices.
+// It records daily price snapshots for ALL assets and refreshes stale prices via Poketrace.
 
 export async function GET(request: NextRequest) {
   // Verify cron secret if configured
@@ -19,10 +18,10 @@ export async function GET(request: NextRequest) {
   console.log("[cron] ===== Daily price recording started =====");
 
   try {
-    // Fetch all assets (including PriceCharting tether fields)
+    // Fetch all assets
     const { data: assets, error } = await supabase
       .from("assets")
-      .select("id, external_id, name, asset_type, price_updated_at, manual_price, current_price, pc_product_id, pc_url, pc_grade_field");
+      .select("id, external_id, name, asset_type, price_updated_at, manual_price, current_price, poketrace_id, poketrace_market, psa_grade");
 
     if (error) {
       console.error("[cron] Failed to fetch assets from database:", error.message);
@@ -35,23 +34,22 @@ export async function GET(request: NextRequest) {
 
     console.log(`[cron] Fetched ${assets.length} total assets from database`);
 
-    const tetheredCount = assets.filter((a) => a.pc_url).length;
+    const poketraceLinked = assets.filter((a) => a.poketrace_id).length;
     const manualCount = assets.filter((a) => a.manual_price).length;
     const sealedCount = assets.filter((a) => a.asset_type === "sealed").length;
     const cardCount = assets.filter((a) => a.asset_type !== "sealed").length;
-    console.log(`[cron] Breakdown: ${cardCount} cards, ${sealedCount} sealed, ${manualCount} manual, ${tetheredCount} PriceCharting-tethered`);
+    console.log(`[cron] Breakdown: ${cardCount} cards, ${sealedCount} sealed, ${manualCount} manual, ${poketraceLinked} Poketrace-linked`);
 
     let apiUpdated = 0;
-    let tetheredUpdated = 0;
+    let poketraceUpdated = 0;
     let snapshotsRecorded = 0;
 
-    // Step 1: Refresh stale API prices
-    // Skip manual_price UNLESS the asset has a PriceCharting tether (pc_url)
+    // Step 1: Refresh stale prices
     const now = Date.now();
     const staleMs = 24 * 60 * 60 * 1000;
 
     const staleApiAssets = assets.filter((a) => {
-      if (a.manual_price && !a.pc_url) return false;
+      if (a.manual_price && !a.poketrace_id) return false;
       if (!a.price_updated_at) return true;
       return now - new Date(a.price_updated_at).getTime() > staleMs;
     });
@@ -67,48 +65,45 @@ export async function GET(request: NextRequest) {
 
       try {
         let marketPrice: number | null = null;
-        let priceSource = asset.asset_type === "sealed" ? "pokemonpricetracker" : "tcgplayer";
+        let isConverted = false;
+        let exchangeRate: number | undefined;
+        const priceSource = "poketrace";
 
-        // Tethered assets → fetch price from PriceCharting first
-        if (asset.pc_url) {
+        // Poketrace direct lookup (if linked)
+        if (asset.poketrace_id) {
           try {
-            console.log(`[cron]   Fetching PriceCharting tethered price for "${asset.name}" (grade: ${asset.pc_grade_field || "ungraded"}, url: ${asset.pc_url})`);
-            if (tetheredUpdated > 0) await new Promise((r) => setTimeout(r, 500));
-            const tetheredPrice = await fetchTetheredPrice(
-              asset.pc_url,
-              asset.pc_grade_field || undefined
+            console.log(`[cron]   Fetching Poketrace price for "${asset.name}" (id: ${asset.poketrace_id})`);
+            const result = await fetchPoketracePrice(
+              asset.poketrace_id,
+              asset.psa_grade || undefined
             );
-            if (tetheredPrice != null) {
-              marketPrice = tetheredPrice;
-              priceSource = "pricecharting";
-              console.log(`[cron]   ✓ PriceCharting price for "${asset.name}": $${tetheredPrice}`);
+            if (result) {
+              marketPrice = result.price;
+              isConverted = result.isConverted;
+              exchangeRate = result.rate;
+              console.log(`[cron]   ✓ Poketrace: $${result.price}${result.isConverted ? " (EUR→USD)" : ""}`);
             } else {
-              console.warn(`[cron]   ✗ PriceCharting returned null for "${asset.name}" — will fall back to API`);
+              console.warn(`[cron]   ✗ Poketrace returned null for "${asset.name}" — falling back to search`);
             }
           } catch (e) {
-            console.warn(`[cron]   ✗ PriceCharting tether failed for "${asset.name}":`, e instanceof Error ? e.message : e);
+            console.warn(`[cron]   ✗ Poketrace lookup failed for "${asset.name}":`, e instanceof Error ? e.message : e);
           }
         }
 
-        // Fallback to JustTCG / PokemonPriceTracker if no tethered price
+        // Fallback to name search
         if (marketPrice == null) {
           let results: Record<string, unknown>[];
 
           if (asset.asset_type === "sealed") {
-            console.log(`[cron]   Fetching sealed price from PokemonPriceTracker for "${asset.name}"`);
-            try {
-              results = (await searchSealedProducts(asset.name, undefined, 5)) as unknown as Record<string, unknown>[];
-            } catch {
-              console.warn(`[cron]   PokemonPriceTracker failed for "${asset.name}", falling back to JustTCG`);
-              results = (await searchCards(asset.name, undefined, 5)) as unknown as Record<string, unknown>[];
-            }
+            console.log(`[cron]   Searching Poketrace sealed for "${asset.name}"`);
+            results = (await searchSealedProducts(asset.name, undefined, 5)) as unknown as Record<string, unknown>[];
           } else {
-            console.log(`[cron]   Fetching card price from JustTCG for "${asset.name}"`);
+            console.log(`[cron]   Searching Poketrace cards for "${asset.name}"`);
             results = (await searchCards(asset.name, undefined, 5)) as unknown as Record<string, unknown>[];
           }
 
           if (results.length === 0) {
-            console.warn(`[cron]   ✗ No API results for "${asset.name}" — skipping`);
+            console.warn(`[cron]   ✗ No results for "${asset.name}" — skipping`);
             continue;
           }
 
@@ -120,7 +115,7 @@ export async function GET(request: NextRequest) {
 
           marketPrice = extractCardPrice(match);
           if (marketPrice != null) {
-            console.log(`[cron]   ✓ API price for "${asset.name}": $${marketPrice} (source: ${priceSource})`);
+            console.log(`[cron]   ✓ Poketrace search: $${marketPrice} for "${asset.name}"`);
           }
         }
 
@@ -143,13 +138,13 @@ export async function GET(request: NextRequest) {
           .update({
             current_price: marketPrice,
             price_updated_at: new Date().toISOString(),
+            price_currency: "USD",
+            is_converted_price: isConverted,
           })
           .eq("id", asset.id);
 
         if (!updateError) {
-          if (priceSource === "pricecharting") {
-            tetheredUpdated++;
-          }
+          if (asset.poketrace_id) poketraceUpdated++;
           apiUpdated++;
           // Update the local reference for snapshot recording
           asset.current_price = marketPrice;
@@ -161,7 +156,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`[cron] Step 1 complete: ${apiUpdated} prices refreshed (${tetheredUpdated} from PriceCharting)`);
+    console.log(`[cron] Step 1 complete: ${apiUpdated} prices refreshed (${poketraceUpdated} via Poketrace ID)`);
 
     // Step 2: Record daily price snapshots for ALL assets that have a current price
     console.log("[cron] Step 2: Recording daily price snapshots...");
@@ -171,18 +166,13 @@ export async function GET(request: NextRequest) {
       if (price == null) continue;
 
       try {
-        const source = asset.pc_url
-          ? "pricecharting"
-          : asset.manual_price
-            ? "manual"
-            : asset.asset_type === "sealed"
-              ? "pokemonpricetracker"
-              : "tcgplayer";
+        const source = asset.manual_price ? "manual" : "poketrace";
 
         const { error: snapError } = await supabase.from("price_snapshots").insert({
           asset_id: asset.id,
           price,
           source,
+          currency: "USD",
         });
 
         if (!snapError) {
@@ -197,13 +187,13 @@ export async function GET(request: NextRequest) {
 
     console.log(`[cron] Step 2 complete: ${snapshotsRecorded} snapshots recorded`);
     console.log(`[cron] ===== Daily price recording finished =====`);
-    console.log(`[cron] Summary: ${assets.length} total | ${apiUpdated} refreshed (${tetheredUpdated} tethered) | ${snapshotsRecorded} snapshots`);
+    console.log(`[cron] Summary: ${assets.length} total | ${apiUpdated} refreshed (${poketraceUpdated} via ID) | ${snapshotsRecorded} snapshots`);
 
     return NextResponse.json({
       message: "Daily price recording complete",
       total_assets: assets.length,
       api_prices_refreshed: apiUpdated,
-      tethered_prices_refreshed: tetheredUpdated,
+      poketrace_prices_refreshed: poketraceUpdated,
       snapshots_recorded: snapshotsRecorded,
       timestamp: new Date().toISOString(),
     });

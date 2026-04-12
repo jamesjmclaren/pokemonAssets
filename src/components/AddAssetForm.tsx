@@ -94,9 +94,11 @@ export default function AddAssetForm() {
     id: string;
     name: string;
     setName: string;
-    url: string;
+    poketraceId: string;
+    poketraceMarket: string;
     imageUrl?: string;
     currency: string;
+    rawPrice?: number | null;
     prices: {
       ungraded?: number;
       grade7?: number;
@@ -193,16 +195,16 @@ export default function AddAssetForm() {
     setTetherSearchQuery("");
   };
 
-  // Search PriceCharting for tether candidates
+  // Search Poketrace for tether candidates
   const searchTether = useCallback(async (query: string) => {
     if (!query.trim()) return;
     setTetherLoading(true);
     setSelectedTether(null);
     try {
       const res = await fetch(
-        `/api/pricecharting-search?q=${encodeURIComponent(query)}`
+        `/api/graded-search?q=${encodeURIComponent(query)}`
       );
-      if (!res.ok) throw new Error("Failed to search PriceCharting");
+      if (!res.ok) throw new Error("Failed to search Poketrace");
       const data = await res.json();
       setTetherCandidates(data.candidates || []);
     } catch (error) {
@@ -326,9 +328,8 @@ export default function AddAssetForm() {
           language: form.language,
           storage_location: form.storageLocation,
           is_manual_submission: isManualSubmission,
-          pc_product_id: selectedTether?.id || null,
-          pc_url: selectedTether?.url || null,
-          pc_grade_field: hasTether ? getTetherGradeField() : null,
+          poketrace_id: selectedTether?.poketraceId || (selectedCard as unknown as Record<string, unknown>)?.poketraceId || null,
+          poketrace_market: selectedTether?.poketraceMarket || (selectedCard as unknown as Record<string, unknown>)?.poketraceMarket || "US",
         }),
       });
 
@@ -654,17 +655,17 @@ export default function AddAssetForm() {
                 </div>
               )}
 
-              {/* PriceCharting Tether - show for manual submissions or graded API cards */}
+              {/* Poketrace Tether - show for manual submissions or graded API cards */}
               {(isManualSubmission || (selectedCard && form.psaGrade)) && (
                 <div className="bg-surface-hover border border-border rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Link2 className="w-4 h-4 text-accent" />
                     <span className="text-sm font-medium text-text-primary">
-                      Tether to PriceCharting
+                      Link to Poketrace
                     </span>
                   </div>
                   <p className="text-xs text-text-muted mb-3">
-                    Link this asset to a PriceCharting listing for automatic price updates from eBay sold data.
+                    Link this asset to a Poketrace listing for automatic price updates from TCGPlayer and eBay data.
                   </p>
 
                   {/* Search input */}
@@ -680,7 +681,7 @@ export default function AddAssetForm() {
                         }
                       }}
                       className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
-                      placeholder="Search PriceCharting..."
+                      placeholder="Search Poketrace..."
                     />
                     <button
                       type="button"
@@ -701,7 +702,7 @@ export default function AddAssetForm() {
                   {tetherLoading && (
                     <div className="flex items-center gap-2 text-xs text-text-muted py-2">
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      Searching PriceCharting…
+                      Searching Poketrace…
                     </div>
                   )}
 
@@ -810,7 +811,7 @@ export default function AddAssetForm() {
                         )}
                       </div>
                       <p className="text-[10px] text-text-muted mt-1">
-                        Prices from PriceCharting (eBay sold data, USD) · Price will auto-refresh daily
+                        Prices from Poketrace (TCGPlayer + eBay data, USD) · Price will auto-refresh daily
                       </p>
                       <button
                         type="button"
@@ -820,7 +821,7 @@ export default function AddAssetForm() {
                         }}
                         className="text-[10px] text-danger hover:text-danger mt-1"
                       >
-                        Remove tether
+                        Remove link
                       </button>
                     </div>
                   )}

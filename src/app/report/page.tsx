@@ -29,10 +29,10 @@ function getEvidenceLink(asset: PortfolioAsset): {
   url: string | null;
   color: string;
 } {
-  if (asset.pc_url) {
+  if (asset.poketrace_id) {
     return {
-      label: "PriceCharting",
-      url: asset.pc_url,
+      label: "Poketrace",
+      url: `https://poketrace.com/card/${asset.poketrace_id}`,
       color: "text-blue-400 bg-blue-500/10",
     };
   }
@@ -445,6 +445,39 @@ export default function ReportPage() {
         drawTopList("Top 5 Losers", topLosers, red, "▼");
       }
 
+      // -- Currency Notes --
+      const convertedAssets = filteredAssets.filter((a) => a.is_converted_price);
+      if (convertedAssets.length > 0) {
+        if (y > 260) {
+          pdf.addPage();
+          y = margin;
+        }
+        y += 4;
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(100, 180, 255);
+        pdf.text("Currency Notes", margin, y + 4);
+        y += 8;
+        pdf.setFontSize(7);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(...grey);
+        pdf.text("Prices converted from EUR to USD at time of last update. Values are approximate.", margin, y + 3);
+        y += 6;
+        convertedAssets.forEach((a) => {
+          if (y > 280) {
+            pdf.addPage();
+            y = margin;
+          }
+          pdf.setTextColor(...grey);
+          pdf.text(`• ${a.name}`, margin + 2, y + 3);
+          const priceStr = `${formatCurrency(a.current_price ?? 0)} ~USD`;
+          pdf.setTextColor(100, 180, 255);
+          pdf.text(priceStr, pageW - margin, y + 3, { align: "right" });
+          y += 5;
+        });
+        y += 4;
+      }
+
       // -- Footer on last page --
       pdf.setFontSize(7);
       pdf.setTextColor(...grey);
@@ -484,6 +517,15 @@ export default function ReportPage() {
     });
     csvRows.push("");
     csvRows.push(["", "", "", "Totals", "", "", "", totalInvested.toFixed(2), currentValue.toFixed(2), totalProfit.toFixed(2), profitPercent.toFixed(2), ""].join(","));
+
+    const convertedCsv = filteredAssets.filter((a) => a.is_converted_price);
+    if (convertedCsv.length > 0) {
+      csvRows.push("");
+      csvRows.push("Currency Notes: The following prices were converted from EUR to USD");
+      convertedCsv.forEach((a) => {
+        csvRows.push(`"${a.name.replace(/"/g, '""')}",${(a.current_price ?? 0).toFixed(2)},~USD`);
+      });
+    }
 
     const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -1197,6 +1239,30 @@ export default function ReportPage() {
                   </tr>
                 </tfoot>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Currency Notes */}
+        {filteredAssets.some((a) => a.is_converted_price) && (
+          <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 md:p-6">
+            <h2 className="text-sm font-semibold text-blue-400 mb-2">
+              Currency Notes
+            </h2>
+            <p className="text-xs text-text-muted mb-3">
+              The following assets have prices converted from EUR to USD. Converted values are approximate and based on the exchange rate at time of last price update.
+            </p>
+            <div className="space-y-1">
+              {filteredAssets
+                .filter((a) => a.is_converted_price)
+                .map((a) => (
+                  <div key={a.id} className="flex items-center justify-between text-xs">
+                    <span className="text-text-secondary truncate max-w-[60%]">{a.name}</span>
+                    <span className="text-blue-400 font-medium">
+                      {formatCurrency(a.current_price ?? 0)} ~USD
+                    </span>
+                  </div>
+                ))}
             </div>
           </div>
         )}

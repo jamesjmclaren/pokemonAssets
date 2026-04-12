@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { searchCards, searchSealedProducts } from "@/lib/pokemon-api";
+import { searchCards, searchSealedProducts, fetchPoketracePrice } from "@/lib/pokemon-api";
 import { extractCardPrice } from "@/lib/format";
-import { fetchTetheredPrice } from "@/lib/pricecharting";
 
 const STALE_HOURS = 24;
 
@@ -12,7 +11,7 @@ export async function POST() {
   try {
     const { data: assets, error } = await supabase
       .from("assets")
-      .select("id, external_id, name, asset_type, price_updated_at, manual_price, pc_product_id, pc_url, pc_grade_field, current_price");
+      .select("id, external_id, name, asset_type, price_updated_at, manual_price, current_price, poketrace_id, poketrace_market, psa_grade");
 
     if (error) {
       console.error("[refresh-prices] Failed to fetch assets:", error.message);
@@ -25,16 +24,16 @@ export async function POST() {
 
     console.log(`[refresh-prices] Fetched ${assets.length} total assets`);
 
-    const tetheredCount = assets.filter((a) => a.pc_url).length;
+    const poketraceLinked = assets.filter((a) => a.poketrace_id).length;
     const manualCount = assets.filter((a) => a.manual_price).length;
-    console.log(`[refresh-prices] Breakdown: ${manualCount} manual, ${tetheredCount} PriceCharting-tethered`);
+    console.log(`[refresh-prices] Breakdown: ${manualCount} manual, ${poketraceLinked} Poketrace-linked`);
 
     const now = Date.now();
     const staleMs = STALE_HOURS * 60 * 60 * 1000;
 
-    // Refresh stale assets. Skip manual_price UNLESS they have a PriceCharting tether.
+    // Refresh stale assets. Skip manual_price UNLESS they have a Poketrace link.
     const staleAssets = assets.filter((a) => {
-      if (a.manual_price && !a.pc_url) return false;
+      if (a.manual_price && !a.poketrace_id) return false;
       if (!a.price_updated_at) return true;
       return now - new Date(a.price_updated_at).getTime() > staleMs;
     });
@@ -47,7 +46,7 @@ export async function POST() {
     }
 
     let updated = 0;
-    let tetheredUpdated = 0;
+    let poketraceUpdated = 0;
 
     for (const asset of staleAssets) {
       if (!asset.name) {
@@ -57,60 +56,45 @@ export async function POST() {
 
       try {
         let marketPrice: number | null = null;
-        let priceSource = asset.asset_type === "sealed" ? "pokemonpricetracker" : "tcgplayer";
+        let isConverted = false;
+        let exchangeRate: number | undefined;
+        const priceSource = "poketrace";
 
-        // Tethered assets → fetch price from PriceCharting (with delay to avoid 429)
-        if (asset.pc_url) {
+        // Poketrace direct lookup (if linked)
+        if (asset.poketrace_id) {
           try {
-            console.log(`[refresh-prices]   Fetching PriceCharting tethered price for "${asset.name}" (grade: ${asset.pc_grade_field || "ungraded"}, url: ${asset.pc_url})`);
-            if (updated > 0) await new Promise((r) => setTimeout(r, 500));
-            const tetheredPrice = await fetchTetheredPrice(
-              asset.pc_url,
-              asset.pc_grade_field || undefined
+            console.log(`[refresh-prices]   Fetching Poketrace price for "${asset.name}" (id: ${asset.poketrace_id})`);
+            const result = await fetchPoketracePrice(
+              asset.poketrace_id,
+              asset.psa_grade || undefined
             );
-            if (tetheredPrice != null) {
-              marketPrice = tetheredPrice;
-              priceSource = "pricecharting";
-              console.log(`[refresh-prices]   ✓ PriceCharting price for "${asset.name}": $${tetheredPrice}`);
+            if (result) {
+              marketPrice = result.price;
+              isConverted = result.isConverted;
+              exchangeRate = result.rate;
+              console.log(`[refresh-prices]   ✓ Poketrace: $${result.price}${result.isConverted ? " (EUR→USD)" : ""}`);
             } else {
-              console.warn(`[refresh-prices]   ✗ PriceCharting returned null for "${asset.name}" — will fall back to API`);
+              console.warn(`[refresh-prices]   ✗ Poketrace returned null for "${asset.name}" — falling back to search`);
             }
           } catch (e) {
-            console.warn(`[refresh-prices]   ✗ PriceCharting tether failed for "${asset.name}":`, e instanceof Error ? e.message : e);
+            console.warn(`[refresh-prices]   ✗ Poketrace lookup failed for "${asset.name}":`, e instanceof Error ? e.message : e);
           }
         }
 
-        // Fallback to JustTCG / PokemonPriceTracker for non-tethered assets
+        // Fallback to name search via Poketrace
         if (marketPrice == null) {
           let results: Record<string, unknown>[];
 
           if (asset.asset_type === "sealed") {
-            console.log(`[refresh-prices]   Fetching sealed price from PokemonPriceTracker for "${asset.name}"`);
-            try {
-              results = (await searchSealedProducts(
-                asset.name,
-                undefined,
-                5
-              )) as unknown as Record<string, unknown>[];
-            } catch {
-              console.warn(`[refresh-prices]   PokemonPriceTracker failed for "${asset.name}", falling back to JustTCG`);
-              results = (await searchCards(
-                asset.name,
-                undefined,
-                5
-              )) as unknown as Record<string, unknown>[];
-            }
+            console.log(`[refresh-prices]   Searching Poketrace sealed for "${asset.name}"`);
+            results = (await searchSealedProducts(asset.name, undefined, 5)) as unknown as Record<string, unknown>[];
           } else {
-            console.log(`[refresh-prices]   Fetching card price from JustTCG for "${asset.name}"`);
-            results = (await searchCards(
-              asset.name,
-              undefined,
-              5
-            )) as unknown as Record<string, unknown>[];
+            console.log(`[refresh-prices]   Searching Poketrace cards for "${asset.name}"`);
+            results = (await searchCards(asset.name, undefined, 5)) as unknown as Record<string, unknown>[];
           }
 
           if (results.length === 0) {
-            console.warn(`[refresh-prices]   ✗ No API results for "${asset.name}" — skipping`);
+            console.warn(`[refresh-prices]   ✗ No results for "${asset.name}" — skipping`);
             continue;
           }
 
@@ -126,12 +110,12 @@ export async function POST() {
 
           marketPrice = extractCardPrice(match);
           if (marketPrice != null) {
-            console.log(`[refresh-prices]   ✓ API price for "${asset.name}": $${marketPrice} (source: ${priceSource})`);
+            console.log(`[refresh-prices]   ✓ Poketrace search: $${marketPrice} for "${asset.name}"`);
           }
         }
 
         if (marketPrice == null) {
-          console.warn(`[refresh-prices]   ✗ No price found for "${asset.name}" from any source — skipping`);
+          console.warn(`[refresh-prices]   ✗ No price found for "${asset.name}" — skipping`);
           continue;
         }
 
@@ -149,17 +133,22 @@ export async function POST() {
           .update({
             current_price: marketPrice,
             price_updated_at: new Date().toISOString(),
+            price_currency: "USD",
+            is_converted_price: isConverted,
           })
           .eq("id", asset.id);
 
         if (!updateError) {
           updated++;
-          if (priceSource === "pricecharting") tetheredUpdated++;
+          if (asset.poketrace_id) poketraceUpdated++;
 
           const { error: snapError } = await supabase.from("price_snapshots").insert({
             asset_id: asset.id,
             price: marketPrice,
             source: priceSource,
+            currency: "USD",
+            is_converted: isConverted,
+            exchange_rate: exchangeRate || null,
           });
           if (snapError) {
             console.error(`[refresh-prices]   ✗ Snapshot insert failed for "${asset.name}":`, snapError.message);
@@ -172,37 +161,31 @@ export async function POST() {
       }
     }
 
-    console.log(`[refresh-prices] Stale refresh complete: ${updated} updated (${tetheredUpdated} from PriceCharting)`);
+    console.log(`[refresh-prices] Stale refresh complete: ${updated} updated (${poketraceUpdated} via Poketrace ID)`);
 
-    // Record daily price snapshots for ALL assets that have a current price
-    // This builds pricing history even when the price hasn't changed
-    const assetsWithPrices = assets.filter((a) => !staleAssets.some((s) => s.id === a.id));
+    // Record daily price snapshots for non-stale assets
+    const freshAssets = assets.filter((a) => !staleAssets.some((s) => s.id === a.id));
     let snapshotsRecorded = 0;
 
-    console.log(`[refresh-prices] Recording snapshots for ${assetsWithPrices.length} non-stale assets...`);
+    console.log(`[refresh-prices] Recording snapshots for ${freshAssets.length} non-stale assets...`);
 
-    for (const asset of assetsWithPrices) {
+    for (const asset of freshAssets) {
       try {
-        // Fetch the current_price for this asset
         const { data: fullAsset } = await supabase
           .from("assets")
-          .select("current_price")
+          .select("current_price, is_converted_price")
           .eq("id", asset.id)
           .single();
 
         if (fullAsset?.current_price != null) {
-          const source = asset.pc_url
-            ? "pricecharting"
-            : asset.manual_price
-              ? "manual"
-              : asset.asset_type === "sealed"
-                ? "pokemonpricetracker"
-                : "tcgplayer";
+          const source = asset.manual_price ? "manual" : "poketrace";
 
           const { error: snapError } = await supabase.from("price_snapshots").insert({
             asset_id: asset.id,
             price: fullAsset.current_price,
             source,
+            currency: "USD",
+            is_converted: fullAsset.is_converted_price || false,
           });
           if (!snapError) snapshotsRecorded++;
         }
@@ -212,7 +195,7 @@ export async function POST() {
     }
 
     console.log(`[refresh-prices] ===== Manual price refresh finished =====`);
-    console.log(`[refresh-prices] Summary: ${updated} refreshed (${tetheredUpdated} tethered) | ${snapshotsRecorded + updated} total snapshots`);
+    console.log(`[refresh-prices] Summary: ${updated} refreshed (${poketraceUpdated} via ID) | ${snapshotsRecorded + updated} total snapshots`);
 
     return NextResponse.json({
       updated,

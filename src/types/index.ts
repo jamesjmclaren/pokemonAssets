@@ -45,6 +45,8 @@ export interface PriceHistoryPoint {
   date: string;
   price: number;
   source?: string;
+  currency?: string;
+  isConverted?: boolean;
 }
 
 export interface PortfolioAsset {
@@ -79,6 +81,11 @@ export interface PortfolioAsset {
   status?: 'ACTIVE' | 'SOLD';
   sell_price?: number | null;
   sell_date?: string | null;
+  // Poketrace fields
+  poketrace_id?: string | null;
+  poketrace_market?: string;
+  price_currency?: string;
+  is_converted_price?: boolean;
 }
 
 export interface PortfolioSummary {

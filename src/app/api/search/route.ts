@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Search using JustTCG (cards) + PokemonPriceTracker (sealed) via unified search
+    // Search using Poketrace via unified search
     const data = await searchAssets(query, (type as "card" | "sealed" | "all") || "all");
     return NextResponse.json(data);
   } catch (error) {
