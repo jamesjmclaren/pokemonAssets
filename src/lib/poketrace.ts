@@ -355,7 +355,19 @@ export interface NormalizedCard {
   set: string;
   imageUrl?: string;
   tcgplayerId: string | null;
-  prices?: { tcgplayer?: { market: number } };
+  prices?: {
+    tcgplayer?: { market: number };
+    raw?: number;
+    market?: number;
+    psa10?: number;
+    psa9?: number;
+    psa8?: number;
+    psa7?: number;
+    cgc10?: number;
+    cgc95?: number;
+    bgs10?: number;
+    bgs95?: number;
+  };
   marketPrice: number | null;
   type: "card" | "sealed";
   source: "poketrace";
@@ -373,6 +385,21 @@ function normalizeCard(card: PoketraceCard): NormalizedCard {
   const type = inferAssetType(card);
   const gradedPrices = extractAllGradedPrices(card);
 
+  // Map Poketrace tier keys to frontend-friendly price fields
+  const priceFields: NormalizedCard["prices"] = {
+    raw: price ?? undefined,
+    market: price ?? undefined,
+    tcgplayer: price != null ? { market: price } : undefined,
+    psa10: gradedPrices["PSA_10"] ?? undefined,
+    psa9: gradedPrices["PSA_9"] ?? undefined,
+    psa8: gradedPrices["PSA_8"] ?? undefined,
+    psa7: gradedPrices["PSA_7"] ?? undefined,
+    cgc10: gradedPrices["CGC_10"] ?? undefined,
+    cgc95: gradedPrices["CGC_9_5"] ?? undefined,
+    bgs10: gradedPrices["BGS_10"] ?? undefined,
+    bgs95: gradedPrices["BGS_9_5"] ?? undefined,
+  };
+
   return {
     id: card.id,
     name: card.name,
@@ -382,7 +409,7 @@ function normalizeCard(card: PoketraceCard): NormalizedCard {
     set: card.set?.slug || "",
     imageUrl: card.image || undefined,
     tcgplayerId: card.refs?.tcgplayerId || null,
-    prices: price != null ? { tcgplayer: { market: price } } : undefined,
+    prices: priceFields,
     marketPrice: price,
     type,
     source: "poketrace",

@@ -290,7 +290,23 @@ export default function AddAssetForm() {
       } else if (form.manualPrice && form.manualPriceValue) {
         currentPrice = parseFloat(form.manualPriceValue);
       } else if (selectedCard) {
-        currentPrice = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
+        // Use graded price if a grade is selected and the card has graded pricing
+        if (form.psaGrade && selectedCard.prices) {
+          const gradeMap: Record<string, keyof NonNullable<SelectedCard["prices"]>> = {
+            "PSA 10": "psa10",
+            "PSA 9": "psa9",
+            "CGC 10": "cgc10",
+            "BGS 10": "bgs10",
+          };
+          const priceKey = gradeMap[form.psaGrade];
+          if (priceKey && selectedCard.prices[priceKey]) {
+            currentPrice = selectedCard.prices[priceKey]!;
+          }
+        }
+        // Fall back to raw/market price
+        if (currentPrice == null) {
+          currentPrice = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
+        }
       }
 
       // Tethered assets should NOT be marked manual so the cron can auto-refresh

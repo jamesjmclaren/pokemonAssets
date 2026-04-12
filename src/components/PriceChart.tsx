@@ -105,6 +105,7 @@ export default function PriceChart({
   const maxPrice = Math.max(...prices) * 1.05;
   const currentPrice = prices[prices.length - 1];
   const startPrice = prices[0];
+  const pctChange = startPrice > 0 ? ((currentPrice - startPrice) / startPrice * 100) : 0;
   const isUp = currentPrice >= startPrice;
 
   return (
@@ -114,10 +115,10 @@ export default function PriceChart({
           <h3 className="text-sm font-semibold text-text-primary">
             Price History
           </h3>
-          <p className={`text-xs mt-1 ${isUp ? "text-success" : "text-danger"}`}>
-            {isUp ? "+" : ""}
-            {((currentPrice - startPrice) / startPrice * 100).toFixed(2)}% over{" "}
-            {range} days
+          <p className={`text-xs mt-1 ${data.length <= 1 ? "text-text-muted" : isUp ? "text-success" : "text-danger"}`}>
+            {data.length <= 1
+              ? "Tracking started — history will build over time"
+              : `${isUp ? "+" : ""}${pctChange.toFixed(2)}% over ${range} days`}
           </p>
         </div>
         <div className="flex gap-1 bg-background rounded-xl p-1">
