@@ -323,11 +323,23 @@ export function pcGradeFieldToPoketraceTier(pcField: string): string {
  * - Strips trailing card-number suffixes
  */
 function sanitizeQuery(raw: string): string {
-  return raw
+  // Normalize smart quotes and trailing card numbers
+  let q = raw
     .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
     .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
     .replace(/\s+[-#]\s*\d+\s*$/, "")
     .trim();
+
+  // Auto-uppercase Pokemon card mechanic/variant tokens that are
+  // always capitalised in official card names. Without this, searches
+  // like "mega charizard x ex" fail because the API is case-sensitive.
+  const upperTokens = ["ex", "gx", "vmax", "vstar", "v", "lv", "mega", "etb"];
+  q = q
+    .split(/\s+/)
+    .map((t) => (upperTokens.includes(t.toLowerCase()) ? t.toUpperCase() : t))
+    .join(" ");
+
+  return q;
 }
 
 // ---------------------------------------------------------------------------
