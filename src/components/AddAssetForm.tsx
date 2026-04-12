@@ -394,6 +394,7 @@ export default function AddAssetForm() {
         onClose={() => setSearchOpen(false)}
         onSelect={handleCardSelect}
         onManualEntry={handleManualEntry}
+        assetType={form.assetType}
       />
 
       <div className="max-w-4xl mx-auto">
