@@ -1297,6 +1297,7 @@ export default function AssetDetailPage({
             cardName={asset.name}
             purchasePrice={asset.purchase_price}
             assetType={asset.asset_type}
+            poketraceId={asset.poketrace_id}
           />
 
           {/* Price source link */}

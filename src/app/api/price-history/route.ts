@@ -10,10 +10,11 @@ export async function GET(request: NextRequest) {
   const endDate = searchParams.get("endDate");
   const assetType = searchParams.get("assetType") as "card" | "sealed" | null;
   const assetId = searchParams.get("assetId");
+  const poketraceId = searchParams.get("poketraceId");
 
-  if (!cardId && !name && !assetId) {
+  if (!cardId && !name && !assetId && !poketraceId) {
     return NextResponse.json(
-      { error: "cardId, name, or assetId parameter is required" },
+      { error: "cardId, name, assetId, or poketraceId parameter is required" },
       { status: 400 }
     );
   }
@@ -53,21 +54,31 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Try to get external API price history (JustTCG for cards, PPT for sealed)
+    // Try to get external API price history from Poketrace
     let apiPoints: { date: string; price: number; source?: string }[] = [];
     try {
+      // Use poketraceId directly if available, otherwise fall back to cardId/name search
+      const lookupId = poketraceId || cardId || "";
       let apiData;
-      if (assetType) {
+      if (poketraceId) {
+        // Direct Poketrace ID — use it for history lookup
+        apiData = await getPriceHistory(
+          poketraceId,
+          startDate || undefined,
+          endDate || undefined,
+          name || undefined
+        );
+      } else if (assetType) {
         apiData = await getPriceHistoryByType(
           assetType,
-          cardId || "",
+          lookupId,
           name || undefined,
           startDate || undefined,
           endDate || undefined
         );
       } else {
         apiData = await getPriceHistory(
-          cardId || "",
+          lookupId,
           startDate || undefined,
           endDate || undefined,
           name || undefined

@@ -19,6 +19,7 @@ interface PriceChartProps {
   cardName?: string;
   purchasePrice?: number;
   assetType?: "card" | "sealed";
+  poketraceId?: string | null;
   className?: string;
 }
 
@@ -35,6 +36,7 @@ export default function PriceChart({
   cardName,
   purchasePrice,
   assetType,
+  poketraceId,
   className = "",
 }: PriceChartProps) {
   const [data, setData] = useState<PriceHistoryPoint[]>([]);
@@ -54,8 +56,9 @@ export default function PriceChart({
         const nameParam = cardName ? `&name=${encodeURIComponent(cardName)}` : "";
         const typeParam = assetType ? `&assetType=${assetType}` : "";
         const assetIdParam = assetId ? `&assetId=${assetId}` : "";
+        const poketraceParam = poketraceId ? `&poketraceId=${encodeURIComponent(poketraceId)}` : "";
         const res = await fetch(
-          `/api/price-history?cardId=${encodeURIComponent(externalId)}&startDate=${startDate}&endDate=${endDate}${nameParam}${typeParam}${assetIdParam}`
+          `/api/price-history?cardId=${encodeURIComponent(externalId)}&startDate=${startDate}&endDate=${endDate}${nameParam}${typeParam}${assetIdParam}${poketraceParam}`
         );
         if (!res.ok) throw new Error("Failed to fetch price history");
         const json = await res.json();
@@ -72,7 +75,7 @@ export default function PriceChart({
       }
     }
     fetchHistory();
-  }, [externalId, assetId, cardName, assetType, range]);
+  }, [externalId, assetId, cardName, assetType, poketraceId, range]);
 
   if (loading) {
     return (
