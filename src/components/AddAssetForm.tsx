@@ -655,8 +655,8 @@ export default function AddAssetForm() {
                 </div>
               )}
 
-              {/* Poketrace Tether - show for manual submissions or graded API cards */}
-              {(isManualSubmission || (selectedCard && form.psaGrade)) && (
+              {/* Poketrace Tether - only show for manual submissions (API cards already have a poketraceId) */}
+              {isManualSubmission && (
                 <div className="bg-surface-hover border border-border rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Link2 className="w-4 h-4 text-accent" />
