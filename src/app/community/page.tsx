@@ -102,16 +102,16 @@ export default function Design1() {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch("/api/community", {
+      const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: formName.trim(), whatsapp: whatsapp.trim(), dob: dob.trim(), profile: profile.trim(), interests: interests.trim(), referral: referral.trim() }),
       });
-      if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Something went wrong."); }
-      setSubmitted(true);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      if (data.url) window.location.href = data.url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
-    } finally {
       setSubmitting(false);
     }
   };
