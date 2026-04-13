@@ -9,6 +9,7 @@ const isPublicRoute = createRouteMatcher([
   "/privacy",
   "/community(.*)",
   "/api/community",
+  "/api/stripe/(.*)",
   "/api/cron/(.*)",
 ]);
 
