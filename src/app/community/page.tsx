@@ -355,10 +355,10 @@ export default function Design1() {
               {/* Decorative image */}
               <div className="hidden lg:block mt-12 rounded-2xl overflow-hidden border border-border/30" style={{ aspectRatio: "16/9" }}>
                 <img
-                  src="https://images.unsplash.com/photo-1611532736597-de2d4265fba3?auto=format&fit=crop&w=800&q=80"
+                  src="/collectibles-banner.png"
                   alt="Collectibles"
                   className="w-full h-full object-cover"
-                  style={{ filter: "brightness(0.6) saturate(0.8)" }}
+                  style={{ filter: "grayscale(100%) brightness(0.6)" }}
                 />
               </div>
             </div>
@@ -440,16 +440,6 @@ export default function Design1() {
             </div>
           </div>
         </div>
-      </section>
-
-      {/* ============ COLLECTIBLES BANNER — Black & White ============ */}
-      <section className="w-full">
-        <img
-          src="/collectibles-banner.png"
-          alt="High-end collectibles — jerseys, graded cards, memorabilia"
-          className="w-full h-auto object-cover"
-          style={{ filter: "grayscale(100%)" }}
-        />
       </section>
 
       {/* Footer */}
