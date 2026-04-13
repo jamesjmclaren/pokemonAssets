@@ -120,7 +120,7 @@ export default function Design1() {
   const comingSoonFeatures = features.filter((f) => f.comingSoon);
 
   return (
-    <div className="min-h-screen landing-grain" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
+    <div className="min-h-screen" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
       {/* Google Font */}
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap');`}</style>
 
