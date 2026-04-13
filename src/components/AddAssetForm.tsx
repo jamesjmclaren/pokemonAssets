@@ -89,6 +89,8 @@ export default function AddAssetForm() {
   );
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [gradedPrice, setGradedPrice] = useState<number | null>(null);
+  const [gradedPriceLoading, setGradedPriceLoading] = useState(false);
 
   interface TetherCandidate {
     id: string;
@@ -227,6 +229,33 @@ export default function AddAssetForm() {
     return "ungraded";
   }, [form.psaGrade]);
 
+  // Fetch graded price from Poketrace when grade is selected on an API-sourced card
+  useEffect(() => {
+    if (isManualSubmission || !selectedCard || !form.psaGrade) {
+      setGradedPrice(null);
+      return;
+    }
+
+    const poketraceId = (selectedCard as unknown as Record<string, unknown>)?.poketraceId as string | undefined;
+    if (!poketraceId) {
+      setGradedPrice(null);
+      return;
+    }
+
+    setGradedPriceLoading(true);
+    fetch(`/api/card-price?poketraceId=${encodeURIComponent(poketraceId)}&grade=${encodeURIComponent(form.psaGrade)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.price != null) {
+          setGradedPrice(data.price);
+        } else {
+          setGradedPrice(null);
+        }
+      })
+      .catch(() => setGradedPrice(null))
+      .finally(() => setGradedPriceLoading(false));
+  }, [selectedCard, form.psaGrade, isManualSubmission]);
+
   // When user selects a tether candidate, populate the price
   const handleTetherSelect = useCallback((candidate: TetherCandidate) => {
     setSelectedTether(candidate);
@@ -290,18 +319,9 @@ export default function AddAssetForm() {
       } else if (form.manualPrice && form.manualPriceValue) {
         currentPrice = parseFloat(form.manualPriceValue);
       } else if (selectedCard) {
-        // Use graded price if a grade is selected and the card has graded pricing
-        if (form.psaGrade && selectedCard.prices) {
-          const gradeMap: Record<string, keyof NonNullable<SelectedCard["prices"]>> = {
-            "PSA 10": "psa10",
-            "PSA 9": "psa9",
-            "CGC 10": "cgc10",
-            "BGS 10": "bgs10",
-          };
-          const priceKey = gradeMap[form.psaGrade];
-          if (priceKey && selectedCard.prices[priceKey]) {
-            currentPrice = selectedCard.prices[priceKey]!;
-          }
+        // Use graded price fetched from Poketrace if available
+        if (form.psaGrade && gradedPrice != null) {
+          currentPrice = gradedPrice;
         }
         // Fall back to raw/market price
         if (currentPrice == null) {
@@ -665,9 +685,26 @@ export default function AddAssetForm() {
                     ))}
                   </select>
                   {form.psaGrade && (
-                    <p className="text-xs text-gold mt-1.5">
-                      Graded: {form.psaGrade}
-                    </p>
+                    <div className="mt-1.5">
+                      <p className="text-xs text-gold">
+                        Graded: {form.psaGrade}
+                      </p>
+                      {!isManualSubmission && selectedCard && (
+                        <p className="text-xs text-text-muted mt-0.5">
+                          {gradedPriceLoading ? (
+                            <span className="text-accent">Fetching graded price...</span>
+                          ) : gradedPrice != null ? (
+                            <span className="text-success">
+                              {form.psaGrade} price: {formatCurrency(gradedPrice)}
+                            </span>
+                          ) : (
+                            <span className="text-warning">
+                              No graded price available — will use raw price
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

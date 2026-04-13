@@ -616,18 +616,33 @@ export async function fetchPoketracePrice(
   rate?: number;
 } | null> {
   const card = await getRawPoketraceCard(poketraceId);
-  if (!card) return null;
+  if (!card) {
+    console.warn(`[poketrace] fetchPoketracePrice: no card found for ${poketraceId}`);
+    return null;
+  }
+
+  // Log the full price structure for debugging
+  console.log(`[poketrace] fetchPoketracePrice for ${poketraceId}, grade=${grade || "none"}`);
+  console.log(`[poketrace] Available price sources:`, {
+    tcgplayer: card.prices?.tcgplayer ? Object.keys(card.prices.tcgplayer) : "none",
+    ebay: card.prices?.ebay ? Object.keys(card.prices.ebay) : "none",
+    cardmarket: card.prices?.cardmarket ? Object.keys(card.prices.cardmarket) : "none",
+  });
 
   let price: number | null = null;
 
   // Try graded price first if a grade is specified
   if (grade) {
+    const tier = gradeToPoketraceTier(grade);
+    console.log(`[poketrace] Looking for graded tier: ${tier}`);
     price = extractGradedPrice(card, grade);
+    console.log(`[poketrace] Graded price result: ${price ?? "null (not found)"}`);
   }
 
   // Fall back to best raw price
   if (price == null) {
     price = extractBestPrice(card);
+    console.log(`[poketrace] Falling back to raw price: ${price ?? "null"}`);
   }
 
   if (price == null) return null;
