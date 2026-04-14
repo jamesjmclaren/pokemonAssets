@@ -575,27 +575,41 @@ export async function getPoketracePriceHistory(
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let allEntries: any[] = [];
-    let cursor: string | undefined;
-    let pageCount = 0;
-    const maxPages = 10;
+    const fetchWithPeriod = async (p: string): Promise<any[]> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let entries: any[] = [];
+      let cursor: string | undefined;
+      let pageCount = 0;
+      const maxPages = 10;
 
-    do {
-      const cursorParam = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
-      const url = `/v1/cards/${encodeURIComponent(cardId)}/prices/${encodeURIComponent(priceTier)}/history?period=${period}&limit=365${cursorParam}`;
+      do {
+        const cursorParam = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+        const url = `/v1/cards/${encodeURIComponent(cardId)}/prices/${encodeURIComponent(priceTier)}/history?period=${p}&limit=365${cursorParam}`;
 
-      const response = await apiFetch(url);
+        const response = await apiFetch(url);
 
-      const entries = response?.data || [];
-      if (entries.length === 0) break;
+        const pageEntries = response?.data || [];
+        if (pageEntries.length === 0) break;
 
-      allEntries = allEntries.concat(entries);
+        entries = entries.concat(pageEntries);
 
-      cursor = response?.pagination?.hasMore ? response.pagination.nextCursor : undefined;
-      pageCount++;
-    } while (cursor && pageCount < maxPages);
+        cursor = response?.pagination?.hasMore ? response.pagination.nextCursor : undefined;
+        pageCount++;
+      } while (cursor && pageCount < maxPages);
 
-    console.log(`[poketrace] Price history for ${cardId}/${priceTier} period=${period}: ${allEntries.length} entries across ${pageCount + 1} page(s)`);
+      return entries;
+    };
+
+    let allEntries = await fetchWithPeriod(period);
+
+    // If the requested period returned no data, fall back to "all" and filter client-side.
+    // This handles graded tiers with sparse data (few sales in a 30d/90d window).
+    if (allEntries.length === 0 && period !== "all") {
+      console.log(`[poketrace] No data for ${cardId}/${priceTier} period=${period}, falling back to "all"`);
+      allEntries = await fetchWithPeriod("all");
+    }
+
+    console.log(`[poketrace] Price history for ${cardId}/${priceTier} period=${period}: ${allEntries.length} entries`);
 
     // Map entries — Poketrace uses "avg" for the price field
     let points = allEntries
