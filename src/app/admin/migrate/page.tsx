@@ -61,6 +61,30 @@ interface Summary {
 }
 
 // ---------------------------------------------------------------------------
+// Grade options (same as AddAssetForm)
+// ---------------------------------------------------------------------------
+
+const GRADE_OPTIONS = [
+  { value: "", label: "None (Raw)" },
+  { value: "PSA 10", label: "PSA 10 - Gem Mint" },
+  { value: "PSA 9", label: "PSA 9 - Mint" },
+  { value: "PSA 8", label: "PSA 8 - NM-MT" },
+  { value: "PSA 7", label: "PSA 7 - Near Mint" },
+  { value: "PSA 6", label: "PSA 6 - EX-MT" },
+  { value: "PSA 5", label: "PSA 5 - Excellent" },
+  { value: "PSA 4", label: "PSA 4 - VG-EX" },
+  { value: "PSA 3", label: "PSA 3 - Very Good" },
+  { value: "PSA 2", label: "PSA 2 - Good" },
+  { value: "PSA 1", label: "PSA 1 - Poor" },
+  { value: "CGC 10", label: "CGC 10 - Pristine" },
+  { value: "CGC 9.5", label: "CGC 9.5 - Gem Mint" },
+  { value: "CGC 9", label: "CGC 9 - Mint" },
+  { value: "BGS 10", label: "BGS 10 - Pristine" },
+  { value: "BGS 9.5", label: "BGS 9.5 - Gem Mint" },
+  { value: "BGS 9", label: "BGS 9 - Mint" },
+];
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -85,6 +109,7 @@ export default function AdminMigratePage() {
   const [modalSearch, setModalSearch] = useState("");
   const [modalSearching, setModalSearching] = useState(false);
   const [migrating, setMigrating] = useState(false);
+  const [selectedGrade, setSelectedGrade] = useState("");
 
   // ---------------------------------------------------------------------------
   // Fetch assets
@@ -148,6 +173,7 @@ export default function AdminMigratePage() {
           poketraceId: result.poketraceId,
           poketraceMarket: result.market,
           updatePrice: true,
+          grade: selectedGrade || null,
         }),
       });
       if (!res.ok) throw new Error("Migration failed");
@@ -365,6 +391,7 @@ export default function AdminMigratePage() {
                           setSelectedAsset(asset);
                           setModalSearch(asset.name);
                           setSearchResults([]);
+                          setSelectedGrade(asset.psa_grade || "");
                           // Auto-search
                           setTimeout(() => searchPoketrace(asset.name), 100);
                         }}
@@ -419,6 +446,26 @@ export default function AdminMigratePage() {
                 <X className="w-5 h-5 text-text-secondary" />
               </button>
             </div>
+
+            {/* Grade Selection */}
+            {selectedAsset?.asset_type === "card" && (
+              <div className="px-4 pt-3 pb-0 border-b border-border">
+                <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                  Grade (affects price tier)
+                </label>
+                <select
+                  value={selectedGrade}
+                  onChange={(e) => setSelectedGrade(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-text-primary mb-3 focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  {GRADE_OPTIONS.map((g) => (
+                    <option key={g.value} value={g.value}>
+                      {g.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Search */}
             <div className="p-4 border-b border-border">

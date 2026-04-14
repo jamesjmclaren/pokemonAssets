@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { assetId, poketraceId, poketraceMarket, updatePrice } = body;
+    const { assetId, poketraceId, poketraceMarket, updatePrice, grade } = body;
 
     if (!assetId || !poketraceId) {
       return NextResponse.json(
@@ -96,18 +96,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
+    // Determine the grade: use the explicitly provided grade if present,
+    // otherwise fall back to the asset's existing grade
+    const effectiveGrade = grade !== undefined ? (grade || null) : asset.psa_grade;
+
     // Update the asset with Poketrace link
     const updateData: Record<string, unknown> = {
       poketrace_id: poketraceId,
       poketrace_market: poketraceMarket || "US",
     };
 
+    // Update the grade on the asset if one was explicitly provided
+    if (grade !== undefined) {
+      updateData.psa_grade = grade || null;
+    }
+
     // Optionally fetch and update the price from Poketrace
     if (updatePrice !== false) {
       try {
         const result = await fetchPoketracePrice(
           poketraceId,
-          asset.psa_grade || undefined
+          effectiveGrade || undefined
         );
         if (result) {
           updateData.current_price = result.price;
