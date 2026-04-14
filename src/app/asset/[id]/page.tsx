@@ -146,6 +146,17 @@ export default function AssetDetailPage({
   const [savingSell, setSavingSell] = useState(false);
   const [suggestedPrice, setSuggestedPrice] = useState<number | null>(null);
   const [loadingSuggested, setLoadingSuggested] = useState(false);
+  const [gradedValues, setGradedValues] = useState<{
+    tier: string;
+    label: string;
+    avg: number;
+    low: number | null;
+    high: number | null;
+    saleCount: number | null;
+    source: string;
+  }[]>([]);
+  const [gradedCurrentGrade, setGradedCurrentGrade] = useState<string | null>(null);
+  const [loadingGraded, setLoadingGraded] = useState(false);
 
   useEffect(() => {
     async function fetchAsset() {
@@ -193,6 +204,33 @@ export default function AssetDetailPage({
     fetchSuggested();
     return () => { cancelled = true; };
   }, [asset?.id, asset?.manual_price]);
+
+  // Fetch graded values when asset has a Poketrace link
+  useEffect(() => {
+    if (!asset?.poketrace_id) {
+      setGradedValues([]);
+      return;
+    }
+    let cancelled = false;
+    async function fetchGradedValues() {
+      setLoadingGraded(true);
+      try {
+        const res = await fetch(`/api/assets/${asset!.id}/graded-values`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) {
+          setGradedValues(data.gradedValues || []);
+          setGradedCurrentGrade(data.currentGrade || null);
+        }
+      } catch {
+        // Silently fail — graded values are supplementary
+      } finally {
+        if (!cancelled) setLoadingGraded(false);
+      }
+    }
+    fetchGradedValues();
+    return () => { cancelled = true; };
+  }, [asset?.id, asset?.poketrace_id]);
 
   const startEditing = () => {
     if (!asset) return;
@@ -1273,6 +1311,87 @@ export default function AssetDetailPage({
               </div>
             )}
           </div>
+
+          {/* Graded Values */}
+          {asset.poketrace_id && asset.asset_type === "card" && (
+            <div className="bg-surface border border-border rounded-2xl p-4 md:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-gold" />
+                  All Conditions
+                  {gradedValues.length > 0 && (
+                    <span className="text-xs font-normal text-text-muted">({gradedValues.length})</span>
+                  )}
+                </h3>
+                {gradedValues.length > 4 && (
+                  <span className="text-[10px] text-text-muted hidden md:block">scroll &rarr;</span>
+                )}
+              </div>
+
+              {loadingGraded ? (
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="skeleton h-20 w-28 rounded-xl flex-shrink-0" />
+                  ))}
+                </div>
+              ) : gradedValues.length === 0 ? (
+                <p className="text-xs text-text-muted py-2">No graded pricing data available for this card.</p>
+              ) : (
+                <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+                  {gradedValues.map((gv) => {
+                    const isCurrentGrade = gradedCurrentGrade && gv.label.toUpperCase() === gradedCurrentGrade.toUpperCase();
+                    return (
+                      <div
+                        key={gv.tier}
+                        className={clsx(
+                          "flex-shrink-0 rounded-xl px-4 py-3 min-w-[120px] border",
+                          isCurrentGrade
+                            ? "bg-gold/10 border-gold/40"
+                            : "bg-surface-hover/50 border-border"
+                        )}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          {isCurrentGrade && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-gold flex-shrink-0" />
+                          )}
+                          <p className={clsx(
+                            "text-[10px] font-semibold uppercase tracking-wide",
+                            isCurrentGrade ? "text-gold" : "text-text-muted"
+                          )}>
+                            {gv.label}
+                          </p>
+                        </div>
+                        <p className={clsx(
+                          "text-sm font-bold",
+                          isCurrentGrade ? "text-gold" : "text-text-primary"
+                        )}>
+                          {formatCurrency(gv.avg)}
+                        </p>
+                        {(gv.low != null || gv.high != null) && (
+                          <div className="flex items-center gap-1 mt-1">
+                            {gv.low != null && (
+                              <span className="text-[10px] text-text-muted">
+                                L: {formatCurrency(gv.low)}
+                              </span>
+                            )}
+                            {gv.low != null && gv.high != null && (
+                              <span className="text-[10px] text-text-muted">·</span>
+                            )}
+                            {gv.high != null && (
+                              <span className="text-[10px] text-text-muted">
+                                H: {formatCurrency(gv.high)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <p className="text-[9px] text-text-muted mt-1">{gv.source}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Admin: Manage Price History */}
           {isAdmin && (
