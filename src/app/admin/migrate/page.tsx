@@ -85,6 +85,42 @@ const GRADE_OPTIONS = [
 ];
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Map a grade string like "PSA 10" to a Poketrace tier key like "PSA_10". */
+function gradeToTierKey(grade: string): string | null {
+  if (!grade) return null;
+  const g = grade.toUpperCase().trim();
+  for (const prefix of ["PSA", "CGC", "BGS", "SGC", "ACE", "TAG"]) {
+    if (g.includes(prefix)) {
+      const num = g.replace(/[^0-9.]/g, "");
+      if (num) return `${prefix}_${num.replace(".", "_")}`;
+    }
+  }
+  return null;
+}
+
+/** Get the display price for a result: graded price if grade selected, else market. */
+function getDisplayPrice(
+  result: PoketraceResult,
+  grade: string
+): { price: number | null; isGraded: boolean } {
+  if (grade && result.gradedPrices) {
+    const key = gradeToTierKey(grade);
+    if (key && result.gradedPrices[key] != null) {
+      return { price: result.gradedPrices[key], isGraded: true };
+    }
+    // Also try without underscore in decimal (e.g. CGC_9.5 vs CGC_9_5)
+    const altKey = key?.replace("_5", ".5");
+    if (altKey && result.gradedPrices[altKey] != null) {
+      return { price: result.gradedPrices[altKey], isGraded: true };
+    }
+  }
+  return { price: result.marketPrice, isGraded: false };
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -526,9 +562,15 @@ export default function AdminMigratePage() {
                         {result.rarity && ` · ${result.rarity}`}
                       </p>
                       <div className="flex gap-2 mt-1">
-                        <span className="text-xs text-text-secondary">
-                          {result.marketPrice != null ? formatCurrency(result.marketPrice) : "No price"}
-                        </span>
+                        {(() => {
+                          const { price, isGraded } = getDisplayPrice(result, selectedGrade);
+                          return (
+                            <span className={`text-xs ${isGraded ? "text-accent font-medium" : "text-text-secondary"}`}>
+                              {price != null ? formatCurrency(price) : "No price"}
+                              {isGraded && ` (${selectedGrade})`}
+                            </span>
+                          );
+                        })()}
                         <span className={`text-xs px-1.5 py-0.5 rounded ${
                           result.type === "sealed"
                             ? "bg-purple-500/10 text-purple-400"
