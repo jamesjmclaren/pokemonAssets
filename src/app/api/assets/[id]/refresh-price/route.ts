@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
-import { searchCards, searchSealedProducts } from "@/lib/pokemon-api";
+import { searchCards, searchSealedProducts, fetchPoketracePrice } from "@/lib/pokemon-api";
 import { extractCardPrice } from "@/lib/format";
-import { fetchTetheredPrice } from "@/lib/pricecharting";
 
 /**
  * POST /api/assets/[id]/refresh-price
  *
- * Refreshes the market price for a single asset, determines the correct
- * pricing source (PriceCharting tether → API → manual skip), updates the
- * asset, and records a price snapshot.
+ * Refreshes the market price for a single asset using Poketrace.
  *
- * Returns the updated asset with the new price.
+ * Cascade:
+ * 1. If poketrace_id set → fetch by ID from Poketrace (graded or raw)
+ * 2. If manual_price and no link → skip
+ * 3. Else → search by name via Poketrace
  */
 export async function POST(
   request: NextRequest,
@@ -63,33 +63,36 @@ export async function POST(
     }
 
     let marketPrice: number | null = null;
-    let priceSource = asset.asset_type === "sealed" ? "pokemonpricetracker" : "tcgplayer";
+    let priceSource = "poketrace";
+    let isConverted = false;
+    let exchangeRate: number | undefined;
 
     console.log(`[refresh-single] Refreshing price for "${asset.name}" (id: ${id})`);
 
-    // State 3: PriceCharting tether
-    if (asset.pc_url) {
+    // State 1: Poketrace direct lookup (if linked)
+    if (asset.poketrace_id) {
       try {
-        console.log(`[refresh-single]   Trying PriceCharting tether (grade: ${asset.pc_grade_field || "ungraded"}, url: ${asset.pc_url})`);
-        const tetheredPrice = await fetchTetheredPrice(
-          asset.pc_url,
-          asset.pc_grade_field || undefined
+        console.log(`[refresh-single]   Trying Poketrace by ID: ${asset.poketrace_id} (grade: ${asset.psa_grade || "raw"})`);
+        const result = await fetchPoketracePrice(
+          asset.poketrace_id,
+          asset.psa_grade || undefined
         );
-        if (tetheredPrice != null) {
-          marketPrice = tetheredPrice;
-          priceSource = "pricecharting";
-          console.log(`[refresh-single]   ✓ PriceCharting price: $${tetheredPrice}`);
+        if (result) {
+          marketPrice = result.price;
+          isConverted = result.isConverted;
+          exchangeRate = result.rate;
+          console.log(`[refresh-single]   ✓ Poketrace price: $${result.price}${result.isConverted ? ` (converted from EUR at ${result.rate})` : ""}`);
         } else {
-          console.warn(`[refresh-single]   ✗ PriceCharting returned null — falling back to API`);
+          console.warn(`[refresh-single]   ✗ Poketrace returned null — falling back to name search`);
         }
       } catch (e) {
-        console.warn(`[refresh-single]   ✗ PriceCharting failed:`, e instanceof Error ? e.message : e);
+        console.warn(`[refresh-single]   ✗ Poketrace ID lookup failed:`, e instanceof Error ? e.message : e);
       }
     }
 
-    // State 2: Manual price — skip API refresh (unless tether failed above)
-    if (marketPrice == null && asset.manual_price && !asset.pc_url) {
-      console.log(`[refresh-single]   Asset is manual_price — skipping API refresh`);
+    // State 2: Manual price — skip refresh (unless Poketrace linked above)
+    if (marketPrice == null && asset.manual_price && !asset.poketrace_id) {
+      console.log(`[refresh-single]   Asset is manual_price — skipping refresh`);
       return NextResponse.json({
         asset,
         refreshed: false,
@@ -98,30 +101,25 @@ export async function POST(
       });
     }
 
-    // State 1: JustTCG / PokemonPriceTracker API
+    // State 3: Search by name via Poketrace
     if (marketPrice == null) {
       let results: Record<string, unknown>[];
 
       if (asset.asset_type === "sealed") {
-        console.log(`[refresh-single]   Trying PokemonPriceTracker for sealed product`);
-        try {
-          results = (await searchSealedProducts(asset.name, undefined, 5)) as unknown as Record<string, unknown>[];
-        } catch {
-          console.warn(`[refresh-single]   PokemonPriceTracker failed, trying JustTCG`);
-          results = (await searchCards(asset.name, undefined, 5)) as unknown as Record<string, unknown>[];
-        }
+        console.log(`[refresh-single]   Searching Poketrace for sealed: "${asset.name}"`);
+        results = (await searchSealedProducts(asset.name, undefined, 5)) as unknown as Record<string, unknown>[];
       } else {
-        console.log(`[refresh-single]   Trying JustTCG for card`);
+        console.log(`[refresh-single]   Searching Poketrace for card: "${asset.name}"`);
         results = (await searchCards(asset.name, undefined, 5)) as unknown as Record<string, unknown>[];
       }
 
       if (results.length === 0) {
-        console.warn(`[refresh-single]   ✗ No API results found`);
+        console.warn(`[refresh-single]   ✗ No results found`);
         return NextResponse.json({
           asset,
           refreshed: false,
           reason: "no_results",
-          message: "No matching results found from pricing APIs.",
+          message: "No matching results found from Poketrace.",
         });
       }
 
@@ -129,7 +127,7 @@ export async function POST(
       if (match) {
         marketPrice = extractCardPrice(match);
         if (marketPrice != null) {
-          console.log(`[refresh-single]   ✓ API price: $${marketPrice} (source: ${priceSource})`);
+          console.log(`[refresh-single]   ✓ Poketrace search price: $${marketPrice}`);
         }
       }
     }
@@ -140,7 +138,7 @@ export async function POST(
         asset,
         refreshed: false,
         reason: "no_price",
-        message: "Could not extract a price from any source.",
+        message: "Could not extract a price from Poketrace.",
       });
     }
 
@@ -157,6 +155,8 @@ export async function POST(
       .update({
         current_price: marketPrice,
         price_updated_at: new Date().toISOString(),
+        price_currency: "USD",
+        is_converted_price: isConverted,
       })
       .eq("id", id)
       .select()
@@ -172,6 +172,9 @@ export async function POST(
       asset_id: id,
       price: marketPrice,
       source: priceSource,
+      currency: "USD",
+      is_converted: isConverted,
+      exchange_rate: exchangeRate || null,
     });
 
     if (snapError) {

@@ -19,6 +19,7 @@ interface PriceChartProps {
   cardName?: string;
   purchasePrice?: number;
   assetType?: "card" | "sealed";
+  poketraceId?: string | null;
   className?: string;
 }
 
@@ -35,6 +36,7 @@ export default function PriceChart({
   cardName,
   purchasePrice,
   assetType,
+  poketraceId,
   className = "",
 }: PriceChartProps) {
   const [data, setData] = useState<PriceHistoryPoint[]>([]);
@@ -54,8 +56,9 @@ export default function PriceChart({
         const nameParam = cardName ? `&name=${encodeURIComponent(cardName)}` : "";
         const typeParam = assetType ? `&assetType=${assetType}` : "";
         const assetIdParam = assetId ? `&assetId=${assetId}` : "";
+        const poketraceParam = poketraceId ? `&poketraceId=${encodeURIComponent(poketraceId)}` : "";
         const res = await fetch(
-          `/api/price-history?cardId=${encodeURIComponent(externalId)}&startDate=${startDate}&endDate=${endDate}${nameParam}${typeParam}${assetIdParam}`
+          `/api/price-history?cardId=${encodeURIComponent(externalId)}&startDate=${startDate}&endDate=${endDate}${nameParam}${typeParam}${assetIdParam}${poketraceParam}`
         );
         if (!res.ok) throw new Error("Failed to fetch price history");
         const json = await res.json();
@@ -72,7 +75,7 @@ export default function PriceChart({
       }
     }
     fetchHistory();
-  }, [externalId, assetId, cardName, assetType, range]);
+  }, [externalId, assetId, cardName, assetType, poketraceId, range]);
 
   if (loading) {
     return (
@@ -102,7 +105,16 @@ export default function PriceChart({
   const maxPrice = Math.max(...prices) * 1.05;
   const currentPrice = prices[prices.length - 1];
   const startPrice = prices[0];
+  const pctChange = startPrice > 0 ? ((currentPrice - startPrice) / startPrice * 100) : 0;
   const isUp = currentPrice >= startPrice;
+
+  // Calculate actual data span for display
+  const actualDays = data.length >= 2
+    ? Math.round((new Date(data[data.length - 1].date).getTime() - new Date(data[0].date).getTime()) / 86400000)
+    : 0;
+  const rangeLabel = actualDays >= 365
+    ? `${(actualDays / 365).toFixed(1).replace(/\.0$/, "")}y`
+    : `${actualDays}d`;
 
   return (
     <div className={`bg-surface border border-border rounded-2xl p-6 ${className}`}>
@@ -111,10 +123,10 @@ export default function PriceChart({
           <h3 className="text-sm font-semibold text-text-primary">
             Price History
           </h3>
-          <p className={`text-xs mt-1 ${isUp ? "text-success" : "text-danger"}`}>
-            {isUp ? "+" : ""}
-            {((currentPrice - startPrice) / startPrice * 100).toFixed(2)}% over{" "}
-            {range} days
+          <p className={`text-xs mt-1 ${data.length <= 1 ? "text-text-muted" : isUp ? "text-success" : "text-danger"}`}>
+            {data.length <= 1
+              ? "Tracking started — history will build over time"
+              : `${isUp ? "+" : ""}${pctChange.toFixed(2)}% over ${rangeLabel}`}
           </p>
         </div>
         <div className="flex gap-1 bg-background rounded-xl p-1">

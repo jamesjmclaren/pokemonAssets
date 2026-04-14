@@ -83,16 +83,16 @@ interface EditForm {
   storage_location: string;
   current_price: string;
   manual_price: boolean;
-  pc_product_id: string;
-  pc_url: string;
-  pc_grade_field: string;
+  poketrace_id: string;
+  poketrace_market: string;
 }
 
-interface PriceChartingCandidate {
+interface PoketraceCandidate {
   id: string;
   name: string;
   setName: string;
-  url: string;
+  poketraceId: string;
+  poketraceMarket: string;
   imageUrl?: string;
   currency: string;
   prices: {
@@ -105,7 +105,7 @@ interface PriceChartingCandidate {
   };
 }
 
-const PC_GRADE_OPTIONS = [
+const GRADE_OPTIONS = [
   { value: "ungraded", label: "Ungraded" },
   { value: "grade7", label: "Grade 7" },
   { value: "grade8", label: "Grade 8" },
@@ -138,9 +138,9 @@ export default function AssetDetailPage({
   const [snapshots, setSnapshots] = useState<{ id: string; price: number; source: string; recorded_at: string }[]>([]);
   const [loadingSnapshots, setLoadingSnapshots] = useState(false);
   const [deletingSnapshotId, setDeletingSnapshotId] = useState<string | null>(null);
-  const [pcSearching, setPcSearching] = useState(false);
-  const [pcCandidates, setPcCandidates] = useState<PriceChartingCandidate[]>([]);
-  const [pcShowSearch, setPcShowSearch] = useState(false);
+  const [poketraceSearching, setPoketraceSearching] = useState(false);
+  const [poketraceCandidates, setPoketraceCandidates] = useState<PoketraceCandidate[]>([]);
+  const [poketraceShowSearch, setPoketraceShowSearch] = useState(false);
   const [sellPrice, setSellPrice] = useState("");
   const [sellDate, setSellDate] = useState("");
   const [savingSell, setSavingSell] = useState(false);
@@ -183,12 +183,11 @@ export default function AssetDetailPage({
       storage_location: asset.storage_location || "",
       current_price: String(asset.current_price ?? ""),
       manual_price: asset.manual_price || false,
-      pc_product_id: asset.pc_product_id || "",
-      pc_url: asset.pc_url || "",
-      pc_grade_field: asset.pc_grade_field || "ungraded",
+      poketrace_id: asset.poketrace_id || "",
+      poketrace_market: asset.poketrace_market || "US",
     });
-    setPcCandidates([]);
-    setPcShowSearch(false);
+    setPoketraceCandidates([]);
+    setPoketraceShowSearch(false);
     setEditing(true);
   };
 
@@ -220,9 +219,8 @@ export default function AssetDetailPage({
           storage_location: editForm.storage_location,
           current_price: editForm.current_price || undefined,
           manual_price: editForm.manual_price,
-          pc_product_id: editForm.pc_product_id || null,
-          pc_url: editForm.pc_url || null,
-          pc_grade_field: editForm.pc_grade_field || null,
+          poketrace_id: editForm.poketrace_id || null,
+          poketrace_market: editForm.poketrace_market || "US",
         }),
       });
       if (!res.ok) {
@@ -688,145 +686,122 @@ export default function AssetDetailPage({
               </label>
             </div>
 
-            {/* PriceCharting Tether */}
+            {/* Poketrace Link */}
             <div className="md:col-span-2 border-t border-border pt-4 mt-2">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Link2 className="w-4 h-4 text-accent" />
-                  <span className="text-sm font-medium text-text-primary">PriceCharting Tether</span>
+                  <span className="text-sm font-medium text-text-primary">Poketrace Link</span>
                 </div>
-                {editForm.pc_url && (
+                {editForm.poketrace_id && (
                   <button
                     type="button"
                     onClick={() => {
-                      setEditForm({ ...editForm, pc_product_id: "", pc_url: "", pc_grade_field: "ungraded" });
-                      setPcCandidates([]);
-                      setPcShowSearch(false);
+                      setEditForm({ ...editForm, poketrace_id: "", poketrace_market: "US" });
+                      setPoketraceCandidates([]);
+                      setPoketraceShowSearch(false);
                     }}
                     className="text-xs text-danger hover:text-danger/80 font-medium"
                   >
-                    Remove Tether
+                    Remove Link
                   </button>
                 )}
               </div>
 
-              {editForm.pc_url ? (
+              {editForm.poketrace_id ? (
                 <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 space-y-3">
                   <div className="flex items-center gap-2">
                     <Link2 className="w-3.5 h-3.5 text-accent flex-shrink-0" />
-                    <p className="text-xs text-accent truncate">{editForm.pc_url}</p>
+                    <p className="text-xs text-accent truncate">Poketrace ID: {editForm.poketrace_id} ({editForm.poketrace_market})</p>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1">Price Grade</label>
-                    <select
-                      value={editForm.pc_grade_field}
-                      onChange={(e) => setEditForm({ ...editForm, pc_grade_field: e.target.value })}
-                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-text-primary text-sm outline-none focus:border-accent"
-                    >
-                      {PC_GRADE_OPTIONS.map((g) => (
-                        <option key={g.value} value={g.value}>{g.label}</option>
-                      ))}
-                    </select>
-                    <p className="text-[10px] text-text-muted mt-1">Prices auto-refresh daily from eBay sold data (USD)</p>
-                  </div>
+                  <p className="text-[10px] text-text-muted mt-1">Prices auto-refresh daily from Poketrace (TCGPlayer + eBay data, USD)</p>
                 </div>
               ) : (
                 <div>
                   <p className="text-xs text-text-muted mb-2">
-                    Tether this asset to a PriceCharting listing for automatic daily price updates from eBay sold data.
+                    Link this asset to a Poketrace listing for automatic daily price updates.
                   </p>
-                  {!pcShowSearch ? (
+                  {!poketraceShowSearch ? (
                     <button
                       type="button"
                       onClick={() => {
-                        setPcShowSearch(true);
-                        setPcCandidates([]);
+                        setPoketraceShowSearch(true);
+                        setPoketraceCandidates([]);
                       }}
                       className="flex items-center gap-2 px-3 py-2 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-sm font-medium"
                     >
                       <Link2 className="w-3.5 h-3.5" />
-                      Search PriceCharting
+                      Search Poketrace
                     </button>
                   ) : (
                     <div className="space-y-3">
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          id="pc-search-input"
+                          id="poketrace-search-input"
                           defaultValue={editForm.name}
-                          placeholder="Search PriceCharting..."
+                          placeholder="Search Poketrace..."
                           className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-text-primary text-sm outline-none focus:border-accent"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
                               const input = e.currentTarget;
                               if (!input.value.trim()) return;
-                              setPcSearching(true);
-                              fetch(`/api/pricecharting-search?q=${encodeURIComponent(input.value.trim())}`)
+                              setPoketraceSearching(true);
+                              fetch(`/api/graded-search?q=${encodeURIComponent(input.value.trim())}`)
                                 .then((r) => r.json())
-                                .then((data) => setPcCandidates(data.candidates || []))
-                                .catch(() => setPcCandidates([]))
-                                .finally(() => setPcSearching(false));
+                                .then((data) => setPoketraceCandidates(data.candidates || []))
+                                .catch(() => setPoketraceCandidates([]))
+                                .finally(() => setPoketraceSearching(false));
                             }
                           }}
                         />
                         <button
                           type="button"
-                          disabled={pcSearching}
+                          disabled={poketraceSearching}
                           onClick={() => {
-                            const input = document.getElementById("pc-search-input") as HTMLInputElement | null;
+                            const input = document.getElementById("poketrace-search-input") as HTMLInputElement | null;
                             const q = input?.value.trim();
                             if (!q) return;
-                            setPcSearching(true);
-                            fetch(`/api/pricecharting-search?q=${encodeURIComponent(q)}`)
+                            setPoketraceSearching(true);
+                            fetch(`/api/graded-search?q=${encodeURIComponent(q)}`)
                               .then((r) => r.json())
-                              .then((data) => setPcCandidates(data.candidates || []))
-                              .catch(() => setPcCandidates([]))
-                              .finally(() => setPcSearching(false));
+                              .then((data) => setPoketraceCandidates(data.candidates || []))
+                              .catch(() => setPoketraceCandidates([]))
+                              .finally(() => setPoketraceSearching(false));
                           }}
                           className="px-3 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-black rounded-lg text-sm font-medium"
                         >
-                          {pcSearching ? "Searching..." : "Search"}
+                          {poketraceSearching ? "Searching..." : "Search"}
                         </button>
                         <button
                           type="button"
-                          onClick={() => { setPcShowSearch(false); setPcCandidates([]); }}
+                          onClick={() => { setPoketraceShowSearch(false); setPoketraceCandidates([]); }}
                           className="px-2 py-2 text-text-muted hover:text-text-primary rounded-lg hover:bg-surface-hover"
                         >
                           <X className="w-4 h-4" />
                         </button>
                       </div>
 
-                      {pcSearching && (
-                        <p className="text-xs text-text-muted py-2">Searching PriceCharting...</p>
+                      {poketraceSearching && (
+                        <p className="text-xs text-text-muted py-2">Searching Poketrace...</p>
                       )}
 
-                      {!pcSearching && pcCandidates.length > 0 && (
+                      {!poketraceSearching && poketraceCandidates.length > 0 && (
                         <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                          {pcCandidates.map((c) => (
+                          {poketraceCandidates.map((c) => (
                             <button
                               key={c.id}
                               type="button"
                               onClick={() => {
                                 setEditForm({
                                   ...editForm,
-                                  pc_product_id: c.id,
-                                  pc_url: c.url,
-                                  pc_grade_field: editForm.psa_grade
-                                    ? (() => {
-                                        const g = editForm.psa_grade.toLowerCase();
-                                        if (g.includes("10")) return "psa10";
-                                        if (g.includes("9.5")) return "grade95";
-                                        if (g.includes("9")) return "grade9";
-                                        if (g.includes("8")) return "grade8";
-                                        if (g.includes("7")) return "grade7";
-                                        return "ungraded";
-                                      })()
-                                    : "ungraded",
+                                  poketrace_id: c.poketraceId || c.id,
+                                  poketrace_market: c.poketraceMarket || "US",
                                   manual_price: false,
                                 });
-                                setPcCandidates([]);
-                                setPcShowSearch(false);
+                                setPoketraceCandidates([]);
+                                setPoketraceShowSearch(false);
                               }}
                               className="w-full flex items-center gap-3 px-3 py-2.5 bg-background hover:bg-surface-hover border border-border rounded-lg text-left"
                             >
@@ -872,9 +847,9 @@ export default function AssetDetailPage({
                         </div>
                       )}
 
-                      {!pcSearching && pcCandidates.length === 0 && pcShowSearch && (
+                      {!poketraceSearching && poketraceCandidates.length === 0 && poketraceShowSearch && (
                         <p className="text-xs text-text-muted py-1">
-                          Press Search or Enter to find matching products on PriceCharting.
+                          Press Search or Enter to find matching products on Poketrace.
                         </p>
                       )}
                     </div>
@@ -1079,7 +1054,7 @@ export default function AssetDetailPage({
             )}
 
             {/* Manual submission badge */}
-            {asset.is_manual_submission && !asset.pc_url && (
+            {asset.is_manual_submission && !asset.poketrace_id && (
               <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-warning/10 border border-warning/30 rounded-xl">
                 <PenLine className="w-4 h-4 text-warning flex-shrink-0" />
                 <p className="text-xs text-warning">
@@ -1089,11 +1064,11 @@ export default function AssetDetailPage({
             )}
 
             {/* Tether badge */}
-            {asset.pc_url && (
+            {asset.poketrace_id && (
               <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-accent/10 border border-accent/30 rounded-xl">
                 <Link2 className="w-4 h-4 text-accent flex-shrink-0" />
                 <p className="text-xs text-accent">
-                  Tethered to PriceCharting — prices auto-refresh daily from eBay sold data.
+                  Linked to Poketrace — prices auto-refresh daily via Poketrace.
                 </p>
               </div>
             )}
@@ -1136,7 +1111,7 @@ export default function AssetDetailPage({
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                   )}
-                  {!isReadOnly && !(asset.manual_price && !asset.pc_url) && (
+                  {!isReadOnly && !(asset.manual_price && !asset.poketrace_id) && (
                     <button
                       onClick={handleRefreshPrice}
                       disabled={refreshing}
@@ -1322,17 +1297,18 @@ export default function AssetDetailPage({
             cardName={asset.name}
             purchasePrice={asset.purchase_price}
             assetType={asset.asset_type}
+            poketraceId={asset.poketrace_id}
           />
 
           {/* Price source link */}
           <div className="bg-surface border border-border rounded-2xl p-3 md:p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
               <p className="text-xs text-text-muted">
-                {asset.pc_url ? (
+                {asset.poketrace_id ? (
                   <>
-                    Tethered to PriceCharting (eBay sold data, USD)
-                    {asset.pc_grade_field && asset.pc_grade_field !== "ungraded" && (
-                      <> · Using {asset.pc_grade_field} price</>
+                    Linked to Poketrace (TCGPlayer + eBay data, USD)
+                    {asset.is_converted_price && (
+                      <> · <span className="text-warning">Price converted from EUR</span></>
                     )}
                     {asset.price_updated_at &&
                       ` · Updated ${formatDate(asset.price_updated_at)}`}
@@ -1345,40 +1321,23 @@ export default function AssetDetailPage({
                   </>
                 ) : (
                   <>
-                    Price data from{" "}
-                    {asset.asset_type === "sealed"
-                      ? "PokemonPriceTracker"
-                      : "JustTCG"}
+                    Price data from Poketrace
+                    {asset.is_converted_price && (
+                      <> · <span className="text-warning">Converted from EUR</span></>
+                    )}
                     {asset.price_updated_at &&
                       ` · Updated ${formatDate(asset.price_updated_at)}`}
                   </>
                 )}
               </p>
-              {asset.pc_url ? (
+              {!asset.manual_price && (
                 <a
-                  href={asset.pc_url}
+                  href="https://poketrace.com"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
                 >
-                  View on PriceCharting
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              ) : !asset.manual_price && (
-                <a
-                  href={
-                    asset.asset_type === "sealed"
-                      ? "https://www.pokemonpricetracker.com"
-                      : "https://justtcg.com"
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
-                >
-                  View on{" "}
-                  {asset.asset_type === "sealed"
-                    ? "PokemonPriceTracker"
-                    : "JustTCG"}
+                  View on Poketrace
                   <ExternalLink className="w-3 h-3" />
                 </a>
               )}

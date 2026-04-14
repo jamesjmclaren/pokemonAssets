@@ -30,6 +30,7 @@ interface SearchModalProps {
   onClose: () => void;
   onSelect: (card: SearchResult) => void;
   onManualEntry?: (query: string) => void;
+  assetType?: "card" | "sealed";
 }
 
 export default function SearchModal({
@@ -37,6 +38,7 @@ export default function SearchModal({
   onClose,
   onSelect,
   onManualEntry,
+  assetType,
 }: SearchModalProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -61,8 +63,9 @@ export default function SearchModal({
     setLoading(true);
     setSearched(true);
     try {
+      const typeParam = assetType ? `&type=${assetType}` : "";
       const res = await fetch(
-        `/api/search?q=${encodeURIComponent(q.trim())}`
+        `/api/search?q=${encodeURIComponent(q.trim())}${typeParam}`
       );
       if (!res.ok) throw new Error("Search failed");
       const json = await res.json();
@@ -75,7 +78,7 @@ export default function SearchModal({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [assetType]);
 
   const handleInputChange = (value: string) => {
     setQuery(value);

@@ -55,30 +55,48 @@ export function fixStorageUrl(url: string | null | undefined): string | null {
 
 /**
  * Extract a market price from a card object.
- * Handles multiple API formats including Pokemon TCG API (RapidAPI).
+ * Handles Poketrace, JustTCG, and legacy API formats.
  */
 export function extractCardPrice(card: Record<string, unknown>): number | null {
-  // Flat price field
+  // Flat price field (Poketrace normalized and JustTCG normalized)
   if (typeof card.marketPrice === "number") return card.marketPrice;
 
-  // Nested prices object (Pokemon TCG API format)
+  // Nested prices object
   const prices = card.prices as Record<string, unknown> | undefined;
   if (prices) {
-    // New format: prices.raw or prices.market
+    // Poketrace format: prices.tcgplayer.NEAR_MINT.avg
+    const tcgp = prices.tcgplayer as Record<string, unknown> | undefined;
+    if (tcgp) {
+      const nm = tcgp["NEAR_MINT"] as Record<string, unknown> | undefined;
+      if (nm && typeof nm.avg === "number") return nm.avg;
+      // Try first tier
+      const firstKey = Object.keys(tcgp)[0];
+      if (firstKey) {
+        const tier = tcgp[firstKey] as Record<string, unknown> | undefined;
+        if (tier && typeof tier.avg === "number") return tier.avg;
+        // Legacy nested format: prices.tcgplayer.market
+        if (typeof tcgp.market === "number") return tcgp.market;
+        if (typeof tcgp.low === "number") return tcgp.low;
+      }
+    }
+
+    // Poketrace format: prices.ebay.NEAR_MINT.avg
+    const ebay = prices.ebay as Record<string, unknown> | undefined;
+    if (ebay) {
+      const nm = ebay["NEAR_MINT"] as Record<string, unknown> | undefined;
+      if (nm && typeof nm.avg === "number") return nm.avg;
+    }
+
+    // Legacy flat prices format
     const raw = prices.raw as number | undefined;
     if (raw != null) return raw;
-    
+
     const market = prices.market as number | undefined;
     if (market != null) return market;
 
-    // Legacy format
     const direct =
       (prices.market as number) ?? (prices.low as number) ?? null;
     if (direct != null) return direct;
-
-    const tcg = prices.tcgplayer as Record<string, unknown> | undefined;
-    const nested = (tcg?.market as number) ?? (tcg?.low as number) ?? null;
-    if (nested != null) return nested;
   }
 
   // Other flat fields
@@ -89,4 +107,18 @@ export function extractCardPrice(card: Record<string, unknown>): number | null {
   if (flat != null) return flat;
 
   return null;
+}
+
+/**
+ * Format a currency value with a conversion indicator.
+ * Shows "~USD" suffix when the price was converted from a foreign currency.
+ */
+export function formatCurrencyWithNote(
+  value: number | null | undefined,
+  isConverted?: boolean
+): string {
+  if (value == null) return "N/A";
+  const formatted = formatCurrency(value);
+  if (isConverted) return `${formatted} ~USD`;
+  return formatted;
 }

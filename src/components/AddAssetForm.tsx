@@ -89,14 +89,18 @@ export default function AddAssetForm() {
   );
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [gradedPrice, setGradedPrice] = useState<number | null>(null);
+  const [gradedPriceLoading, setGradedPriceLoading] = useState(false);
 
   interface TetherCandidate {
     id: string;
     name: string;
     setName: string;
-    url: string;
+    poketraceId: string;
+    poketraceMarket: string;
     imageUrl?: string;
     currency: string;
+    rawPrice?: number | null;
     prices: {
       ungraded?: number;
       grade7?: number;
@@ -193,16 +197,16 @@ export default function AddAssetForm() {
     setTetherSearchQuery("");
   };
 
-  // Search PriceCharting for tether candidates
+  // Search Poketrace for tether candidates
   const searchTether = useCallback(async (query: string) => {
     if (!query.trim()) return;
     setTetherLoading(true);
     setSelectedTether(null);
     try {
       const res = await fetch(
-        `/api/pricecharting-search?q=${encodeURIComponent(query)}`
+        `/api/graded-search?q=${encodeURIComponent(query)}`
       );
-      if (!res.ok) throw new Error("Failed to search PriceCharting");
+      if (!res.ok) throw new Error("Failed to search Poketrace");
       const data = await res.json();
       setTetherCandidates(data.candidates || []);
     } catch (error) {
@@ -224,6 +228,33 @@ export default function AddAssetForm() {
     if (g.includes("7")) return "grade7";
     return "ungraded";
   }, [form.psaGrade]);
+
+  // Fetch graded price from Poketrace when grade is selected on an API-sourced card
+  useEffect(() => {
+    if (isManualSubmission || !selectedCard || !form.psaGrade) {
+      setGradedPrice(null);
+      return;
+    }
+
+    const poketraceId = (selectedCard as unknown as Record<string, unknown>)?.poketraceId as string | undefined;
+    if (!poketraceId) {
+      setGradedPrice(null);
+      return;
+    }
+
+    setGradedPriceLoading(true);
+    fetch(`/api/card-price?poketraceId=${encodeURIComponent(poketraceId)}&grade=${encodeURIComponent(form.psaGrade)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.price != null) {
+          setGradedPrice(data.price);
+        } else {
+          setGradedPrice(null);
+        }
+      })
+      .catch(() => setGradedPrice(null))
+      .finally(() => setGradedPriceLoading(false));
+  }, [selectedCard, form.psaGrade, isManualSubmission]);
 
   // When user selects a tether candidate, populate the price
   const handleTetherSelect = useCallback((candidate: TetherCandidate) => {
@@ -288,7 +319,14 @@ export default function AddAssetForm() {
       } else if (form.manualPrice && form.manualPriceValue) {
         currentPrice = parseFloat(form.manualPriceValue);
       } else if (selectedCard) {
-        currentPrice = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
+        // Use graded price fetched from Poketrace if available
+        if (form.psaGrade && gradedPrice != null) {
+          currentPrice = gradedPrice;
+        }
+        // Fall back to raw/market price
+        if (currentPrice == null) {
+          currentPrice = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
+        }
       }
 
       // Tethered assets should NOT be marked manual so the cron can auto-refresh
@@ -326,9 +364,8 @@ export default function AddAssetForm() {
           language: form.language,
           storage_location: form.storageLocation,
           is_manual_submission: isManualSubmission,
-          pc_product_id: selectedTether?.id || null,
-          pc_url: selectedTether?.url || null,
-          pc_grade_field: hasTether ? getTetherGradeField() : null,
+          poketrace_id: selectedTether?.poketraceId || (selectedCard as unknown as Record<string, unknown>)?.poketraceId || null,
+          poketrace_market: selectedTether?.poketraceMarket || (selectedCard as unknown as Record<string, unknown>)?.poketraceMarket || "US",
         }),
       });
 
@@ -393,6 +430,7 @@ export default function AddAssetForm() {
         onClose={() => setSearchOpen(false)}
         onSelect={handleCardSelect}
         onManualEntry={handleManualEntry}
+        assetType={form.assetType}
       />
 
       <div className="max-w-4xl mx-auto">
@@ -647,24 +685,41 @@ export default function AddAssetForm() {
                     ))}
                   </select>
                   {form.psaGrade && (
-                    <p className="text-xs text-gold mt-1.5">
-                      Graded: {form.psaGrade}
-                    </p>
+                    <div className="mt-1.5">
+                      <p className="text-xs text-gold">
+                        Graded: {form.psaGrade}
+                      </p>
+                      {!isManualSubmission && selectedCard && (
+                        <p className="text-xs text-text-muted mt-0.5">
+                          {gradedPriceLoading ? (
+                            <span className="text-accent">Fetching graded price...</span>
+                          ) : gradedPrice != null ? (
+                            <span className="text-success">
+                              {form.psaGrade} price: {formatCurrency(gradedPrice)}
+                            </span>
+                          ) : (
+                            <span className="text-warning">
+                              No graded price available — will use raw price
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
 
-              {/* PriceCharting Tether - show for manual submissions or graded API cards */}
-              {(isManualSubmission || (selectedCard && form.psaGrade)) && (
+              {/* Poketrace Tether - only show for manual submissions (API cards already have a poketraceId) */}
+              {isManualSubmission && (
                 <div className="bg-surface-hover border border-border rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Link2 className="w-4 h-4 text-accent" />
                     <span className="text-sm font-medium text-text-primary">
-                      Tether to PriceCharting
+                      Link to Poketrace
                     </span>
                   </div>
                   <p className="text-xs text-text-muted mb-3">
-                    Link this asset to a PriceCharting listing for automatic price updates from eBay sold data.
+                    Link this asset to a Poketrace listing for automatic price updates from TCGPlayer and eBay data.
                   </p>
 
                   {/* Search input */}
@@ -680,7 +735,7 @@ export default function AddAssetForm() {
                         }
                       }}
                       className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
-                      placeholder="Search PriceCharting..."
+                      placeholder="Search Poketrace..."
                     />
                     <button
                       type="button"
@@ -701,7 +756,7 @@ export default function AddAssetForm() {
                   {tetherLoading && (
                     <div className="flex items-center gap-2 text-xs text-text-muted py-2">
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      Searching PriceCharting…
+                      Searching Poketrace…
                     </div>
                   )}
 
@@ -810,7 +865,7 @@ export default function AddAssetForm() {
                         )}
                       </div>
                       <p className="text-[10px] text-text-muted mt-1">
-                        Prices from PriceCharting (eBay sold data, USD) · Price will auto-refresh daily
+                        Prices from Poketrace (TCGPlayer + eBay data, USD) · Price will auto-refresh daily
                       </p>
                       <button
                         type="button"
@@ -820,7 +875,7 @@ export default function AddAssetForm() {
                         }}
                         className="text-[10px] text-danger hover:text-danger mt-1"
                       >
-                        Remove tether
+                        Remove link
                       </button>
                     </div>
                   )}

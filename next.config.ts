@@ -23,6 +23,14 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "storage.googleapis.com",
       },
+      {
+        protocol: "https",
+        hostname: "*.poketrace.com",
+      },
+      {
+        protocol: "https",
+        hostname: "poketrace.com",
+      },
     ],
   },
 };

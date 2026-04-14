@@ -607,6 +607,9 @@ export default function CollectionPage() {
                             <span className={`text-sm font-semibold ${stale ? "text-danger" : asset.manual_price ? "text-warning" : "text-gold"}`}>
                               {formatCurrency(marketPrice)}
                             </span>
+                            {asset.is_converted_price && (
+                              <span className="text-[9px] font-medium text-blue-400 bg-blue-500/10 px-1 py-0.5 rounded leading-none" title="Converted from EUR to USD">~USD</span>
+                            )}
                             {stale && (
                               <span className="text-[9px] font-bold text-danger bg-danger/15 px-1 py-0.5 rounded leading-none">STALE</span>
                             )}
