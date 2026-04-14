@@ -14,9 +14,15 @@ import {
   ChevronDown,
   Plus,
   FileText,
+  Shield,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { usePortfolio, Portfolio } from "@/lib/portfolio-context";
+
+const PLATFORM_ADMIN_EMAILS = [
+  "jamesjmclaren@gmail.com",
+  "k1west.cityboy@gmail.com",
+];
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
@@ -28,10 +34,13 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
   const { portfolios, currentPortfolio, setCurrentPortfolio, isReadOnly } = usePortfolio();
   const [open, setOpen] = useState(false);
   const [portfolioDropdownOpen, setPortfolioDropdownOpen] = useState(false);
+  const isPlatformAdmin = PLATFORM_ADMIN_EMAILS.some(
+    (e) => e.toLowerCase() === user?.primaryEmailAddress?.emailAddress?.toLowerCase()
+  );
 
   // Close sidebar on route change
   useEffect(() => {
@@ -124,6 +133,23 @@ export default function Sidebar() {
               );
             })}
 
+          {isPlatformAdmin && (
+            <>
+              <div className="my-3 mx-4 border-t border-border" />
+              <Link
+                href="/admin"
+                className={clsx(
+                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium",
+                  pathname === "/admin"
+                    ? "bg-accent-muted text-accent-hover"
+                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+                )}
+              >
+                <Shield className="w-5 h-5" />
+                Admin
+              </Link>
+            </>
+          )}
         </nav>
 
         {/* Portfolio Switcher */}
