@@ -14,7 +14,6 @@ import {
   ChevronDown,
   Plus,
   FileText,
-  Settings,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { usePortfolio, Portfolio } from "@/lib/portfolio-context";
@@ -27,24 +26,10 @@ const navItems = [
   { href: "/team", label: "Team", icon: Users, adminOnly: false },
 ];
 
-function useIsAdmin(): boolean {
-  const { user } = useUser();
-  const [isAdmin, setIsAdmin] = useState(false);
-  useEffect(() => {
-    if (!user?.id) return;
-    // Check against the admin user IDs configured in the API
-    fetch("/api/admin/migrate").then((res) => {
-      setIsAdmin(res.status !== 403);
-    }).catch(() => setIsAdmin(false));
-  }, [user?.id]);
-  return isAdmin;
-}
-
 export default function Sidebar() {
   const pathname = usePathname();
   const { isSignedIn } = useUser();
   const { portfolios, currentPortfolio, setCurrentPortfolio, isReadOnly } = usePortfolio();
-  const isAdmin = useIsAdmin();
   const [open, setOpen] = useState(false);
   const [portfolioDropdownOpen, setPortfolioDropdownOpen] = useState(false);
 
@@ -139,26 +124,6 @@ export default function Sidebar() {
               );
             })}
 
-          {/* Admin section */}
-          {isAdmin && (
-            <>
-              <div className="mt-4 mb-2 px-4">
-                <p className="text-xs text-text-muted uppercase tracking-wider">Admin</p>
-              </div>
-              <Link
-                href="/admin/migrate"
-                className={clsx(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium",
-                  pathname === "/admin/migrate"
-                    ? "bg-accent-muted text-accent-hover"
-                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-                )}
-              >
-                <Settings className="w-5 h-5" />
-                API Migration
-              </Link>
-            </>
-          )}
         </nav>
 
         {/* Portfolio Switcher */}
