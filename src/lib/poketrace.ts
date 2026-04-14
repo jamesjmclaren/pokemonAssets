@@ -545,6 +545,10 @@ export async function getRawPoketraceCard(
 
 /**
  * Get price history for a card from Poketrace.
+ *
+ * Poketrace response shape:
+ *   { data: [{ date, source, avg, low, high, saleCount, approxSaleCount, median3d, median7d, median30d }],
+ *     pagination: { hasMore, nextCursor, count } }
  */
 export async function getPoketracePriceHistory(
   cardId: string,
@@ -554,23 +558,52 @@ export async function getPoketracePriceHistory(
 ): Promise<{ date: string; price: number; source: string }[]> {
   const priceTier = tier || "NEAR_MINT";
 
-  try {
-    const response = await apiFetch(
-      `/v1/cards/${encodeURIComponent(cardId)}/prices/${encodeURIComponent(priceTier)}/history`
+  // Determine period param based on date range
+  let period = "365d";
+  if (startDate) {
+    const diffDays = Math.ceil(
+      (Date.now() - new Date(startDate).getTime()) / 86400000
     );
+    if (diffDays <= 30) period = "30d";
+    else if (diffDays <= 90) period = "90d";
+    else period = "365d";
+  }
 
-    // Normalize the response — expect an array of { date, price } or similar
-    const history: { date: string; price: number }[] = Array.isArray(response)
-      ? response
-      : response.data || response.history || [];
+  try {
+    // Paginate to collect all history points
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let allEntries: any[] = [];
+    let cursor: string | undefined;
+    let pageCount = 0;
+    const maxPages = 10; // Safety limit
 
-    let points = history.map((entry) => ({
-      date: typeof entry.date === "number"
-        ? new Date(entry.date * 1000).toISOString().split("T")[0]
-        : entry.date,
-      price: entry.price,
-      source: "poketrace",
-    }));
+    do {
+      const cursorParam = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+      const response = await apiFetch(
+        `/v1/cards/${encodeURIComponent(cardId)}/prices/${encodeURIComponent(priceTier)}/history?period=${period}&limit=365${cursorParam}`
+      );
+
+      const entries = response?.data || [];
+      allEntries = allEntries.concat(entries);
+
+      cursor = response?.pagination?.hasMore ? response.pagination.nextCursor : undefined;
+      pageCount++;
+    } while (cursor && pageCount < maxPages);
+
+    console.log(`[poketrace] Price history for ${cardId}/${priceTier}: ${allEntries.length} entries across ${pageCount} page(s)`);
+
+    if (allEntries.length > 0) {
+      console.log(`[poketrace] First entry:`, JSON.stringify(allEntries[0]));
+    }
+
+    // Map entries — Poketrace uses "avg" for the price field
+    let points = allEntries
+      .map((entry) => ({
+        date: entry.date,
+        price: Number(entry.avg) || 0,
+        source: entry.source || "poketrace",
+      }))
+      .filter((p) => p.price > 0 && p.date);
 
     // Filter by date range if provided
     if (startDate) points = points.filter((p) => p.date >= startDate);
