@@ -547,11 +547,10 @@ export async function getRawPoketraceCard(
  * Get price history for a card from Poketrace.
  *
  * Poketrace response shape:
- *   { data: [{ date, source, avg, low, high, saleCount, approxSaleCount, median3d, median7d, median30d }],
+ *   { data: [{ date, source, avg, low, high, saleCount, ... }],
  *     pagination: { hasMore, nextCursor, count } }
  *
- * The API's `period` parameter may only support "30d". To get longer ranges
- * we paginate backwards using cursors (each cursor is a base64-encoded date).
+ * Supported period values: 7d, 30d, 90d, 1y, all
  */
 export async function getPoketracePriceHistory(
   cardId: string,
@@ -561,17 +560,29 @@ export async function getPoketracePriceHistory(
 ): Promise<{ date: string; price: number; source: string }[]> {
   const priceTier = tier || "NEAR_MINT";
 
+  // Map requested date range to a Poketrace period value
+  let period = "all";
+  if (startDate) {
+    const diffDays = Math.ceil(
+      (Date.now() - new Date(startDate).getTime()) / 86400000
+    );
+    if (diffDays <= 7) period = "7d";
+    else if (diffDays <= 30) period = "30d";
+    else if (diffDays <= 90) period = "90d";
+    else if (diffDays <= 365) period = "1y";
+    else period = "all";
+  }
+
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let allEntries: any[] = [];
     let cursor: string | undefined;
     let pageCount = 0;
-    // Allow enough pages to cover ~1 year (each page ≈ 30 days)
-    const maxPages = 13;
+    const maxPages = 10;
 
     do {
       const cursorParam = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
-      const url = `/v1/cards/${encodeURIComponent(cardId)}/prices/${encodeURIComponent(priceTier)}/history?period=30d&limit=365${cursorParam}`;
+      const url = `/v1/cards/${encodeURIComponent(cardId)}/prices/${encodeURIComponent(priceTier)}/history?period=${period}&limit=365${cursorParam}`;
 
       const response = await apiFetch(url);
 
@@ -580,25 +591,11 @@ export async function getPoketracePriceHistory(
 
       allEntries = allEntries.concat(entries);
 
-      // Check if we have enough data for the requested range
-      if (startDate && entries.length > 0) {
-        const oldestDate = entries[entries.length - 1]?.date || entries[0]?.date;
-        if (oldestDate && oldestDate <= startDate) {
-          // We've gone back far enough
-          break;
-        }
-      }
-
       cursor = response?.pagination?.hasMore ? response.pagination.nextCursor : undefined;
       pageCount++;
     } while (cursor && pageCount < maxPages);
 
-    console.log(`[poketrace] Price history for ${cardId}/${priceTier}: ${allEntries.length} entries across ${pageCount + 1} page(s)`);
-
-    if (allEntries.length > 0) {
-      console.log(`[poketrace] Date range: ${allEntries[allEntries.length - 1]?.date} to ${allEntries[0]?.date}`);
-      console.log(`[poketrace] First entry:`, JSON.stringify(allEntries[0]));
-    }
+    console.log(`[poketrace] Price history for ${cardId}/${priceTier} period=${period}: ${allEntries.length} entries across ${pageCount + 1} page(s)`);
 
     // Map entries — Poketrace uses "avg" for the price field
     let points = allEntries
