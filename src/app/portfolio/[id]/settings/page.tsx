@@ -6,6 +6,11 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, UserPlus, Trash2, Copy, Check, Shield, Eye } from "lucide-react";
 import Link from "next/link";
 
+const SUPER_ADMIN_EMAILS = [
+  "jamesjmclaren@gmail.com",
+  "k1west.cityboy@gmail.com",
+];
+
 interface Member {
   id: string;
   user_id: string;
@@ -38,6 +43,8 @@ export default function PortfolioSettingsPage() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const isOwner = user?.id === ownerId;
+  const isSuperAdmin = user?.emailAddresses
+    ?.some((e) => SUPER_ADMIN_EMAILS.includes(e.emailAddress.toLowerCase())) ?? false;
 
   useEffect(() => {
     if (isLoaded && user) {
@@ -155,14 +162,20 @@ export default function PortfolioSettingsPage() {
               placeholder="Email address"
               className="flex-1 px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
             />
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as "admin" | "read_only")}
-              className="px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
-            >
-              <option value="read_only">Read Only</option>
-              <option value="admin">Admin</option>
-            </select>
+            {isSuperAdmin ? (
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as "admin" | "read_only")}
+                className="px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="read_only">Read Only</option>
+                <option value="admin">Admin</option>
+              </select>
+            ) : (
+              <span className="px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-400 flex items-center gap-1.5">
+                <Eye className="w-4 h-4" /> Read Only
+              </span>
+            )}
           </div>
           <button
             type="submit"
