@@ -144,6 +144,8 @@ export default function AssetDetailPage({
   const [sellPrice, setSellPrice] = useState("");
   const [sellDate, setSellDate] = useState("");
   const [savingSell, setSavingSell] = useState(false);
+  const [suggestedPrice, setSuggestedPrice] = useState<number | null>(null);
+  const [loadingSuggested, setLoadingSuggested] = useState(false);
 
   useEffect(() => {
     async function fetchAsset() {
@@ -165,6 +167,32 @@ export default function AssetDetailPage({
     }
     fetchAsset();
   }, [id, currentPortfolio]);
+
+  // Fetch suggested Poketrace price when asset uses manual pricing
+  useEffect(() => {
+    if (!asset?.manual_price) {
+      setSuggestedPrice(null);
+      return;
+    }
+    let cancelled = false;
+    async function fetchSuggested() {
+      setLoadingSuggested(true);
+      try {
+        const res = await fetch(`/api/assets/${asset!.id}/suggested-price`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data.suggestedPrice != null) {
+          setSuggestedPrice(data.suggestedPrice);
+        }
+      } catch {
+        // Silently fail — suggestion is optional
+      } finally {
+        if (!cancelled) setLoadingSuggested(false);
+      }
+    }
+    fetchSuggested();
+    return () => { cancelled = true; };
+  }, [asset?.id, asset?.manual_price]);
 
   const startEditing = () => {
     if (!asset) return;
@@ -1122,6 +1150,22 @@ export default function AssetDetailPage({
                     </button>
                   )}
                 </div>
+                {asset.manual_price && suggestedPrice != null && (
+                  <p className="text-[10px] text-text-muted mt-1">
+                    Poketrace suggests{" "}
+                    <span className={clsx(
+                      "font-semibold",
+                      suggestedPrice > currentPrice ? "text-success" : suggestedPrice < currentPrice ? "text-danger" : "text-text-secondary"
+                    )}>
+                      {formatCurrency(suggestedPrice)}
+                    </span>
+                  </p>
+                )}
+                {asset.manual_price && loadingSuggested && (
+                  <p className="text-[10px] text-text-muted mt-1 animate-pulse">
+                    Checking Poketrace...
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-[10px] md:text-xs text-text-muted">
