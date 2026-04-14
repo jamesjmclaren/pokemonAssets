@@ -108,6 +108,14 @@ export default function PriceChart({
   const pctChange = startPrice > 0 ? ((currentPrice - startPrice) / startPrice * 100) : 0;
   const isUp = currentPrice >= startPrice;
 
+  // Calculate actual data span for display
+  const actualDays = data.length >= 2
+    ? Math.round((new Date(data[data.length - 1].date).getTime() - new Date(data[0].date).getTime()) / 86400000)
+    : 0;
+  const rangeLabel = actualDays >= 365
+    ? `${(actualDays / 365).toFixed(1).replace(/\.0$/, "")}y`
+    : `${actualDays}d`;
+
   return (
     <div className={`bg-surface border border-border rounded-2xl p-6 ${className}`}>
       <div className="flex items-center justify-between mb-6">
@@ -118,7 +126,7 @@ export default function PriceChart({
           <p className={`text-xs mt-1 ${data.length <= 1 ? "text-text-muted" : isUp ? "text-success" : "text-danger"}`}>
             {data.length <= 1
               ? "Tracking started — history will build over time"
-              : `${isUp ? "+" : ""}${pctChange.toFixed(2)}% over ${range} days`}
+              : `${isUp ? "+" : ""}${pctChange.toFixed(2)}% over ${rangeLabel}`}
           </p>
         </div>
         <div className="flex gap-1 bg-background rounded-xl p-1">

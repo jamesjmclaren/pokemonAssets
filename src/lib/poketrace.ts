@@ -558,16 +558,10 @@ export async function getPoketracePriceHistory(
 ): Promise<{ date: string; price: number; source: string }[]> {
   const priceTier = tier || "NEAR_MINT";
 
-  // Determine period param based on date range
-  let period = "365d";
-  if (startDate) {
-    const diffDays = Math.ceil(
-      (Date.now() - new Date(startDate).getTime()) / 86400000
-    );
-    if (diffDays <= 30) period = "30d";
-    else if (diffDays <= 90) period = "90d";
-    else period = "365d";
-  }
+  // Always request the maximum period from the API (365d).
+  // The API may not support arbitrary period values (e.g. "90d"),
+  // so we fetch the full year and filter client-side.
+  const period = "365d";
 
   try {
     // Paginate to collect all history points
