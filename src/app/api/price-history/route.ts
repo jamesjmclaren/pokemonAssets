@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
   const assetId = searchParams.get("assetId");
   const poketraceId = searchParams.get("poketraceId");
 
+  console.log(`[price-history] Request: cardId=${cardId}, assetId=${assetId}, poketraceId=${poketraceId}, name=${name}, range=${startDate}..${endDate}`);
+
   if (!cardId && !name && !assetId && !poketraceId) {
     return NextResponse.json(
       { error: "cardId, name, assetId, or poketraceId parameter is required" },
@@ -37,7 +39,9 @@ export async function GET(request: NextRequest) {
         query = query.lte("recorded_at", `${endDate}T23:59:59.999Z`);
       }
 
-      const { data: snapshots } = await query;
+      const { data: snapshots, error: snapError } = await query;
+
+      console.log(`[price-history] Supabase snapshots: ${snapshots?.length ?? 0} rows, error=${snapError?.message || "none"}`);
 
       if (snapshots && snapshots.length > 0) {
         // Deduplicate by date (keep only one entry per day)
@@ -57,11 +61,10 @@ export async function GET(request: NextRequest) {
     // Try to get external API price history from Poketrace
     let apiPoints: { date: string; price: number; source?: string }[] = [];
     try {
-      // Use poketraceId directly if available, otherwise fall back to cardId/name search
       const lookupId = poketraceId || cardId || "";
+      console.log(`[price-history] Fetching Poketrace history for: ${lookupId}`);
       let apiData;
       if (poketraceId) {
-        // Direct Poketrace ID — use it for history lookup
         apiData = await getPriceHistory(
           poketraceId,
           startDate || undefined,
@@ -87,9 +90,12 @@ export async function GET(request: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rawPoints = Array.isArray(apiData) ? apiData : (apiData as any)?.data || [];
       apiPoints = rawPoints as { date: string; price: number; source?: string }[];
+      console.log(`[price-history] Poketrace API returned ${apiPoints.length} points`);
     } catch (apiError) {
       console.warn("[price-history] External API failed, using snapshots only:", apiError instanceof Error ? apiError.message : apiError);
     }
+
+    console.log(`[price-history] Final: ${snapshotData.length} snapshots, ${apiPoints.length} API points`);
 
     // Merge both sources, preferring snapshot data for overlapping dates
     if (snapshotData.length > 0 && apiPoints.length > 0) {
