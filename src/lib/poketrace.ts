@@ -165,7 +165,8 @@ export function inferAssetType(card: PoketraceCard): "card" | "sealed" {
  * Prefers TCGPlayer Near Mint, falls back to eBay, then CardMarket.
  */
 export function extractBestPrice(card: PoketraceCard): number | null {
-  const { prices } = card;
+  const prices = card.prices;
+  if (!prices) return null;
 
   // US market: prefer TCGPlayer NM, then eBay NM
   if (prices.tcgplayer) {
@@ -201,7 +202,8 @@ export function extractGradedPrice(
   grade: string
 ): number | null {
   const tier = gradeToPoketraceTier(grade);
-  const { prices } = card;
+  const prices = card.prices;
+  if (!prices) return null;
 
   // Check TCGPlayer first, then eBay
   for (const source of [prices.tcgplayer, prices.ebay, prices.cardmarket]) {
@@ -219,7 +221,8 @@ export function extractGradedPrice(
  */
 export function extractAllGradedPrices(card: PoketraceCard): Record<string, number> {
   const result: Record<string, number> = {};
-  const { prices } = card;
+  const prices = card.prices;
+  if (!prices) return result;
 
   // Collect all tiers from all sources
   for (const source of [prices.tcgplayer, prices.ebay, prices.cardmarket]) {
@@ -524,7 +527,16 @@ export async function getRawPoketraceCard(
   id: string
 ): Promise<PoketraceCard | null> {
   try {
-    return await apiFetch(`/v1/cards/${encodeURIComponent(id)}`);
+    const response = await apiFetch(`/v1/cards/${encodeURIComponent(id)}`);
+    // The API may return the card directly or wrapped in { data: card }
+    const card = response?.data || response;
+    console.log(`[poketrace] getRawPoketraceCard(${id}) response keys:`, Object.keys(response || {}));
+    if (card?.prices) {
+      console.log(`[poketrace] Card prices keys:`, Object.keys(card.prices));
+    } else {
+      console.log(`[poketrace] Card has no 'prices' field. Top-level keys:`, Object.keys(card || {}));
+    }
+    return card;
   } catch (error) {
     console.error(`[poketrace] Failed to fetch raw card ${id}:`, error instanceof Error ? error.message : error);
     return null;
@@ -623,10 +635,11 @@ export async function fetchPoketracePrice(
 
   // Log the full price structure for debugging
   console.log(`[poketrace] fetchPoketracePrice for ${poketraceId}, grade=${grade || "none"}`);
+  const cardPrices = card.prices || {};
   console.log(`[poketrace] Available price sources:`, {
-    tcgplayer: card.prices?.tcgplayer ? Object.keys(card.prices.tcgplayer) : "none",
-    ebay: card.prices?.ebay ? Object.keys(card.prices.ebay) : "none",
-    cardmarket: card.prices?.cardmarket ? Object.keys(card.prices.cardmarket) : "none",
+    tcgplayer: cardPrices.tcgplayer ? Object.keys(cardPrices.tcgplayer) : "none",
+    ebay: cardPrices.ebay ? Object.keys(cardPrices.ebay) : "none",
+    cardmarket: cardPrices.cardmarket ? Object.keys(cardPrices.cardmarket) : "none",
   });
 
   let price: number | null = null;
