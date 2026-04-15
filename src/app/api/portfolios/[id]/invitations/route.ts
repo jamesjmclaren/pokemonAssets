@@ -2,6 +2,11 @@ import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 
+const SUPER_ADMIN_EMAILS = [
+  "jamesjmclaren@gmail.com",
+  "k1west.cityboy@gmail.com",
+];
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -58,6 +63,19 @@ export async function POST(
 
   if (!["admin", "read_only"].includes(role)) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  }
+
+  // Only super admins can invite with admin role
+  const inviterEmail = user.emailAddresses
+    ?.map((e) => e.emailAddress.toLowerCase())
+    ?? [];
+  const isSuperAdmin = inviterEmail.some((e) => SUPER_ADMIN_EMAILS.includes(e));
+
+  if (role === "admin" && !isSuperAdmin) {
+    return NextResponse.json(
+      { error: "Only super admins can invite with admin role" },
+      { status: 403 }
+    );
   }
 
   // Get portfolio details

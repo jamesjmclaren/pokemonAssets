@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { usePortfolio } from "@/lib/portfolio-context";
+import { useUser } from "@clerk/nextjs";
 import { UserPlus, Trash2, Copy, Check, Shield, Eye, Users, Crown, X } from "lucide-react";
+
+const SUPER_ADMIN_EMAILS = [
+  "jamesjmclaren@gmail.com",
+  "k1west.cityboy@gmail.com",
+];
 
 interface Member {
   id: string;
@@ -22,6 +28,9 @@ interface Invitation {
 
 export default function TeamPage() {
   const { currentPortfolio, loading: portfolioLoading } = usePortfolio();
+  const { user } = useUser();
+  const isSuperAdmin = user?.emailAddresses
+    ?.some((e) => SUPER_ADMIN_EMAILS.includes(e.emailAddress.toLowerCase())) ?? false;
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [ownerId, setOwnerId] = useState<string | null>(null);
@@ -192,14 +201,20 @@ export default function TeamPage() {
                 placeholder="Email address"
                 className="flex-1 px-4 py-2.5 bg-background border border-border rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
               />
-              <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as "admin" | "read_only")}
-                className="px-4 py-2.5 bg-background border border-border rounded-xl text-text-primary focus:outline-none focus:border-accent"
-              >
-                <option value="read_only">Read Only</option>
-                <option value="admin">Admin</option>
-              </select>
+              {isSuperAdmin ? (
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value as "admin" | "read_only")}
+                  className="px-4 py-2.5 bg-background border border-border rounded-xl text-text-primary focus:outline-none focus:border-accent"
+                >
+                  <option value="read_only">Read Only</option>
+                  <option value="admin">Admin</option>
+                </select>
+              ) : (
+                <span className="px-4 py-2.5 bg-background border border-border rounded-xl text-text-muted flex items-center gap-1.5">
+                  <Eye className="w-4 h-4" /> Read Only
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-4">
@@ -216,10 +231,12 @@ export default function TeamPage() {
           </form>
 
           <div className="mt-4 p-3 bg-background rounded-xl">
-            <p className="text-xs text-text-muted">
-              <strong className="text-text-secondary">Admin:</strong> Can add/edit assets and invite members
-            </p>
-            <p className="text-xs text-text-muted mt-1">
+            {isSuperAdmin && (
+              <p className="text-xs text-text-muted">
+                <strong className="text-text-secondary">Admin:</strong> Can add/edit assets and invite members
+              </p>
+            )}
+            <p className={`text-xs text-text-muted ${isSuperAdmin ? "mt-1" : ""}`}>
               <strong className="text-text-secondary">Read Only:</strong> Can only view portfolio and assets
             </p>
           </div>
