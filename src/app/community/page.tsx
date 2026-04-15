@@ -102,16 +102,20 @@ export default function Design1() {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch("/api/community", {
+      const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: formName.trim(), whatsapp: whatsapp.trim(), dob: dob.trim(), profile: profile.trim(), interests: interests.trim(), referral: referral.trim() }),
       });
       if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Something went wrong."); }
-      setSubmitted(true);
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
-    } finally {
       setSubmitting(false);
     }
   };
@@ -131,7 +135,6 @@ export default function Design1() {
           <div className="hidden md:flex items-center gap-10">
             <Link href="/" className="text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>Home</Link>
             <a href="#features" className="text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>Features</a>
-            <a href="#subscribe" className="text-text-secondary hover:text-text-primary transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>Join</a>
             <button onClick={() => router.push("/sign-in")} className="text-xs tracking-widest uppercase border border-accent/40 text-accent px-6 py-2.5 hover:bg-accent hover:text-background transition-all cursor-pointer" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.2em" }}>Client Login</button>
           </div>
           <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 -mr-2 text-text-secondary hover:text-text-primary" aria-label="Toggle menu">
@@ -142,7 +145,6 @@ export default function Design1() {
           <div className="md:hidden border-t border-border/20 px-6 py-4 space-y-1" style={{ backgroundColor: "rgba(10,10,10,0.95)" }}>
             <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-text-secondary hover:text-text-primary" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>Home</Link>
             <a href="#features" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-text-secondary hover:text-text-primary" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>Features</a>
-            <a href="#subscribe" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-text-secondary hover:text-text-primary" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>Join</a>
             <button onClick={() => { setMobileMenuOpen(false); router.push("/sign-in"); }} className="w-full mt-2 text-xs tracking-widest uppercase border border-accent/40 text-accent px-6 py-2.5 hover:bg-accent hover:text-background transition-all cursor-pointer" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.2em" }}>Client Login</button>
           </div>
         )}
@@ -439,6 +441,15 @@ export default function Design1() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Referral Bonus Note */}
+      <section className="px-6 md:px-12 py-12">
+        <div className="max-w-5xl mx-auto text-center">
+          <p className="text-text-secondary text-sm leading-relaxed" style={{ fontFamily: "Inter, sans-serif", fontWeight: 300 }}>
+            ** £20 referral bonus for approved and onboarded community members. Please put their full names. Eg. Paul Smith.
+          </p>
         </div>
       </section>
 
