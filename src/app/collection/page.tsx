@@ -119,6 +119,13 @@ export default function CollectionPage() {
     }
 
     result.sort((a, b) => {
+      // In "all" tab, push sold items to the bottom
+      if (typeTab === "all") {
+        const aSold = a.status === "SOLD";
+        const bSold = b.status === "SOLD";
+        if (aSold !== bSold) return aSold ? 1 : -1;
+      }
+
       const qtyA = a.quantity || 1;
       const qtyB = b.quantity || 1;
       let valA: number, valB: number;
@@ -414,8 +421,8 @@ export default function CollectionPage() {
                   const qty = asset.quantity || 1;
                   const sold = asset.status === "SOLD";
 
-                  if (isSoldTab || sold) {
-                    // Sold row rendering
+                  if (isSoldTab && sold) {
+                    // Sold tab: dedicated sold column layout
                     const sellTotal = (asset.sell_price ?? asset.purchase_price) * qty;
                     const invested = asset.purchase_price * qty;
                     const realisedPnL = sellTotal - invested;
@@ -424,7 +431,7 @@ export default function CollectionPage() {
                     return (
                       <tr
                         key={asset.id}
-                        className={`hover:bg-surface-hover cursor-pointer group ${sold && !isSoldTab ? "opacity-50" : ""}`}
+                        className="hover:bg-surface-hover cursor-pointer group"
                         onClick={() => (window.location.href = `/asset/${asset.id}`)}
                       >
                         {/* Product */}
@@ -541,19 +548,19 @@ export default function CollectionPage() {
                     );
                   }
 
-                  // Active row rendering (default)
-                  const marketPrice = asset.current_price ?? asset.purchase_price;
+                  // Active row rendering (also used for sold items in "All" tab)
+                  const marketPrice = sold ? (asset.sell_price ?? asset.purchase_price) : (asset.current_price ?? asset.purchase_price);
                   const total = marketPrice * qty;
                   const invested = asset.purchase_price * qty;
                   const avgPer = asset.purchase_price;
                   const profit = total - invested;
                   const perfPct = invested > 0 ? (profit / invested) * 100 : 0;
-                  const stale = isPriceStale(asset);
+                  const stale = !sold && isPriceStale(asset);
 
                   return (
                     <tr
                       key={asset.id}
-                      className="hover:bg-surface-hover cursor-pointer group"
+                      className={`hover:bg-surface-hover cursor-pointer group ${sold ? "opacity-50" : ""}`}
                       onClick={() => (window.location.href = `/asset/${asset.id}`)}
                     >
                       {/* Product */}
@@ -580,11 +587,16 @@ export default function CollectionPage() {
                             <p className="text-sm font-semibold text-text-primary truncate max-w-[200px]">
                               {asset.name}
                             </p>
-                            {asset.psa_grade && (
-                              <span className="text-[10px] text-gold font-medium">
-                                {asset.psa_grade}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {asset.psa_grade && (
+                                <span className="text-[10px] text-gold font-medium">
+                                  {asset.psa_grade}
+                                </span>
+                              )}
+                              {sold && (
+                                <span className="text-[10px] font-bold text-text-muted bg-surface-hover px-1.5 py-0.5 rounded">SOLD</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -594,20 +606,24 @@ export default function CollectionPage() {
                         {formatDate(asset.purchase_date)}
                       </td>
 
-                      {/* Market Price */}
+                      {/* Market Price (or Sold Price for sold items in All tab) */}
                       <td className="px-4 py-3">
                         <div>
-                          {asset.manual_price && (
+                          {sold ? (
+                            <div className="flex items-center gap-1 mb-0.5">
+                              <span className="text-[10px] font-semibold text-text-muted">Sold Price</span>
+                            </div>
+                          ) : asset.manual_price ? (
                             <div className="flex items-center gap-1 mb-0.5">
                               <PenLine className="w-2.5 h-2.5 text-warning" />
                               <span className="text-[10px] font-semibold text-warning">Manual</span>
                             </div>
-                          )}
+                          ) : null}
                           <div className="flex items-center gap-1.5">
-                            <span className={`text-sm font-semibold ${stale ? "text-danger" : asset.manual_price ? "text-warning" : "text-gold"}`}>
+                            <span className={`text-sm font-semibold ${sold ? "text-text-secondary" : stale ? "text-danger" : asset.manual_price ? "text-warning" : "text-gold"}`}>
                               {formatCurrency(marketPrice)}
                             </span>
-                            {asset.is_converted_price && (
+                            {!sold && asset.is_converted_price && (
                               <span className="text-[9px] font-medium text-blue-400 bg-blue-500/10 px-1 py-0.5 rounded leading-none" title="Converted from EUR to USD">~USD</span>
                             )}
                             {stale && (
@@ -620,13 +636,17 @@ export default function CollectionPage() {
                       {/* Mini sparkline */}
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="w-24 h-8 mx-auto">
-                          <MiniSparkline
-                            assetId={asset.external_id}
-                            assetName={asset.name}
-                            assetType={asset.asset_type}
-                            currentPrice={marketPrice}
-                            purchasePrice={asset.purchase_price}
-                          />
+                          {sold ? (
+                            <span className="text-text-muted text-xs">—</span>
+                          ) : (
+                            <MiniSparkline
+                              assetId={asset.external_id}
+                              assetName={asset.name}
+                              assetType={asset.asset_type}
+                              currentPrice={marketPrice}
+                              purchasePrice={asset.purchase_price}
+                            />
+                          )}
                         </div>
                       </td>
 
