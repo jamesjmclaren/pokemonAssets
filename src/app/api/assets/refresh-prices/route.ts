@@ -81,6 +81,13 @@ export async function POST() {
           }
         }
 
+        // If a grade is specified but no graded price was found, skip —
+        // don't fall back to raw price.
+        if (marketPrice == null && asset.psa_grade) {
+          console.log(`[refresh-prices]   Grade "${asset.psa_grade}" has no graded price for "${asset.name}" — skipping (N/A)`);
+          continue;
+        }
+
         // Fallback to name search via Poketrace
         if (marketPrice == null) {
           let results: Record<string, unknown>[];

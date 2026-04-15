@@ -90,6 +90,18 @@ export async function POST(
       }
     }
 
+    // If a grade is specified but no graded price was found, don't fall back
+    // to raw price — return N/A instead of a misleading ungraded price.
+    if (marketPrice == null && asset.psa_grade) {
+      console.log(`[refresh-single]   Grade "${asset.psa_grade}" has no graded price — returning N/A (not falling back to raw)`);
+      return NextResponse.json({
+        asset,
+        refreshed: false,
+        reason: "no_graded_price",
+        message: `No ${asset.psa_grade} price available from Poketrace.`,
+      });
+    }
+
     // State 2: Manual price — skip refresh (unless Poketrace linked above)
     if (marketPrice == null && asset.manual_price && !asset.poketrace_id) {
       console.log(`[refresh-single]   Asset is manual_price — skipping refresh`);

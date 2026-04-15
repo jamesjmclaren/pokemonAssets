@@ -700,10 +700,14 @@ export async function fetchPoketracePrice(
     console.log(`[poketrace] Graded price result: ${price ?? "null (not found)"}`);
   }
 
-  // Fall back to best raw price
-  if (price == null) {
+  // Fall back to best raw price only if no grade was requested.
+  // If a grade was specified but its price wasn't found, return null (N/A)
+  // rather than silently substituting the raw price.
+  if (price == null && !grade) {
     price = extractBestPrice(card);
     console.log(`[poketrace] Falling back to raw price: ${price ?? "null"}`);
+  } else if (price == null && grade) {
+    console.log(`[poketrace] No graded price found for ${grade} – returning N/A (not falling back to raw)`);
   }
 
   if (price == null) return null;

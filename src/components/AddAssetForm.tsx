@@ -322,9 +322,11 @@ export default function AddAssetForm() {
         // Use graded price fetched from Poketrace if available
         if (form.psaGrade && gradedPrice != null) {
           currentPrice = gradedPrice;
-        }
-        // Fall back to raw/market price
-        if (currentPrice == null) {
+        } else if (form.psaGrade) {
+          // Grade selected but no graded price found — leave as null (N/A)
+          currentPrice = null;
+        } else {
+          // No grade selected — use raw/market price
           currentPrice = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
         }
       }
@@ -699,7 +701,7 @@ export default function AddAssetForm() {
                             </span>
                           ) : (
                             <span className="text-warning">
-                              No graded price available — will use raw price
+                              No graded price available — price will show as N/A
                             </span>
                           )}
                         </p>

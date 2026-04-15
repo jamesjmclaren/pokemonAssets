@@ -70,6 +70,12 @@ export async function GET(
       }
     }
 
+    // If a grade is specified but no graded price was found, don't fall back
+    // to raw price — return null (N/A) instead.
+    if (suggestedPrice == null && asset.psa_grade) {
+      return NextResponse.json({ suggestedPrice: null });
+    }
+
     // Priority 2: Search by name
     if (suggestedPrice == null && asset.name) {
       try {
