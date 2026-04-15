@@ -119,6 +119,13 @@ export default function CollectionPage() {
     }
 
     result.sort((a, b) => {
+      // When viewing "all", push sold items to the bottom
+      if (typeTab === "all") {
+        const aSold = a.status === "SOLD" ? 1 : 0;
+        const bSold = b.status === "SOLD" ? 1 : 0;
+        if (aSold !== bSold) return aSold - bSold;
+      }
+
       const qtyA = a.quantity || 1;
       const qtyB = b.quantity || 1;
       let valA: number, valB: number;
