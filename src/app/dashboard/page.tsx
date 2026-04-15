@@ -87,7 +87,7 @@ export default function DashboardPage() {
     (sum, a) => sum + (a.current_price ?? a.purchase_price) * (a.quantity || 1),
     0
   );
-  const totalPortfolioValue = activeValue + cashBalance;
+  const totalPortfolioValue = activeValue;
 
   const unrealisedPnL = activeAssets.reduce((sum, a) => {
     const qty = a.quantity || 1;
@@ -180,7 +180,7 @@ export default function DashboardPage() {
           value={formatCurrency(totalPortfolioValue)}
           change={
             cashBalance > 0
-              ? `${formatCurrency(activeValue)} assets + ${formatCurrency(cashBalance)} cash`
+              ? `+ ${formatCurrency(cashBalance)} cash from sales`
               : undefined
           }
           changeType="neutral"
