@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      mode: "payment",
+      mode: "subscription",
       success_url: `${req.nextUrl.origin}/community/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.nextUrl.origin}/community`,
       customer_email: undefined,
