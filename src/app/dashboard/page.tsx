@@ -25,7 +25,6 @@ import type { PortfolioAsset } from "@/types";
 export default function DashboardPage() {
   const { currentPortfolio, loading: portfolioLoading, isReadOnly } = usePortfolio();
   const [assets, setAssets] = useState<PortfolioAsset[]>([]);
-  const [cashBalance, setCashBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -36,18 +35,10 @@ export default function DashboardPage() {
         return;
       }
       try {
-        const [assetsRes, portfolioRes] = await Promise.all([
-          fetch(`/api/assets?portfolioId=${currentPortfolio.id}`),
-          fetch(`/api/portfolios/${currentPortfolio.id}`),
-        ]);
+        const assetsRes = await fetch(`/api/assets?portfolioId=${currentPortfolio.id}`);
         if (!assetsRes.ok) throw new Error("Failed to fetch assets");
         const data = await assetsRes.json();
         setAssets(Array.isArray(data) ? data : []);
-
-        if (portfolioRes.ok) {
-          const portfolioData = await portfolioRes.json();
-          setCashBalance(portfolioData.cash_balance || 0);
-        }
       } catch (error) {
         console.error("Error fetching data:", error);
         setAssets([]);
@@ -88,6 +79,12 @@ export default function DashboardPage() {
     0
   );
   const totalPortfolioValue = activeValue;
+
+  // Compute cash from sales directly from sold assets to avoid stale cached values
+  const computedCashBalance = soldAssets.reduce(
+    (sum, a) => sum + (a.sell_price ?? 0) * (a.quantity || 1),
+    0
+  );
 
   const unrealisedPnL = activeAssets.reduce((sum, a) => {
     const qty = a.quantity || 1;
@@ -179,8 +176,8 @@ export default function DashboardPage() {
           label="Total Value"
           value={formatCurrency(totalPortfolioValue)}
           change={
-            cashBalance > 0
-              ? `+ ${formatCurrency(cashBalance)} cash from sales`
+            computedCashBalance > 0
+              ? `+ ${formatCurrency(computedCashBalance)} cash from sales`
               : undefined
           }
           changeType="neutral"
@@ -216,7 +213,7 @@ export default function DashboardPage() {
         />
         <StatCard
           label="Cash Balance"
-          value={formatCurrency(cashBalance)}
+          value={formatCurrency(computedCashBalance)}
           change={
             totalInvested > 0
               ? `Net return: ${overallReturnPct >= 0 ? "+" : ""}${overallReturnPct.toFixed(1)}%`
