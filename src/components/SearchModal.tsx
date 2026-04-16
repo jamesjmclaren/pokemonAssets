@@ -108,7 +108,7 @@ export default function SearchModal({
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search cards or sealed products..."
+            placeholder="e.g. mega charizard x ex 125"
             value={query}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
