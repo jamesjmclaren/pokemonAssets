@@ -19,18 +19,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const priceId = process.env.STRIPE_PRICE_ID;
+    if (!priceId) {
+      return NextResponse.json(
+        { error: "STRIPE_PRICE_ID is not configured." },
+        { status: 500 }
+      );
+    }
+
     const session = await getStripe().checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
         {
-          price_data: {
-            currency: "gbp",
-            product_data: {
-              name: "West Investments Community Membership",
-              description: "Annual membership — all features included",
-            },
-            unit_amount: 27000, // £270.00
-          },
+          price: priceId,
           quantity: 1,
         },
       ],
