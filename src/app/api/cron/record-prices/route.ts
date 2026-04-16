@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     const staleMs = 24 * 60 * 60 * 1000;
 
     const staleApiAssets = assets.filter((a) => {
-      if (a.manual_price && !a.poketrace_id) return false;
+      if (a.manual_price) return false;
       if (!a.price_updated_at) return true;
       return now - new Date(a.price_updated_at).getTime() > staleMs;
     });
