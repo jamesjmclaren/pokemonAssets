@@ -696,18 +696,6 @@ export default function AssetDetailPage({
               </select>
             </div>
 
-            {/* Storage Location */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">Physical Location</label>
-              <input
-                type="text"
-                value={editForm.storage_location}
-                onChange={(e) => setEditForm({ ...editForm, storage_location: e.target.value })}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-text-primary text-sm outline-none focus:border-accent"
-                placeholder="e.g. Binder A, Safe, Display Case..."
-              />
-            </div>
-
             {/* Current Market Price */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">Current Market Price</label>

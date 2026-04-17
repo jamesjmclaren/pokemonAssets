@@ -281,8 +281,8 @@ export default function AddAssetForm() {
   // Determine the effective name/id for submission
   const effectiveName = isManualSubmission ? form.manualName : selectedCard?.name || "";
   const canSubmit = isManualSubmission
-    ? form.manualName.trim().length > 0 && !!form.purchasePrice && !!currentPortfolio && !!form.evidenceUrl.trim()
-    : !!selectedCard && !!form.purchasePrice && !!currentPortfolio && (!form.manualPrice || !!form.evidenceUrl.trim());
+    ? form.manualName.trim().length > 0 && !!form.purchasePrice && !!currentPortfolio
+    : !!selectedCard && !!form.purchasePrice && !!currentPortfolio;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -981,28 +981,6 @@ export default function AddAssetForm() {
                 />
               </div>
 
-              {/* Physical Storage Location */}
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Physical Location
-                </label>
-                <input
-                  type="text"
-                  value={form.storageLocation}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      storageLocation: e.target.value,
-                    }))
-                  }
-                  className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
-                  placeholder="e.g. Binder A, Safe, Display Case..."
-                />
-                <p className="text-xs text-text-muted mt-1">
-                  Where the physical card or product is stored
-                </p>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-2">
                   Condition
@@ -1075,11 +1053,10 @@ export default function AddAssetForm() {
                       </div>
                   <div className="mt-3">
                     <label className="block text-sm font-medium text-text-secondary mb-2">
-                      Evidence URL *
+                      Evidence URL
                     </label>
                     <input
                       type="url"
-                      required
                       value={form.evidenceUrl}
                       onChange={(e) =>
                         setForm((f) => ({ ...f, evidenceUrl: e.target.value }))
@@ -1127,11 +1104,10 @@ export default function AddAssetForm() {
                     </div>
                     <div className="mt-3">
                       <label className="block text-sm font-medium text-text-secondary mb-2">
-                        Evidence URL *
+                        Evidence URL
                       </label>
                       <input
                         type="url"
-                        required
                         value={form.evidenceUrl}
                         onChange={(e) =>
                           setForm((f) => ({ ...f, evidenceUrl: e.target.value }))
