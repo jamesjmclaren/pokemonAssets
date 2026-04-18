@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { usePortfolio, Portfolio } from "@/lib/portfolio-context";
+import CurrencySelector from "@/components/CurrencySelector";
 
 const PLATFORM_ADMIN_EMAILS = [
   "jamesjmclaren@gmail.com",
@@ -237,7 +238,8 @@ export default function Sidebar() {
         )}
 
         {/* Footer */}
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border space-y-3">
+          <CurrencySelector />
           {isSignedIn ? (
             <div className="flex items-center gap-3 px-4 py-3">
               <UserButton afterSignOutUrl="/" />
@@ -251,7 +253,7 @@ export default function Sidebar() {
               Sign In
             </Link>
           )}
-          <div className="px-4 py-2 mt-2">
+          <div className="px-4 py-2">
             <p className="text-xs text-text-muted">
               Powered by Poketrace
             </p>

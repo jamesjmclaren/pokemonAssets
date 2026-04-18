@@ -18,12 +18,14 @@ import {
 import StatCard from "@/components/StatCard";
 import PortfolioChart from "@/components/PortfolioChart";
 import AssetCard from "@/components/AssetCard";
-import { formatCurrency, formatPercentage } from "@/lib/format";
+import { formatPercentage } from "@/lib/format";
 import { usePortfolio } from "@/lib/portfolio-context";
+import { useFormatCurrency } from "@/lib/currency-context";
 import type { PortfolioAsset } from "@/types";
 
 export default function DashboardPage() {
   const { currentPortfolio, loading: portfolioLoading, isReadOnly } = usePortfolio();
+  const formatCurrency = useFormatCurrency();
   const [assets, setAssets] = useState<PortfolioAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

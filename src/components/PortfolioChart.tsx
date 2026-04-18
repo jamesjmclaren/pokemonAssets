@@ -10,7 +10,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { formatCurrency, formatDateShort } from "@/lib/format";
+import { formatDateShort } from "@/lib/format";
+import { useFormatCurrency } from "@/lib/currency-context";
 
 type TimeRange = "1M" | "3M" | "1Y" | "All";
 
@@ -40,6 +41,7 @@ const STACKED_SERIES: Array<{ key: string; label: string; color: string }> = [
 const COST_BASIS = { key: "costBasis", label: "Cost Basis", color: "#9090a8" };
 
 export default function PortfolioChart({ portfolioId, data: staticData, className = "" }: PortfolioChartProps) {
+  const formatCurrency = useFormatCurrency();
   const [range, setRange] = useState<TimeRange>("3M");
   const [data, setData] = useState<ChartPoint[]>(staticData ?? []);
   const [loading, setLoading] = useState(!staticData);

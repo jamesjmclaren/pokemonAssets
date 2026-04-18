@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import LayoutShell from "@/components/LayoutShell";
 import { PortfolioProvider } from "@/lib/portfolio-context";
+import { CurrencyProvider } from "@/lib/currency-context";
 
 export const metadata: Metadata = {
   title: "West Investments Ltd",
@@ -28,7 +29,9 @@ export default function RootLayout({
         </head>
         <body className="antialiased">
           <PortfolioProvider>
-            <LayoutShell>{children}</LayoutShell>
+            <CurrencyProvider>
+              <LayoutShell>{children}</LayoutShell>
+            </CurrencyProvider>
           </PortfolioProvider>
         </body>
       </html>

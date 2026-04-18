@@ -22,8 +22,9 @@ import {
 import AssetCard from "@/components/AssetCard";
 import MiniSparkline from "@/components/MiniSparkline";
 import MarketDisclaimer from "@/components/MarketDisclaimer";
-import { formatCurrency, formatDate, fixStorageUrl } from "@/lib/format";
+import { formatDate, fixStorageUrl } from "@/lib/format";
 import { usePortfolio } from "@/lib/portfolio-context";
+import { useFormatCurrency } from "@/lib/currency-context";
 import type { PortfolioAsset } from "@/types";
 
 type SortField = "name" | "purchase_price" | "current_price" | "profit" | "purchase_date" | "performance";
@@ -43,6 +44,7 @@ function isActive(asset: PortfolioAsset): boolean {
 
 export default function CollectionPage() {
   const { currentPortfolio, loading: portfolioLoading, isReadOnly } = usePortfolio();
+  const formatCurrency = useFormatCurrency();
   const [assets, setAssets] = useState<PortfolioAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");

@@ -6,7 +6,15 @@
  */
 
 const FALLBACK_EUR_USD_RATE = 1.08; // Last updated: April 2026
+const FALLBACK_GBP_USD_RATE = 1.27; // Last updated: April 2026
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Rates are expressed relative to a USD base (USD → X).
+const FALLBACK_USD_RATES: Record<string, number> = {
+  USD: 1,
+  EUR: 1 / FALLBACK_EUR_USD_RATE,
+  GBP: 1 / FALLBACK_GBP_USD_RATE,
+};
 
 interface CachedRates {
   rates: Record<string, number>;
@@ -50,8 +58,35 @@ async function fetchRates(): Promise<Record<string, number>> {
     );
 
     // Return fallback rates
-    return { EUR: 1 / FALLBACK_EUR_USD_RATE, USD: 1 };
+    return { ...FALLBACK_USD_RATES };
   }
+}
+
+/**
+ * Return USD-based rates for a fixed subset of currencies used by the UI.
+ * e.g. { USD: 1, GBP: 0.787..., EUR: 0.925... }.
+ */
+export async function getDisplayRates(): Promise<Record<string, number>> {
+  const rates = await fetchRates();
+  const pick = (code: string) =>
+    typeof rates[code] === "number" ? rates[code] : FALLBACK_USD_RATES[code] ?? 1;
+  return {
+    USD: 1,
+    EUR: pick("EUR"),
+    GBP: pick("GBP"),
+  };
+}
+
+/**
+ * Convert a USD amount into the target currency using today's cached rate.
+ */
+export async function convertFromUsd(
+  amount: number,
+  toCurrency: string
+): Promise<{ value: number; rate: number }> {
+  if (toCurrency === "USD") return { value: amount, rate: 1 };
+  const rate = await getExchangeRate("USD", toCurrency);
+  return { value: Math.round(amount * rate * 100) / 100, rate };
 }
 
 /**

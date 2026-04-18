@@ -28,7 +28,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import PriceChart from "@/components/PriceChart";
-import { formatCurrency, formatPercentage, formatDate, fixStorageUrl, getMarketDisclaimer } from "@/lib/format";
+import { formatPercentage, formatDate, fixStorageUrl, getMarketDisclaimer } from "@/lib/format";
+import { useFormatCurrency } from "@/lib/currency-context";
 import { clsx } from "clsx";
 import { usePortfolio } from "@/lib/portfolio-context";
 import type { PortfolioAsset } from "@/types";
@@ -122,6 +123,7 @@ export default function AssetDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const { currentPortfolio, isReadOnly } = usePortfolio();
+  const formatCurrency = useFormatCurrency();
   const [asset, setAsset] = useState<PortfolioAsset | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
