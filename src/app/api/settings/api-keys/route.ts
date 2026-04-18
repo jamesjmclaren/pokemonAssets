@@ -1,25 +1,42 @@
 import { NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 
+function formatClerkError(err: unknown): { message: string; status: number } {
+  // ClerkAPIResponseError shape: { status, clerkError, errors: [{code, message, longMessage}] }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const e = err as any;
+  if (e?.errors && Array.isArray(e.errors) && e.errors.length > 0) {
+    const first = e.errors[0];
+    const msg = first?.longMessage || first?.message || first?.code || "Clerk error";
+    return { message: msg, status: e.status && e.status >= 400 ? e.status : 500 };
+  }
+  if (typeof e?.message === "string") return { message: e.message, status: 500 };
+  return { message: "Unknown error", status: 500 };
+}
+
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const clerk = await clerkClient();
-  const { data } = await clerk.apiKeys.list({ subject: userId });
-
-  const keys = data.map((k) => ({
-    id: k.id,
-    name: k.name,
-    description: k.description,
-    revoked: k.revoked,
-    expired: k.expired,
-    expiration: k.expiration,
-    lastUsedAt: k.lastUsedAt,
-    createdAt: k.createdAt,
-  }));
-
-  return NextResponse.json({ keys });
+  try {
+    const clerk = await clerkClient();
+    const { data } = await clerk.apiKeys.list({ subject: userId });
+    const keys = data.map((k) => ({
+      id: k.id,
+      name: k.name,
+      description: k.description,
+      revoked: k.revoked,
+      expired: k.expired,
+      expiration: k.expiration,
+      lastUsedAt: k.lastUsedAt,
+      createdAt: k.createdAt,
+    }));
+    return NextResponse.json({ keys });
+  } catch (err) {
+    const { message, status } = formatClerkError(err);
+    console.error("[settings/api-keys] list failed:", err);
+    return NextResponse.json({ error: message, keys: [] }, { status });
+  }
 }
 
 export async function POST(request: Request) {
@@ -52,7 +69,9 @@ export async function POST(request: Request) {
       secret: apiKey.secret,
     });
   } catch (err) {
+    const { message, status } = formatClerkError(err);
     console.error("[settings/api-keys] create failed:", err);
-    return NextResponse.json({ error: "Failed to create API key" }, { status: 500 });
+    return NextResponse.json({ error: message }, { status });
   }
 }
+

@@ -1,9 +1,18 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { FileCode, Terminal, KeyRound } from "lucide-react";
 
 export const metadata = {
   title: "API Docs — West Investments",
 };
+
+async function getBaseUrl(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") || h.get("host") || "portfolio.westinvestments.co.uk";
+  const proto =
+    h.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
 
 function Code({ children }: { children: React.ReactNode }) {
   return (
@@ -13,7 +22,9 @@ function Code({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function ApiDocsPage() {
+export default async function ApiDocsPage() {
+  const baseUrl = await getBaseUrl();
+  const apiBase = `${baseUrl}/api/v1`;
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
@@ -47,7 +58,7 @@ export default function ApiDocsPage() {
 
       <section className="bg-surface border border-border rounded-2xl p-4 md:p-6 space-y-4">
         <h2 className="text-lg font-semibold text-text-primary">Base URL</h2>
-        <Code>{`https://<your-host>/api/v1`}</Code>
+        <Code>{apiBase}</Code>
         <p className="text-xs text-text-muted">
           All prices are returned in USD (US-market Poketrace data). European-market assets are converted from EUR upstream.
         </p>
@@ -62,7 +73,7 @@ export default function ApiDocsPage() {
           Lists every portfolio you own or are a member of, with aggregate asset count, cost, and value.
         </p>
         <Code>{`curl -H "Authorization: Bearer $KEY" \\
-  https://<host>/api/v1/portfolio`}</Code>
+  ${apiBase}/portfolio`}</Code>
         <p className="text-xs text-text-muted">Response:</p>
         <Code>{`{
   "portfolios": [
@@ -114,7 +125,7 @@ export default function ApiDocsPage() {
           </tbody>
         </table>
         <Code>{`curl -H "Authorization: Bearer $KEY" \\
-  "https://<host>/api/v1/assets?limit=50"`}</Code>
+  "${apiBase}/assets?limit=50"`}</Code>
         <Code>{`{
   "assets": [
     {

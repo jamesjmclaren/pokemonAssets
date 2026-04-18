@@ -179,8 +179,14 @@ export default function ApiKeysPage() {
       </form>
 
       {error && (
-        <div className="bg-danger/5 border border-danger/30 rounded-2xl p-3 text-sm text-danger">
-          {error}
+        <div className="bg-danger/5 border border-danger/30 rounded-2xl p-3 text-sm text-danger space-y-2">
+          <p>{error}</p>
+          {/(api.?key|machine.?auth|not enabled|disabled|beta|plan|feature)/i.test(error) && (
+            <p className="text-xs text-text-muted">
+              Clerk&apos;s API Keys feature may need to be enabled on your Clerk instance. In the Clerk Dashboard, open{" "}
+              <strong>Configure → API Keys</strong> (Machine Auth) and enable it, then reload this page.
+            </p>
+          )}
         </div>
       )}
 
