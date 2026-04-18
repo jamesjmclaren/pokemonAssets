@@ -28,7 +28,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import PriceChart from "@/components/PriceChart";
-import { formatCurrency, formatPercentage, formatDate, fixStorageUrl } from "@/lib/format";
+import { formatCurrency, formatPercentage, formatDate, fixStorageUrl, getMarketDisclaimer } from "@/lib/format";
 import { clsx } from "clsx";
 import { usePortfolio } from "@/lib/portfolio-context";
 import type { PortfolioAsset } from "@/types";
@@ -768,7 +768,9 @@ export default function AssetDetailPage({
                     <Link2 className="w-3.5 h-3.5 text-accent flex-shrink-0" />
                     <p className="text-xs text-accent truncate">Poketrace ID: {editForm.poketrace_id} ({editForm.poketrace_market})</p>
                   </div>
-                  <p className="text-[10px] text-text-muted mt-1">Prices auto-refresh daily from Poketrace (TCGPlayer + eBay data, USD)</p>
+                  <p className="text-[10px] text-text-muted mt-1">
+                    {getMarketDisclaimer(editForm.poketrace_market, "long")} Prices auto-refresh daily.
+                  </p>
                 </div>
               ) : (
                 <div>
@@ -1457,9 +1459,9 @@ export default function AssetDetailPage({
               <p className="text-xs text-text-muted">
                 {asset.poketrace_id ? (
                   <>
-                    Linked to Poketrace (TCGPlayer + eBay data, USD)
+                    Linked to Poketrace · {getMarketDisclaimer(asset.poketrace_market, "short")}
                     {asset.is_converted_price && (
-                      <> · <span className="text-warning">Price converted from EUR</span></>
+                      <> · <span className="text-warning">Converted from EUR to USD</span></>
                     )}
                     {asset.price_updated_at &&
                       ` · Updated ${formatDate(asset.price_updated_at)}`}
@@ -1472,9 +1474,9 @@ export default function AssetDetailPage({
                   </>
                 ) : (
                   <>
-                    Price data from Poketrace
+                    Price data from Poketrace · {getMarketDisclaimer(asset.poketrace_market, "short")}
                     {asset.is_converted_price && (
-                      <> · <span className="text-warning">Converted from EUR</span></>
+                      <> · <span className="text-warning">Converted from EUR to USD</span></>
                     )}
                     {asset.price_updated_at &&
                       ` · Updated ${formatDate(asset.price_updated_at)}`}

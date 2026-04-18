@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import AssetCard from "@/components/AssetCard";
 import MiniSparkline from "@/components/MiniSparkline";
+import MarketDisclaimer from "@/components/MarketDisclaimer";
 import { formatCurrency, formatDate, fixStorageUrl } from "@/lib/format";
 import { usePortfolio } from "@/lib/portfolio-context";
 import type { PortfolioAsset } from "@/types";
@@ -248,6 +249,7 @@ export default function CollectionPage() {
               ? `${formatCurrency(totalValue)} sold`
               : `${formatCurrency(totalValue)} total value`}
           </p>
+          <MarketDisclaimer variant="long" showIcon className="mt-1" />
         </div>
         {!isReadOnly && (
           <Link

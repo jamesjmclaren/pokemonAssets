@@ -224,6 +224,11 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* Market disclaimer footnote */}
+      <p className="text-[11px] text-text-muted -mt-1">
+        Valuations based on US market pricing (TCGPlayer + eBay, USD). European-market assets are converted from EUR at today&apos;s rate.
+      </p>
+
       {/* Summary bar */}
       {assets.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-surface border border-border rounded-2xl p-4">

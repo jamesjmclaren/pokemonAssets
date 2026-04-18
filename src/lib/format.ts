@@ -122,3 +122,22 @@ export function formatCurrencyWithNote(
   if (isConverted) return `${formatted} ~USD`;
   return formatted;
 }
+
+/**
+ * Return a disclaimer string describing which market a Poketrace price comes from.
+ * Used to make the US-vs-EU provenance explicit wherever prices render.
+ */
+export function getMarketDisclaimer(
+  market?: string | null,
+  variant: "short" | "long" = "short"
+): string {
+  const isEu = (market || "").toUpperCase() === "EU";
+  if (isEu) {
+    return variant === "long"
+      ? "Based on European market pricing (CardMarket, EUR; converted to USD)."
+      : "European market (CardMarket)";
+  }
+  return variant === "long"
+    ? "Based on US market pricing (TCGPlayer + eBay data, USD)."
+    : "US market (TCGPlayer + eBay)";
+}

@@ -761,6 +761,9 @@ export default function ReportPage() {
                 </span>
               )}
             </p>
+            <p className="text-[11px] text-text-muted mt-1">
+              All figures based on US market pricing from Poketrace (TCGPlayer + eBay, USD). European-market assets are converted from EUR. Informational only; not financial or tax advice.
+            </p>
           </div>
           <div className="print:hidden flex items-center gap-2">
             <button
