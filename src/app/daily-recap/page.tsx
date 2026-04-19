@@ -57,6 +57,9 @@ export default function DailyRecapPage() {
   const [setMoversLoading, setSetMoversLoading] = useState(true);
   const [setMoversFetchedAt, setSetMoversFetchedAt] = useState<string | null>(null);
   const [setMoversMissing, setSetMoversMissing] = useState<string[]>([]);
+  const [setMoversAvailable, setSetMoversAvailable] = useState<
+    { slug: string; name: string; releaseDate?: string }[]
+  >([]);
 
   useEffect(() => {
     async function fetchMovers() {
@@ -91,6 +94,9 @@ export default function DailyRecapPage() {
         setSetBlocks(Array.isArray(data.sets) ? data.sets : []);
         setSetMoversFetchedAt(data.fetchedAt || null);
         setSetMoversMissing(Array.isArray(data.missing) ? data.missing : []);
+        setSetMoversAvailable(
+          Array.isArray(data.availableSets) ? data.availableSets : []
+        );
       } catch (err) {
         console.error("[daily-recap] set-movers fetch failed:", err);
         setSetBlocks([]);
@@ -247,6 +253,7 @@ export default function DailyRecapPage() {
         loading={setMoversLoading}
         fetchedAt={setMoversFetchedAt}
         missing={setMoversMissing}
+        availableSets={setMoversAvailable}
         formatCurrency={formatCurrency}
       />
     </div>
@@ -258,6 +265,7 @@ interface SetMoversSectionProps {
   loading: boolean;
   fetchedAt: string | null;
   missing: string[];
+  availableSets: { slug: string; name: string; releaseDate?: string }[];
   formatCurrency: (v: number | null | undefined) => string;
 }
 
@@ -266,6 +274,7 @@ function SetMoversSection({
   loading,
   fetchedAt,
   missing,
+  availableSets,
   formatCurrency,
 }: SetMoversSectionProps) {
   return (
@@ -281,9 +290,26 @@ function SetMoversSection({
           {fetchedAt && ` Updated ${new Date(fetchedAt).toLocaleString()}.`}
         </p>
         {missing.length > 0 && (
-          <p className="text-[11px] text-warning mt-2">
-            Could not resolve a Poketrace match for: {missing.join(", ")}
-          </p>
+          <div className="mt-2 space-y-1">
+            <p className="text-[11px] text-warning">
+              Could not resolve a Poketrace match for: {missing.join(", ")}
+            </p>
+            {availableSets.length > 0 && (
+              <details className="text-[11px] text-text-muted">
+                <summary className="cursor-pointer hover:text-text-primary">
+                  Show 30 most recent Poketrace sets (click to inspect naming)
+                </summary>
+                <ul className="mt-1 ml-4 list-disc space-y-0.5">
+                  {availableSets.map((s) => (
+                    <li key={s.slug}>
+                      <span className="text-text-primary">{s.name}</span>
+                      <span className="text-text-muted"> — slug: {s.slug}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
         )}
       </div>
 

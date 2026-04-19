@@ -153,6 +153,13 @@ export async function GET() {
       missing: WANTED_SETS.filter(
         (w) => !resolved.some((r) => r.match === w.match)
       ).map((w) => w.label),
+      // Surface the 30 newest Poketrace set names so we can diagnose
+      // mismatches between our filters and Poketrace's actual naming.
+      availableSets: allSets.slice(0, 30).map((s) => ({
+        slug: s.id,
+        name: s.name,
+        releaseDate: s.releaseDate,
+      })),
       fetchedAt: new Date().toISOString(),
     });
   } catch (err) {
