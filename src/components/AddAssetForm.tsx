@@ -14,7 +14,7 @@ import {
   PenLine,
   Link2,
 } from "lucide-react";
-import { formatCurrency, extractCardPrice, fixStorageUrl } from "@/lib/format";
+import { formatCurrency, extractCardPrice, fixStorageUrl, getMarketDisclaimer } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import { usePortfolio } from "@/lib/portfolio-context";
 import SearchModal from "./SearchModal";
@@ -867,7 +867,7 @@ export default function AddAssetForm() {
                         )}
                       </div>
                       <p className="text-[10px] text-text-muted mt-1">
-                        Prices from Poketrace (TCGPlayer + eBay data, USD) · Price will auto-refresh daily
+                        {getMarketDisclaimer(selectedTether.poketraceMarket, "long")} Prices auto-refresh daily.
                       </p>
                       <button
                         type="button"

@@ -8,6 +8,35 @@ export function formatCurrency(value: number | null | undefined): string {
   }).format(value);
 }
 
+const CURRENCY_LOCALE: Record<string, string> = {
+  USD: "en-US",
+  GBP: "en-GB",
+  EUR: "en-IE",
+};
+
+/**
+ * Format a USD value in the chosen display currency using today's rate.
+ * The raw value is always treated as USD; pass rate=1 for USD itself.
+ * When the display currency is not USD, appends "~GBP" / "~EUR" to signal
+ * the figure is a converted estimate, not a native market price.
+ */
+export function formatCurrencyIn(
+  usdValue: number | null | undefined,
+  currency: string,
+  rate: number
+): string {
+  if (usdValue == null) return "N/A";
+  const locale = CURRENCY_LOCALE[currency] || "en-US";
+  const converted = usdValue * rate;
+  const formatted = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(converted);
+  return currency === "USD" ? formatted : `${formatted} ~${currency}`;
+}
+
 export function formatPercentage(value: number | null | undefined): string {
   if (value == null) return "N/A";
   const sign = value >= 0 ? "+" : "";
@@ -121,4 +150,23 @@ export function formatCurrencyWithNote(
   const formatted = formatCurrency(value);
   if (isConverted) return `${formatted} ~USD`;
   return formatted;
+}
+
+/**
+ * Return a disclaimer string describing which market a Poketrace price comes from.
+ * Used to make the US-vs-EU provenance explicit wherever prices render.
+ */
+export function getMarketDisclaimer(
+  market?: string | null,
+  variant: "short" | "long" = "short"
+): string {
+  const isEu = (market || "").toUpperCase() === "EU";
+  if (isEu) {
+    return variant === "long"
+      ? "Based on European market pricing (CardMarket, EUR; converted to USD)."
+      : "European market (CardMarket)";
+  }
+  return variant === "long"
+    ? "Based on US market pricing (TCGPlayer + eBay data, USD)."
+    : "US market (TCGPlayer + eBay)";
 }

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Image from "next/image";
 import { Search, X, Loader2, Package, CreditCard, PlusCircle } from "lucide-react";
-import { formatCurrency } from "@/lib/format";
+import { useFormatCurrency } from "@/lib/currency-context";
 
 interface SearchResult {
   id: string;
@@ -40,6 +40,7 @@ export default function SearchModal({
   onManualEntry,
   assetType,
 }: SearchModalProps) {
+  const formatCurrency = useFormatCurrency();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
