@@ -141,7 +141,7 @@ export async function fetchPoketraceCardsBySet(
 export function getPoketraceTier(
   card: PoketraceCard,
   tier: string
-): { avg: number; avg1d: number | null; saleCount: number | null; source: string } | null {
+): { avg: number; avg1d: number | null; avg7d: number | null; avg30d: number | null; saleCount: number | null; source: string } | null {
   const prices = card.prices || {};
   const sources = tier.startsWith("PSA_") || tier.startsWith("CGC_") || tier.startsWith("BGS_")
     ? ["ebay", "tcgplayer"] // graded tiers primarily on eBay
@@ -156,6 +156,8 @@ export function getPoketraceTier(
       return {
         avg: t.avg,
         avg1d: typeof t.avg1d === "number" ? t.avg1d : null,
+        avg7d: typeof t.avg7d === "number" ? t.avg7d : null,
+        avg30d: typeof t.avg30d === "number" ? t.avg30d : null,
         saleCount:
           typeof t.saleCount === "number"
             ? t.saleCount

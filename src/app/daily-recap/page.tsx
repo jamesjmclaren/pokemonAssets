@@ -346,7 +346,7 @@ function SetBlockView({
                 <th className="py-2 pr-3 font-medium w-8">#</th>
                 <th className="py-2 pr-3 font-medium">Card</th>
                 <th className="py-2 pr-3 font-medium text-right">Price</th>
-                <th className="py-2 pr-3 font-medium text-right">Prev 24h</th>
+                <th className="py-2 pr-3 font-medium text-right">7d Avg</th>
                 <th className="py-2 pr-3 font-medium text-right">Δ</th>
                 <th className="py-2 font-medium text-right">%</th>
               </tr>

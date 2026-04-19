@@ -50,7 +50,7 @@ interface SetBlock {
 function buildRow(card: PoketraceCard, tier: string): CardRow | null {
   const t = getPoketraceTier(card, tier);
   if (!t) return null;
-  const previousPrice = t.avg1d;
+  const previousPrice = t.avg7d ?? t.avg30d;
   const absChange = previousPrice != null ? t.avg - previousPrice : null;
   const pctChange =
     previousPrice != null && previousPrice > 0
