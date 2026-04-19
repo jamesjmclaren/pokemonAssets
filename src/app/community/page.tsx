@@ -55,7 +55,7 @@ const features: Feature[] = [
   { icon: Calculator, title: "Trade Calculator", description: "Analyse, compare, and record trades with greater accuracy and confidence.", comingSoon: true },
   { icon: BarChart3, title: "Enhanced Reports, Trends & Analytics", description: "Deeper insights to support more informed collecting and trading decisions.", comingSoon: true },
   { icon: Receipt, title: "Tax Reporting Support", description: "UK tax-year presets (6 April – 5 April), realised-gains breakdown, and GBP conversion alongside USD for accounting preparation.", comingSoon: false },
-  { icon: Clock, title: "Daily Movers", description: "See the biggest day-over-day price changes across your portfolio, powered by daily aggregated market data from Poketrace.", comingSoon: false },
+  { icon: Clock, title: "Daily Movers", description: "See the biggest day-over-day price changes across your portfolio, powered by daily aggregated market data from Poketrace.", comingSoon: true },
   { icon: Camera, title: "Camera Search", description: "Use your camera to search millions of cards instantly.", comingSoon: true },
   { icon: BadgeCheck, title: "Verified Vendor Profiles", description: "Connect with trusted vendors through verified profiles.", comingSoon: true },
 ];

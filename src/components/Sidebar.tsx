@@ -15,7 +15,6 @@ import {
   Plus,
   FileText,
   Shield,
-  TrendingUp,
   Settings,
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -31,7 +30,6 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
   { href: "/collection", label: "Collection", icon: FolderOpen, adminOnly: false },
   { href: "/dashboard/add", label: "Add Asset", icon: Search, adminOnly: true },
-  { href: "/daily-recap", label: "Daily Movers", icon: TrendingUp, adminOnly: false },
   { href: "/report", label: "Report", icon: FileText, adminOnly: false },
   { href: "/team", label: "Team", icon: Users, adminOnly: false },
   { href: "/settings/api-keys", label: "Settings", icon: Settings, adminOnly: false },
