@@ -56,6 +56,7 @@ export default function DailyRecapPage() {
   const [setBlocks, setSetBlocks] = useState<SetBlock[]>([]);
   const [setMoversLoading, setSetMoversLoading] = useState(true);
   const [setMoversFetchedAt, setSetMoversFetchedAt] = useState<string | null>(null);
+  const [setMoversMissing, setSetMoversMissing] = useState<string[]>([]);
 
   useEffect(() => {
     async function fetchMovers() {
@@ -89,6 +90,7 @@ export default function DailyRecapPage() {
         const data = await res.json();
         setSetBlocks(Array.isArray(data.sets) ? data.sets : []);
         setSetMoversFetchedAt(data.fetchedAt || null);
+        setSetMoversMissing(Array.isArray(data.missing) ? data.missing : []);
       } catch (err) {
         console.error("[daily-recap] set-movers fetch failed:", err);
         setSetBlocks([]);
@@ -244,6 +246,7 @@ export default function DailyRecapPage() {
         blocks={setBlocks}
         loading={setMoversLoading}
         fetchedAt={setMoversFetchedAt}
+        missing={setMoversMissing}
         formatCurrency={formatCurrency}
       />
     </div>
@@ -254,21 +257,34 @@ interface SetMoversSectionProps {
   blocks: SetBlock[];
   loading: boolean;
   fetchedAt: string | null;
+  missing: string[];
   formatCurrency: (v: number | null | undefined) => string;
 }
 
-function SetMoversSection({ blocks, loading, fetchedAt, formatCurrency }: SetMoversSectionProps) {
+function SetMoversSection({
+  blocks,
+  loading,
+  fetchedAt,
+  missing,
+  formatCurrency,
+}: SetMoversSectionProps) {
   return (
     <section className="space-y-4">
       <div>
         <h2 className="text-lg md:text-xl font-semibold text-text-primary">
-          Top Cards by Set
+          Top Cards · Mega Evolution Series
         </h2>
         <p className="text-text-muted text-sm mt-1">
-          The 10 most valuable Holofoil cards (NM, US market) and PSA 10 copies for the
-          5 most recent sets, with the latest 24-hour price change.
+          The 10 most valuable Holofoil cards (NM, US market) and PSA 10 copies for
+          ME03 Perfect Order, ME02 Phantasmal Flames, ME01 Mega Evolution, and ME
+          Ascended Heroes, with the latest 24-hour price change.
           {fetchedAt && ` Updated ${new Date(fetchedAt).toLocaleString()}.`}
         </p>
+        {missing.length > 0 && (
+          <p className="text-[11px] text-warning mt-2">
+            Could not resolve a Poketrace match for: {missing.join(", ")}
+          </p>
+        )}
       </div>
 
       {loading ? (

@@ -10,9 +10,30 @@ import {
 // Cache aggressively — top-of-set lists are stable within a day.
 export const revalidate = 3600;
 
-const NUM_SETS = 5;
 const TOP_N = 10;
 const MIN_RAW_PRICE = 2; // ignore dime cards that clutter the top
+
+/**
+ * Sets to surface, in display order. `match` is a case-insensitive substring
+ * matched against the Poketrace set name; `label` is what we show in the UI.
+ * Order matters — the first filter to match a set claims it (so
+ * "Mega Evolution" is processed last to avoid cannibalising the specific
+ * variant names).
+ */
+const WANTED_SETS: { match: string; label: string }[] = [
+  { match: "Perfect Order", label: "ME03 · Perfect Order" },
+  { match: "Phantasmal Flames", label: "ME02 · Phantasmal Flames" },
+  { match: "Ascended Heroes", label: "ME · Ascended Heroes" },
+  { match: "Mega Evolution", label: "ME01 · Mega Evolution" },
+];
+
+// Order in which the UI renders them (ME03, ME02, ME01, ME Ascended Heroes).
+const DISPLAY_ORDER = [
+  "Perfect Order",
+  "Phantasmal Flames",
+  "Mega Evolution",
+  "Ascended Heroes",
+];
 
 interface CardRow {
   id: string;
@@ -86,19 +107,41 @@ export async function GET() {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const sets = await getPoketraceSets("releaseDate", "desc");
-    const recent = sets.slice(0, NUM_SETS);
+    const allSets = await getPoketraceSets("releaseDate", "desc");
+
+    // Resolve each wanted filter to exactly one set, preferring the newest
+    // release that matches (handy when Poketrace has reprints or sub-sets).
+    const resolved: { set: typeof allSets[number]; label: string; match: string }[] = [];
+    const usedIds = new Set<string>();
+    for (const w of WANTED_SETS) {
+      const hit = allSets.find(
+        (s) =>
+          !usedIds.has(s.id) &&
+          s.name.toLowerCase().includes(w.match.toLowerCase())
+      );
+      if (hit) {
+        resolved.push({ set: hit, label: w.label, match: w.match });
+        usedIds.add(hit.id);
+      } else {
+        console.warn(`[set-movers] no Poketrace set matched "${w.match}"`);
+      }
+    }
+
+    // Render in the order the user listed (ME03 → ME02 → ME01 → ME Ascended Heroes)
+    resolved.sort(
+      (a, b) => DISPLAY_ORDER.indexOf(a.match) - DISPLAY_ORDER.indexOf(b.match)
+    );
 
     const blocks: SetBlock[] = await Promise.all(
-      recent.map(async (s) => {
-        const cards = await fetchPoketraceCardsBySet(s.id, "US", {
+      resolved.map(async ({ set, label }) => {
+        const cards = await fetchPoketraceCardsBySet(set.id, "US", {
           pageSize: 100,
           maxPages: 4,
         });
         return {
-          setSlug: s.id,
-          setName: s.name,
-          releaseDate: s.releaseDate,
+          setSlug: set.id,
+          setName: label,
+          releaseDate: set.releaseDate,
           raw: pickTop(cards, "NEAR_MINT", MIN_RAW_PRICE),
           psa10: pickTop(cards, "PSA_10", 5),
         };
@@ -107,6 +150,9 @@ export async function GET() {
 
     return NextResponse.json({
       sets: blocks,
+      missing: WANTED_SETS.filter(
+        (w) => !resolved.some((r) => r.match === w.match)
+      ).map((w) => w.label),
       fetchedAt: new Date().toISOString(),
     });
   } catch (err) {
