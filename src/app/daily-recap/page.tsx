@@ -24,12 +24,38 @@ interface MoverRow {
   pctChange: number | null;
 }
 
+interface SetCardRow {
+  id: string;
+  name: string;
+  number: string | null;
+  rarity: string | null;
+  imageUrl: string | null;
+  variant: string | null;
+  price: number;
+  previousPrice: number | null;
+  absChange: number | null;
+  pctChange: number | null;
+  saleCount: number | null;
+  source: string;
+}
+
+interface SetBlock {
+  setSlug: string;
+  setName: string;
+  releaseDate: string;
+  raw: SetCardRow[];
+  psa10: SetCardRow[];
+}
+
 export default function DailyRecapPage() {
   const { currentPortfolio, loading: portfolioLoading } = usePortfolio();
   const formatCurrency = useFormatCurrency();
   const [rows, setRows] = useState<MoverRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
+  const [setBlocks, setSetBlocks] = useState<SetBlock[]>([]);
+  const [setMoversLoading, setSetMoversLoading] = useState(true);
+  const [setMoversFetchedAt, setSetMoversFetchedAt] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchMovers() {
@@ -53,6 +79,25 @@ export default function DailyRecapPage() {
     }
     fetchMovers();
   }, [currentPortfolio]);
+
+  useEffect(() => {
+    async function fetchSetMovers() {
+      setSetMoversLoading(true);
+      try {
+        const res = await fetch("/api/set-movers");
+        if (!res.ok) throw new Error("Failed");
+        const data = await res.json();
+        setSetBlocks(Array.isArray(data.sets) ? data.sets : []);
+        setSetMoversFetchedAt(data.fetchedAt || null);
+      } catch (err) {
+        console.error("[daily-recap] set-movers fetch failed:", err);
+        setSetBlocks([]);
+      } finally {
+        setSetMoversLoading(false);
+      }
+    }
+    fetchSetMovers();
+  }, []);
 
   const tracked = useMemo(
     () => rows.filter((r) => r.pctChange != null),
@@ -192,6 +237,176 @@ export default function DailyRecapPage() {
               {unchanged.length} linked asset{unchanged.length === 1 ? "" : "s"} had no day-over-day change (insufficient history or no recorded sales).
             </p>
           )}
+        </div>
+      )}
+
+      <SetMoversSection
+        blocks={setBlocks}
+        loading={setMoversLoading}
+        fetchedAt={setMoversFetchedAt}
+        formatCurrency={formatCurrency}
+      />
+    </div>
+  );
+}
+
+interface SetMoversSectionProps {
+  blocks: SetBlock[];
+  loading: boolean;
+  fetchedAt: string | null;
+  formatCurrency: (v: number | null | undefined) => string;
+}
+
+function SetMoversSection({ blocks, loading, fetchedAt, formatCurrency }: SetMoversSectionProps) {
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-lg md:text-xl font-semibold text-text-primary">
+          Top Cards by Set
+        </h2>
+        <p className="text-text-muted text-sm mt-1">
+          The 10 most valuable Holofoil cards (NM, US market) and PSA 10 copies for the
+          5 most recent sets, with the latest 24-hour price change.
+          {fetchedAt && ` Updated ${new Date(fetchedAt).toLocaleString()}.`}
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="skeleton h-80 rounded-2xl" />
+          <div className="skeleton h-80 rounded-2xl" />
+        </div>
+      ) : blocks.length === 0 ? (
+        <div className="bg-surface border border-border rounded-2xl p-6 text-center">
+          <p className="text-text-secondary text-sm">
+            Could not load set data right now — please refresh in a minute.
+          </p>
+        </div>
+      ) : (
+        blocks.map((b) => (
+          <SetBlockView key={b.setSlug} block={b} formatCurrency={formatCurrency} />
+        ))
+      )}
+    </section>
+  );
+}
+
+function SetBlockView({
+  block,
+  formatCurrency,
+}: {
+  block: SetBlock;
+  formatCurrency: (v: number | null | undefined) => string;
+}) {
+  const [view, setView] = useState<"raw" | "psa10">("raw");
+  const rows = view === "raw" ? block.raw : block.psa10;
+
+  return (
+    <div className="bg-surface border border-border rounded-2xl p-4 md:p-6">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+        <div>
+          <h3 className="text-base md:text-lg font-semibold text-text-primary">
+            {block.setName}
+          </h3>
+          {block.releaseDate && (
+            <p className="text-[11px] text-text-muted">
+              Released {new Date(block.releaseDate).toLocaleDateString()}
+            </p>
+          )}
+        </div>
+        <div className="inline-flex rounded-lg border border-border overflow-hidden text-xs">
+          <button
+            onClick={() => setView("raw")}
+            className={`px-3 py-1.5 ${view === "raw" ? "bg-accent text-background" : "text-text-secondary hover:bg-surface-hover"}`}
+          >
+            Raw NM
+          </button>
+          <button
+            onClick={() => setView("psa10")}
+            className={`px-3 py-1.5 ${view === "psa10" ? "bg-accent text-background" : "text-text-secondary hover:bg-surface-hover"}`}
+          >
+            PSA 10
+          </button>
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="text-sm text-text-muted">
+          No {view === "raw" ? "raw NM" : "PSA 10"} pricing available for this set yet.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-text-muted text-xs uppercase tracking-wider border-b border-border">
+                <th className="py-2 pr-3 font-medium w-8">#</th>
+                <th className="py-2 pr-3 font-medium">Card</th>
+                <th className="py-2 pr-3 font-medium text-right">Price</th>
+                <th className="py-2 pr-3 font-medium text-right">Prev 24h</th>
+                <th className="py-2 pr-3 font-medium text-right">Δ</th>
+                <th className="py-2 font-medium text-right">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const src = fixStorageUrl(r.imageUrl) || r.imageUrl;
+                const pct = r.pctChange;
+                const abs = r.absChange;
+                const positive = (pct ?? 0) >= 0;
+                return (
+                  <tr key={r.id} className="border-b border-border/50 last:border-0">
+                    <td className="py-2 pr-3 text-text-muted text-xs">{i + 1}</td>
+                    <td className="py-2 pr-3">
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-8 h-10 bg-background rounded flex-shrink-0 overflow-hidden">
+                          {src && (
+                            <Image
+                              src={src}
+                              alt={r.name}
+                              fill
+                              className="object-contain p-0.5"
+                              sizes="32px"
+                              unoptimized={src.includes("tcgplayer-cdn")}
+                            />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-text-primary truncate">{r.name}</p>
+                          <p className="text-[10px] text-text-muted">
+                            {r.number && `#${r.number}`}
+                            {r.rarity && (r.number ? ` · ${r.rarity}` : r.rarity)}
+                            {r.variant && ` · ${r.variant}`}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-2 pr-3 text-right text-text-primary whitespace-nowrap">
+                      {formatCurrency(r.price)}
+                    </td>
+                    <td className="py-2 pr-3 text-right text-text-secondary whitespace-nowrap">
+                      {r.previousPrice != null ? formatCurrency(r.previousPrice) : "—"}
+                    </td>
+                    <td
+                      className={`py-2 pr-3 text-right whitespace-nowrap ${
+                        abs == null ? "text-text-muted" : positive ? "text-success" : "text-danger"
+                      }`}
+                    >
+                      {abs == null
+                        ? "—"
+                        : `${positive ? "+" : ""}${formatCurrency(abs)}`}
+                    </td>
+                    <td
+                      className={`py-2 text-right font-semibold whitespace-nowrap ${
+                        pct == null ? "text-text-muted" : positive ? "text-success" : "text-danger"
+                      }`}
+                    >
+                      {pct == null ? "—" : formatPercentage(pct)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

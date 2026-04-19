@@ -101,6 +101,73 @@ export interface PoketraceSet {
   series?: string;
 }
 
+/**
+ * Fetch every Poketrace card in a given set (paginated).
+ * Returns the raw cards so callers can read tier-level fields like avg1d.
+ */
+export async function fetchPoketraceCardsBySet(
+  setSlug: string,
+  market: "US" | "EU" = "US",
+  opts: { pageSize?: number; maxPages?: number } = {}
+): Promise<PoketraceCard[]> {
+  const pageSize = opts.pageSize ?? 100;
+  const maxPages = opts.maxPages ?? 6;
+  const all: PoketraceCard[] = [];
+  let cursor: string | null | undefined;
+  let pages = 0;
+
+  do {
+    const params: Record<string, string> = {
+      set: setSlug,
+      market,
+      limit: String(pageSize),
+    };
+    if (cursor) params.cursor = cursor;
+    const response: PoketraceSearchResponse = await apiFetch("/v1/cards", params);
+    const batch = response?.data || [];
+    all.push(...batch);
+    cursor = response?.hasMore ? response?.nextCursor : null;
+    pages += 1;
+  } while (cursor && pages < maxPages);
+
+  return all;
+}
+
+/**
+ * Read a specific tier (e.g. NEAR_MINT, PSA_10) from a Poketrace card,
+ * preferring the source that typically carries that tier's data.
+ */
+export function getPoketraceTier(
+  card: PoketraceCard,
+  tier: string
+): { avg: number; avg1d: number | null; saleCount: number | null; source: string } | null {
+  const prices = card.prices || {};
+  const sources = tier.startsWith("PSA_") || tier.startsWith("CGC_") || tier.startsWith("BGS_")
+    ? ["ebay", "tcgplayer"] // graded tiers primarily on eBay
+    : ["tcgplayer", "ebay", "cardmarket"]; // raw/condition tiers primarily on TCGPlayer
+
+  for (const source of sources) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sourceMap = (prices as any)[source] as Record<string, PoketracePriceTier> | undefined;
+    if (!sourceMap) continue;
+    const t = sourceMap[tier];
+    if (t?.avg != null && t.avg > 0) {
+      return {
+        avg: t.avg,
+        avg1d: typeof t.avg1d === "number" ? t.avg1d : null,
+        saleCount:
+          typeof t.saleCount === "number"
+            ? t.saleCount
+            : typeof t.approxSaleCount === "number"
+              ? t.approxSaleCount
+              : null,
+        source,
+      };
+    }
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Sealed product detection
 // ---------------------------------------------------------------------------
