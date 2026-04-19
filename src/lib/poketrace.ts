@@ -147,11 +147,28 @@ export function getPoketraceTier(
     ? ["ebay", "tcgplayer"] // graded tiers primarily on eBay
     : ["tcgplayer", "ebay", "cardmarket"]; // raw/condition tiers primarily on TCGPlayer
 
+  // Build a list of raw-condition aliases to try.  Poketrace isn't consistent
+  // about casing ("NEAR_MINT" vs "Near Mint") across sources and set types.
+  const RAW_ALIASES: Record<string, string[]> = {
+    NEAR_MINT: ["NEAR_MINT", "Near Mint", "NM"],
+    LIGHTLY_PLAYED: ["LIGHTLY_PLAYED", "Lightly Played", "LP"],
+  };
+  const aliases = RAW_ALIASES[tier] ?? [tier];
+
   for (const source of sources) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sourceMap = (prices as any)[source] as Record<string, PoketracePriceTier> | undefined;
     if (!sourceMap) continue;
-    const t = sourceMap[tier];
+
+    // Try each alias for the requested tier.
+    let t: PoketracePriceTier | undefined;
+    for (const alias of aliases) {
+      if (sourceMap[alias]?.avg != null && sourceMap[alias]!.avg > 0) {
+        t = sourceMap[alias];
+        break;
+      }
+    }
+
     if (t?.avg != null && t.avg > 0) {
       return {
         avg: t.avg,
