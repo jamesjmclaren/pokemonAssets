@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import {
   fetchPoketraceCardsBySet,
   getPoketraceTier,
+  inferAssetType,
   type PoketraceCard,
 } from "@/lib/poketrace";
 
@@ -78,8 +79,7 @@ function pickTop(
 ): CardRow[] {
   const rows: CardRow[] = [];
   for (const c of cards) {
-    // Exclude reverse-holo duplicates from the "Holofoil" view — they typically
-    // trade at a discount and crowd out the proper holo variant.
+    if (inferAssetType(c) === "sealed") continue;
     if (c.variant && /reverse/i.test(c.variant)) continue;
     const row = buildRow(c, tier);
     if (!row) continue;
@@ -101,6 +101,7 @@ export async function GET() {
           const cards = await fetchPoketraceCardsBySet(slug, "US", {
             pageSize: 100,
             maxPages: 4,
+            variant: "Holofoil",
           });
           return {
             setSlug: slug,

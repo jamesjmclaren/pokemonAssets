@@ -108,7 +108,7 @@ export interface PoketraceSet {
 export async function fetchPoketraceCardsBySet(
   setSlug: string,
   market: "US" | "EU" = "US",
-  opts: { pageSize?: number; maxPages?: number } = {}
+  opts: { pageSize?: number; maxPages?: number; variant?: string } = {}
 ): Promise<PoketraceCard[]> {
   const pageSize = opts.pageSize ?? 100;
   const maxPages = opts.maxPages ?? 6;
@@ -123,6 +123,7 @@ export async function fetchPoketraceCardsBySet(
       limit: String(pageSize),
     };
     if (cursor) params.cursor = cursor;
+    if (opts.variant) params.variant = opts.variant;
     const response: PoketraceSearchResponse = await apiFetch("/v1/cards", params);
     const batch = response?.data || [];
     all.push(...batch);
