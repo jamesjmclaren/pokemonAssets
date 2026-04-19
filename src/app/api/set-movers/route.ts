@@ -59,14 +59,38 @@ function pickTop(
   minPrice: number
 ): CardRow[] {
   const rows: CardRow[] = [];
+  const seen = new Map<string, CardRow>(); // dedup by card-number+name (prefer Holofoil over Normal)
   for (const c of cards) {
     if (inferAssetType(c) === "sealed") continue;
-    if (c.variant && /reverse/i.test(c.variant)) continue;
+    if (c.variant) {
+      const v = c.variant.toLowerCase();
+      // Skip the "Reverse Holofoil" duplicate (trades at a discount and
+      // crowds out the proper holo).
+      if (v.includes("reverse")) continue;
+      // Skip the plain "Normal" version when a higher-rarity variant exists
+      // for the same card. We dedupe below to handle that.
+    }
     const row = buildRow(c, tier);
     if (!row) continue;
     if (row.price < minPrice) continue;
-    rows.push(row);
+
+    // Dedup by (number, name) — prefer the Holofoil/special variant over Normal.
+    const key = `${row.number ?? ""}|${row.name}`;
+    const existing = seen.get(key);
+    if (existing) {
+      const existingNormal = (existing.variant ?? "").toLowerCase().includes("normal");
+      const newNormal = (row.variant ?? "").toLowerCase().includes("normal");
+      // Prefer non-Normal; if both same, keep the higher-priced one.
+      if (existingNormal && !newNormal) {
+        seen.set(key, row);
+      } else if (existingNormal === newNormal && row.price > existing.price) {
+        seen.set(key, row);
+      }
+      continue;
+    }
+    seen.set(key, row);
   }
+  for (const r of seen.values()) rows.push(r);
   rows.sort((a, b) => b.price - a.price);
   return rows.slice(0, TOP_N);
 }
@@ -81,10 +105,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Don't pass `variant: "Holofoil"` to the API — many high-rarity cards
+    // (SIRs, hyper rares) have an empty or different variant tag and would
+    // be excluded. We filter "Normal" and "Reverse Holofoil" client-side
+    // in pickTop instead.
     const cards = await fetchPoketraceCardsBySet(slug, "US", {
       pageSize: 100,
-      maxPages: 4,
-      variant: "Holofoil",
+      maxPages: 6,
     });
     return NextResponse.json({
       setSlug: slug,
