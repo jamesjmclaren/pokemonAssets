@@ -1,27 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
-import { TrendingUp, TrendingDown, Clock, Info } from "lucide-react";
-import { usePortfolio } from "@/lib/portfolio-context";
+import { Clock, Info } from "lucide-react";
 import { useFormatCurrency } from "@/lib/currency-context";
 import { formatPercentage, fixStorageUrl, getMarketDisclaimer } from "@/lib/format";
 
-interface MoverRow {
-  assetId: string;
+interface SetOption {
+  slug: string;
   name: string;
-  setName: string | null;
-  imageUrl: string | null;
-  poketraceId: string;
-  poketraceMarket: string;
-  grade: string | null;
-  latestDate: string | null;
-  latestPrice: number | null;
-  previousDate: string | null;
-  previousPrice: number | null;
-  absChange: number | null;
-  pctChange: number | null;
+  series: string;
+  totalCards: number;
 }
 
 interface SetCardRow {
@@ -39,107 +28,80 @@ interface SetCardRow {
   source: string;
 }
 
-interface SetBlock {
+interface SetMoversResponse {
   setSlug: string;
-  setName: string;
   raw: SetCardRow[];
   psa10: SetCardRow[];
-  error?: string;
+  fetchedAt: string;
 }
 
+// Default to the newest Mega Evolution set so the page isn't empty on first load.
+const DEFAULT_SLUG = "me03-perfect-order";
+
 export default function DailyRecapPage() {
-  const { currentPortfolio, loading: portfolioLoading } = usePortfolio();
   const formatCurrency = useFormatCurrency();
-  const [rows, setRows] = useState<MoverRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchedAt, setFetchedAt] = useState<string | null>(null);
-  const [setBlocks, setSetBlocks] = useState<SetBlock[]>([]);
-  const [setMoversLoading, setSetMoversLoading] = useState(true);
-  const [setMoversFetchedAt, setSetMoversFetchedAt] = useState<string | null>(null);
+  const [sets, setSets] = useState<SetOption[]>([]);
+  const [setsLoading, setSetsLoading] = useState(true);
+  const [selectedSlug, setSelectedSlug] = useState<string>(DEFAULT_SLUG);
+  const [block, setBlock] = useState<SetMoversResponse | null>(null);
+  const [blockLoading, setBlockLoading] = useState(false);
+  const [view, setView] = useState<"raw" | "psa10">("raw");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
-    async function fetchMovers() {
-      if (!currentPortfolio) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
+    async function fetchSets() {
+      setSetsLoading(true);
       try {
-        const res = await fetch(`/api/daily-movers?portfolioId=${currentPortfolio.id}`);
+        const res = await fetch("/api/poketrace-sets");
         if (!res.ok) throw new Error("Failed");
         const data = await res.json();
-        setRows(Array.isArray(data.rows) ? data.rows : []);
-        setFetchedAt(data.fetchedAt || null);
+        setSets(Array.isArray(data.sets) ? data.sets : []);
       } catch (err) {
-        console.error("[daily-recap] fetch failed:", err);
-        setRows([]);
+        console.error("[daily-recap] sets fetch failed:", err);
       } finally {
-        setLoading(false);
+        setSetsLoading(false);
       }
     }
-    fetchMovers();
-  }, [currentPortfolio]);
-
-  useEffect(() => {
-    async function fetchSetMovers() {
-      setSetMoversLoading(true);
-      try {
-        const res = await fetch("/api/set-movers");
-        if (!res.ok) throw new Error("Failed");
-        const data = await res.json();
-        setSetBlocks(Array.isArray(data.sets) ? data.sets : []);
-        setSetMoversFetchedAt(data.fetchedAt || null);
-      } catch (err) {
-        console.error("[daily-recap] set-movers fetch failed:", err);
-        setSetBlocks([]);
-      } finally {
-        setSetMoversLoading(false);
-      }
-    }
-    fetchSetMovers();
+    fetchSets();
   }, []);
 
-  const tracked = useMemo(
-    () => rows.filter((r) => r.pctChange != null),
-    [rows]
-  );
-  const unchanged = useMemo(
-    () => rows.filter((r) => r.pctChange == null),
-    [rows]
-  );
+  useEffect(() => {
+    if (!selectedSlug) return;
+    let cancelled = false;
+    async function fetchBlock() {
+      setBlockLoading(true);
+      try {
+        const res = await fetch(`/api/set-movers?slug=${encodeURIComponent(selectedSlug)}`);
+        if (!res.ok) throw new Error("Failed");
+        const data: SetMoversResponse = await res.json();
+        if (!cancelled) setBlock(data);
+      } catch (err) {
+        console.error("[daily-recap] block fetch failed:", err);
+        if (!cancelled) setBlock(null);
+      } finally {
+        if (!cancelled) setBlockLoading(false);
+      }
+    }
+    fetchBlock();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSlug]);
 
-  const topUp = useMemo(
-    () => [...tracked].filter((r) => (r.pctChange ?? 0) > 0).sort((a, b) => (b.pctChange ?? 0) - (a.pctChange ?? 0)).slice(0, 10),
-    [tracked]
-  );
-  const topDown = useMemo(
-    () => [...tracked].filter((r) => (r.pctChange ?? 0) < 0).sort((a, b) => (a.pctChange ?? 0) - (b.pctChange ?? 0)).slice(0, 10),
-    [tracked]
-  );
-
-  if (portfolioLoading || loading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-text-primary">Daily Movers</h1>
-          <p className="text-text-muted text-sm mt-1">Loading latest price changes...</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="skeleton h-80 rounded-2xl" />
-          <div className="skeleton h-80 rounded-2xl" />
-        </div>
-      </div>
+  const filteredSets = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sets;
+    return sets.filter(
+      (s) => s.name.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q)
     );
-  }
+  }, [sets, query]);
 
-  if (!currentPortfolio) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-xl md:text-2xl font-bold text-text-primary">Daily Movers</h1>
-        <p className="text-text-muted text-sm">Select a portfolio to see daily price changes.</p>
-      </div>
-    );
-  }
+  const selectedSet = useMemo(
+    () => sets.find((s) => s.slug === selectedSlug),
+    [sets, selectedSlug]
+  );
+
+  const rows = view === "raw" ? block?.raw ?? [] : block?.psa10 ?? [];
 
   return (
     <div className="space-y-6">
@@ -149,333 +111,164 @@ export default function DailyRecapPage() {
           Daily Movers
         </h1>
         <p className="text-text-muted text-sm mt-1">
-          Latest day-over-day price changes across your linked Poketrace assets.
-          {fetchedAt && ` Updated ${new Date(fetchedAt).toLocaleString()}.`}
+          Browse the top Holofoil cards (NM, US market) and PSA 10 copies for any
+          Poketrace set, with the latest 7-day price change.
+          {block?.fetchedAt && ` Updated ${new Date(block.fetchedAt).toLocaleString()}.`}
         </p>
         <p className="text-[11px] text-text-muted mt-1 flex items-start gap-1">
           <Info className="w-3 h-3 mt-0.5 flex-shrink-0" aria-hidden />
-          <span>
-            {getMarketDisclaimer("US", "long")} Moves reflect daily aggregated market data, not individual verified sales.
-            European-market assets are converted from EUR.
-          </span>
+          <span>{getMarketDisclaimer("US", "long")}</span>
         </p>
       </div>
 
-      {tracked.length === 0 ? (
-        <div className="bg-surface border border-border rounded-2xl p-6 text-center">
-          <p className="text-text-secondary">
-            No day-over-day movement yet. Link more assets to Poketrace or check back tomorrow.
+      <div className="bg-surface border border-border rounded-2xl p-4 md:p-6 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end">
+          <div>
+            <label htmlFor="set-search" className="block text-[11px] text-text-muted mb-1 uppercase tracking-wider">
+              Search sets
+            </label>
+            <input
+              id="set-search"
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter by name or slug"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+            />
+          </div>
+          <div>
+            <label htmlFor="set-select" className="block text-[11px] text-text-muted mb-1 uppercase tracking-wider">
+              Set
+            </label>
+            <select
+              id="set-select"
+              value={selectedSlug}
+              onChange={(e) => setSelectedSlug(e.target.value)}
+              disabled={setsLoading}
+              className="w-full md:min-w-[280px] bg-background border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent disabled:opacity-50"
+            >
+              {setsLoading ? (
+                <option value="">Loading sets…</option>
+              ) : filteredSets.length === 0 ? (
+                <option value="">No sets match "{query}"</option>
+              ) : (
+                filteredSets.map((s) => (
+                  <option key={s.slug} value={s.slug}>
+                    {s.name}
+                    {s.totalCards ? ` (${s.totalCards})` : ""}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1 uppercase tracking-wider">
+              Condition
+            </label>
+            <div className="inline-flex rounded-lg border border-border overflow-hidden text-xs">
+              <button
+                onClick={() => setView("raw")}
+                className={`px-3 py-2 ${view === "raw" ? "bg-accent text-background" : "text-text-secondary hover:bg-surface-hover"}`}
+              >
+                Raw NM
+              </button>
+              <button
+                onClick={() => setView("psa10")}
+                className={`px-3 py-2 ${view === "psa10" ? "bg-accent text-background" : "text-text-secondary hover:bg-surface-hover"}`}
+              >
+                PSA 10
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-border">
+          <h2 className="text-base md:text-lg font-semibold text-text-primary">
+            {selectedSet?.name || (setsLoading ? "Loading…" : "Select a set")}
+          </h2>
+          <p className="text-[11px] text-text-muted">
+            Top 10 Holofoil · sorted by price (high → low) · US market
           </p>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <MoversPanel
-            title="Top Movers Up"
-            icon={<TrendingUp className="w-5 h-5 text-success" />}
-            rows={topUp}
-            emptyLabel="No upward movement today."
-            formatCurrency={formatCurrency}
-            direction="up"
-          />
-          <MoversPanel
-            title="Top Movers Down"
-            icon={<TrendingDown className="w-5 h-5 text-danger" />}
-            rows={topDown}
-            emptyLabel="No downward movement today."
-            formatCurrency={formatCurrency}
-            direction="down"
-          />
-        </div>
-      )}
 
-      {tracked.length > 0 && (
-        <div className="bg-surface border border-border rounded-2xl p-4 md:p-6">
-          <h2 className="text-lg font-semibold text-text-primary mb-4">All Tracked Assets</h2>
+        {blockLoading ? (
+          <div className="skeleton h-96 rounded-xl" />
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-text-muted">
+            No {view === "raw" ? "raw NM" : "PSA 10"} pricing available for this set yet.
+          </p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-text-muted text-xs uppercase tracking-wider border-b border-border">
-                  <th className="py-2 pr-3 font-medium">Asset</th>
-                  <th className="py-2 pr-3 font-medium">Market</th>
-                  <th className="py-2 pr-3 font-medium text-right">Previous</th>
-                  <th className="py-2 pr-3 font-medium text-right">Latest</th>
+                  <th className="py-2 pr-3 font-medium w-8">#</th>
+                  <th className="py-2 pr-3 font-medium">Card</th>
+                  <th className="py-2 pr-3 font-medium text-right">Price</th>
+                  <th className="py-2 pr-3 font-medium text-right">7d Avg</th>
                   <th className="py-2 pr-3 font-medium text-right">Δ</th>
                   <th className="py-2 font-medium text-right">%</th>
                 </tr>
               </thead>
               <tbody>
-                {[...tracked]
-                  .sort((a, b) => Math.abs(b.pctChange ?? 0) - Math.abs(a.pctChange ?? 0))
-                  .map((r) => {
-                    const positive = (r.pctChange ?? 0) >= 0;
-                    return (
-                      <tr key={r.assetId} className="border-b border-border/50 last:border-0">
-                        <td className="py-2 pr-3">
-                          <Link href={`/asset/${r.assetId}`} className="text-text-primary hover:text-accent">
-                            {r.name}
-                          </Link>
-                          {r.grade && <span className="ml-1 text-[10px] text-text-muted">({r.grade})</span>}
-                        </td>
-                        <td className="py-2 pr-3 text-text-muted">{r.poketraceMarket}</td>
-                        <td className="py-2 pr-3 text-right text-text-secondary">{formatCurrency(r.previousPrice ?? 0)}</td>
-                        <td className="py-2 pr-3 text-right text-text-primary">{formatCurrency(r.latestPrice ?? 0)}</td>
-                        <td className={`py-2 pr-3 text-right ${positive ? "text-success" : "text-danger"}`}>
-                          {positive ? "+" : ""}
-                          {formatCurrency(r.absChange ?? 0)}
-                        </td>
-                        <td className={`py-2 text-right font-semibold ${positive ? "text-success" : "text-danger"}`}>
-                          {formatPercentage(r.pctChange ?? 0)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                {rows.map((r, i) => {
+                  const src = fixStorageUrl(r.imageUrl) || r.imageUrl;
+                  const pct = r.pctChange;
+                  const abs = r.absChange;
+                  const positive = (pct ?? 0) >= 0;
+                  return (
+                    <tr key={r.id} className="border-b border-border/50 last:border-0">
+                      <td className="py-2 pr-3 text-text-muted text-xs">{i + 1}</td>
+                      <td className="py-2 pr-3">
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-8 h-10 bg-background rounded flex-shrink-0 overflow-hidden">
+                            {src && (
+                              <Image
+                                src={src}
+                                alt={r.name}
+                                fill
+                                className="object-contain p-0.5"
+                                sizes="32px"
+                                unoptimized={src.includes("tcgplayer-cdn")}
+                              />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-text-primary truncate">{r.name}</p>
+                            <p className="text-[10px] text-text-muted">
+                              {r.number && `#${r.number}`}
+                              {r.rarity && (r.number ? ` · ${r.rarity}` : r.rarity)}
+                              {r.variant && ` · ${r.variant}`}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2 pr-3 text-right text-text-primary whitespace-nowrap">
+                        {formatCurrency(r.price)}
+                      </td>
+                      <td className="py-2 pr-3 text-right text-text-secondary whitespace-nowrap">
+                        {r.previousPrice != null ? formatCurrency(r.previousPrice) : "—"}
+                      </td>
+                      <td
+                        className={`py-2 pr-3 text-right whitespace-nowrap ${
+                          abs == null ? "text-text-muted" : positive ? "text-success" : "text-danger"
+                        }`}
+                      >
+                        {abs == null ? "—" : `${positive ? "+" : ""}${formatCurrency(abs)}`}
+                      </td>
+                      <td
+                        className={`py-2 text-right font-semibold whitespace-nowrap ${
+                          pct == null ? "text-text-muted" : positive ? "text-success" : "text-danger"
+                        }`}
+                      >
+                        {pct == null ? "—" : formatPercentage(pct)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-          {unchanged.length > 0 && (
-            <p className="text-[11px] text-text-muted mt-3">
-              {unchanged.length} linked asset{unchanged.length === 1 ? "" : "s"} had no day-over-day change (insufficient history or no recorded sales).
-            </p>
-          )}
-        </div>
-      )}
-
-      <SetMoversSection
-        blocks={setBlocks}
-        loading={setMoversLoading}
-        fetchedAt={setMoversFetchedAt}
-        formatCurrency={formatCurrency}
-      />
-    </div>
-  );
-}
-
-interface SetMoversSectionProps {
-  blocks: SetBlock[];
-  loading: boolean;
-  fetchedAt: string | null;
-  formatCurrency: (v: number | null | undefined) => string;
-}
-
-function SetMoversSection({
-  blocks,
-  loading,
-  fetchedAt,
-  formatCurrency,
-}: SetMoversSectionProps) {
-  return (
-    <section className="space-y-4">
-      <div>
-        <h2 className="text-lg md:text-xl font-semibold text-text-primary">
-          Top Cards · Mega Evolution Series
-        </h2>
-        <p className="text-text-muted text-sm mt-1">
-          The 10 most valuable Holofoil cards (NM, US market) and PSA 10 copies for
-          ME03 Perfect Order, ME02 Phantasmal Flames, ME01 Mega Evolution, and ME
-          Ascended Heroes, with the latest 24-hour price change.
-          {fetchedAt && ` Updated ${new Date(fetchedAt).toLocaleString()}.`}
-        </p>
-      </div>
-
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="skeleton h-80 rounded-2xl" />
-          <div className="skeleton h-80 rounded-2xl" />
-        </div>
-      ) : blocks.length === 0 ? (
-        <div className="bg-surface border border-border rounded-2xl p-6 text-center">
-          <p className="text-text-secondary text-sm">
-            Could not load set data right now — please refresh in a minute.
-          </p>
-        </div>
-      ) : (
-        blocks.map((b) => (
-          <SetBlockView key={b.setSlug} block={b} formatCurrency={formatCurrency} />
-        ))
-      )}
-    </section>
-  );
-}
-
-function SetBlockView({
-  block,
-  formatCurrency,
-}: {
-  block: SetBlock;
-  formatCurrency: (v: number | null | undefined) => string;
-}) {
-  const [view, setView] = useState<"raw" | "psa10">("raw");
-  const rows = view === "raw" ? block.raw : block.psa10;
-
-  return (
-    <div className="bg-surface border border-border rounded-2xl p-4 md:p-6">
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-        <div>
-          <h3 className="text-base md:text-lg font-semibold text-text-primary">
-            {block.setName}
-          </h3>
-          {block.error && (
-            <p className="text-[11px] text-warning">Fetch failed: {block.error}</p>
-          )}
-        </div>
-        <div className="inline-flex rounded-lg border border-border overflow-hidden text-xs">
-          <button
-            onClick={() => setView("raw")}
-            className={`px-3 py-1.5 ${view === "raw" ? "bg-accent text-background" : "text-text-secondary hover:bg-surface-hover"}`}
-          >
-            Raw NM
-          </button>
-          <button
-            onClick={() => setView("psa10")}
-            className={`px-3 py-1.5 ${view === "psa10" ? "bg-accent text-background" : "text-text-secondary hover:bg-surface-hover"}`}
-          >
-            PSA 10
-          </button>
-        </div>
-      </div>
-
-      {rows.length === 0 ? (
-        <p className="text-sm text-text-muted">
-          No {view === "raw" ? "raw NM" : "PSA 10"} pricing available for this set yet.
-        </p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-text-muted text-xs uppercase tracking-wider border-b border-border">
-                <th className="py-2 pr-3 font-medium w-8">#</th>
-                <th className="py-2 pr-3 font-medium">Card</th>
-                <th className="py-2 pr-3 font-medium text-right">Price</th>
-                <th className="py-2 pr-3 font-medium text-right">7d Avg</th>
-                <th className="py-2 pr-3 font-medium text-right">Δ</th>
-                <th className="py-2 font-medium text-right">%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const src = fixStorageUrl(r.imageUrl) || r.imageUrl;
-                const pct = r.pctChange;
-                const abs = r.absChange;
-                const positive = (pct ?? 0) >= 0;
-                return (
-                  <tr key={r.id} className="border-b border-border/50 last:border-0">
-                    <td className="py-2 pr-3 text-text-muted text-xs">{i + 1}</td>
-                    <td className="py-2 pr-3">
-                      <div className="flex items-center gap-3">
-                        <div className="relative w-8 h-10 bg-background rounded flex-shrink-0 overflow-hidden">
-                          {src && (
-                            <Image
-                              src={src}
-                              alt={r.name}
-                              fill
-                              className="object-contain p-0.5"
-                              sizes="32px"
-                              unoptimized={src.includes("tcgplayer-cdn")}
-                            />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-text-primary truncate">{r.name}</p>
-                          <p className="text-[10px] text-text-muted">
-                            {r.number && `#${r.number}`}
-                            {r.rarity && (r.number ? ` · ${r.rarity}` : r.rarity)}
-                            {r.variant && ` · ${r.variant}`}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-2 pr-3 text-right text-text-primary whitespace-nowrap">
-                      {formatCurrency(r.price)}
-                    </td>
-                    <td className="py-2 pr-3 text-right text-text-secondary whitespace-nowrap">
-                      {r.previousPrice != null ? formatCurrency(r.previousPrice) : "—"}
-                    </td>
-                    <td
-                      className={`py-2 pr-3 text-right whitespace-nowrap ${
-                        abs == null ? "text-text-muted" : positive ? "text-success" : "text-danger"
-                      }`}
-                    >
-                      {abs == null
-                        ? "—"
-                        : `${positive ? "+" : ""}${formatCurrency(abs)}`}
-                    </td>
-                    <td
-                      className={`py-2 text-right font-semibold whitespace-nowrap ${
-                        pct == null ? "text-text-muted" : positive ? "text-success" : "text-danger"
-                      }`}
-                    >
-                      {pct == null ? "—" : formatPercentage(pct)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface PanelProps {
-  title: string;
-  icon: React.ReactNode;
-  rows: MoverRow[];
-  emptyLabel: string;
-  formatCurrency: (v: number | null | undefined) => string;
-  direction: "up" | "down";
-}
-
-function MoversPanel({ title, icon, rows, emptyLabel, formatCurrency, direction }: PanelProps) {
-  return (
-    <div className="bg-surface border border-border rounded-2xl p-4 md:p-6">
-      <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2 mb-4">
-        {icon}
-        {title}
-      </h2>
-      <div className="space-y-3">
-        {rows.length === 0 ? (
-          <p className="text-sm text-text-muted">{emptyLabel}</p>
-        ) : (
-          rows.map((r, i) => {
-            const src = fixStorageUrl(r.imageUrl) || r.imageUrl;
-            return (
-              <Link
-                key={r.assetId}
-                href={`/asset/${r.assetId}`}
-                className="flex items-center gap-3 group"
-              >
-                <span className="text-xs text-text-muted font-medium w-4">{i + 1}.</span>
-                <div className="relative w-8 h-10 bg-background rounded flex-shrink-0 overflow-hidden">
-                  {src && (
-                    <Image
-                      src={src}
-                      alt={r.name}
-                      fill
-                      className="object-contain p-0.5"
-                      sizes="32px"
-                      unoptimized={src.includes("tcgplayer-cdn")}
-                    />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-text-primary truncate group-hover:text-accent">{r.name}</p>
-                  <p className="text-[10px] text-text-muted">
-                    {formatCurrency(r.previousPrice ?? 0)} → {formatCurrency(r.latestPrice ?? 0)}
-                  </p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className={`text-sm font-semibold ${direction === "up" ? "text-success" : "text-danger"}`}>
-                    {formatPercentage(r.pctChange ?? 0)}
-                  </p>
-                  <p className={`text-[10px] ${direction === "up" ? "text-success" : "text-danger"}`}>
-                    {(r.absChange ?? 0) >= 0 ? "+" : ""}
-                    {formatCurrency(r.absChange ?? 0)}
-                  </p>
-                </div>
-              </Link>
-            );
-          })
         )}
       </div>
     </div>

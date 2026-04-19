@@ -708,10 +708,22 @@ export async function getPoketraceSets(
   sortBy = "releaseDate",
   sortOrder = "desc"
 ): Promise<{ id: string; name: string; series: string; releaseDate: string; totalCards: number }[]> {
-  const response = await apiFetch("/v1/sets");
-  const sets: PoketraceSet[] = response.data || response || [];
+  const all: PoketraceSet[] = [];
+  let cursor: string | null | undefined;
+  let pages = 0;
+  const maxPages = 20; // 2000 sets is well above Poketrace's actual catalogue size
 
-  const normalized = sets.map((s) => ({
+  do {
+    const params: Record<string, string> = { limit: "100" };
+    if (cursor) params.cursor = cursor;
+    const response = await apiFetch("/v1/sets", params);
+    const batch: PoketraceSet[] = response?.data || [];
+    all.push(...batch);
+    cursor = response?.pagination?.hasMore ? response?.pagination?.nextCursor : null;
+    pages += 1;
+  } while (cursor && pages < maxPages);
+
+  const normalized = all.map((s) => ({
     id: s.slug,
     name: s.name,
     series: s.series || "pokemon",

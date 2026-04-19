@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import {
   fetchPoketraceCardsBySet,
@@ -13,17 +13,6 @@ export const revalidate = 3600;
 const TOP_N = 10;
 const MIN_RAW_PRICE = 2; // ignore dime cards that clutter the top
 
-/**
- * Hardcoded Poketrace slugs for the Mega Evolution series sets we surface.
- * Order here = order rendered in the UI.
- */
-const WANTED_SETS: { slug: string; label: string }[] = [
-  { slug: "me03-perfect-order", label: "ME03 · Perfect Order" },
-  { slug: "me02-phantasmal-flames", label: "ME02 · Phantasmal Flames" },
-  { slug: "me01-mega-evolution", label: "ME01 · Mega Evolution" },
-  { slug: "me-ascended-heroes", label: "ME · Ascended Heroes" },
-];
-
 interface CardRow {
   id: string;
   name: string;
@@ -37,14 +26,6 @@ interface CardRow {
   pctChange: number | null;
   saleCount: number | null;
   source: string;
-}
-
-interface SetBlock {
-  setSlug: string;
-  setName: string;
-  raw: CardRow[];
-  psa10: CardRow[];
-  error?: string;
 }
 
 function buildRow(card: PoketraceCard, tier: string): CardRow | null {
@@ -90,46 +71,31 @@ function pickTop(
   return rows.slice(0, TOP_N);
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  try {
-    const blocks: SetBlock[] = await Promise.all(
-      WANTED_SETS.map(async ({ slug, label }): Promise<SetBlock> => {
-        try {
-          const cards = await fetchPoketraceCardsBySet(slug, "US", {
-            pageSize: 100,
-            maxPages: 4,
-            variant: "Holofoil",
-          });
-          return {
-            setSlug: slug,
-            setName: label,
-            raw: pickTop(cards, "NEAR_MINT", MIN_RAW_PRICE),
-            psa10: pickTop(cards, "PSA_10", 5),
-          };
-        } catch (err) {
-          console.warn(`[set-movers] ${slug} fetch failed:`, err);
-          return {
-            setSlug: slug,
-            setName: label,
-            raw: [],
-            psa10: [],
-            error: err instanceof Error ? err.message : "Fetch failed",
-          };
-        }
-      })
-    );
+  const slug = req.nextUrl.searchParams.get("slug");
+  if (!slug) {
+    return NextResponse.json({ error: "Missing slug parameter" }, { status: 400 });
+  }
 
+  try {
+    const cards = await fetchPoketraceCardsBySet(slug, "US", {
+      pageSize: 100,
+      maxPages: 4,
+      variant: "Holofoil",
+    });
     return NextResponse.json({
-      sets: blocks,
+      setSlug: slug,
+      raw: pickTop(cards, "NEAR_MINT", MIN_RAW_PRICE),
+      psa10: pickTop(cards, "PSA_10", 5),
       fetchedAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error("[set-movers] failed:", err);
+    console.error(`[set-movers] ${slug} failed:`, err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to load set movers" },
+      { error: err instanceof Error ? err.message : "Failed to load set" },
       { status: 500 }
     );
   }
