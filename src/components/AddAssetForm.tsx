@@ -91,6 +91,10 @@ export default function AddAssetForm() {
   const [success, setSuccess] = useState(false);
   const [gradedPrice, setGradedPrice] = useState<number | null>(null);
   const [gradedPriceLoading, setGradedPriceLoading] = useState(false);
+  type PriceSource = "tcgplayer" | "ebay" | "cardmarket";
+  const [sourceBreakdown, setSourceBreakdown] = useState<Partial<Record<PriceSource, number>>>({});
+  const [selectedSource, setSelectedSource] = useState<PriceSource | null>(null);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
 
   interface TetherCandidate {
     id: string;
@@ -195,6 +199,9 @@ export default function AddAssetForm() {
     setTetherCandidates([]);
     setSelectedTether(null);
     setTetherSearchQuery("");
+    setSourceBreakdown({});
+    setSelectedSource(null);
+    setGradedPrice(null);
   };
 
   // Search Poketrace for tether candidates
@@ -229,31 +236,51 @@ export default function AddAssetForm() {
     return "ungraded";
   }, [form.psaGrade]);
 
-  // Fetch graded price from Poketrace when grade is selected on an API-sourced card
+  // Fetch per-source price breakdown (TCGPlayer / eBay / CardMarket) whenever
+  // the selected card or grade changes. Also refreshes gradedPrice for raw-or-
+  // graded display.
   useEffect(() => {
-    if (isManualSubmission || !selectedCard || !form.psaGrade) {
+    if (isManualSubmission || !selectedCard) {
       setGradedPrice(null);
+      setSourceBreakdown({});
+      setSelectedSource(null);
       return;
     }
 
     const poketraceId = (selectedCard as unknown as Record<string, unknown>)?.poketraceId as string | undefined;
     if (!poketraceId) {
       setGradedPrice(null);
+      setSourceBreakdown({});
+      setSelectedSource(null);
       return;
     }
 
-    setGradedPriceLoading(true);
-    fetch(`/api/card-price?poketraceId=${encodeURIComponent(poketraceId)}&grade=${encodeURIComponent(form.psaGrade)}`)
+    const isGraded = !!form.psaGrade;
+    setBreakdownLoading(true);
+    if (isGraded) setGradedPriceLoading(true);
+
+    const url = `/api/card-price?poketraceId=${encodeURIComponent(poketraceId)}${
+      isGraded ? `&grade=${encodeURIComponent(form.psaGrade)}` : ""
+    }`;
+
+    fetch(url)
       .then((res) => res.json())
       .then((data) => {
-        if (data.price != null) {
-          setGradedPrice(data.price);
-        } else {
-          setGradedPrice(null);
-        }
+        const breakdown = (data.breakdown || {}) as Partial<Record<PriceSource, number>>;
+        setSourceBreakdown(breakdown);
+        setGradedPrice(isGraded ? (data.price ?? null) : null);
+        // Reset selection if the previously chosen source no longer has a price
+        setSelectedSource((prev) => (prev && breakdown[prev] != null ? prev : null));
       })
-      .catch(() => setGradedPrice(null))
-      .finally(() => setGradedPriceLoading(false));
+      .catch(() => {
+        setSourceBreakdown({});
+        setGradedPrice(null);
+        setSelectedSource(null);
+      })
+      .finally(() => {
+        setBreakdownLoading(false);
+        setGradedPriceLoading(false);
+      });
   }, [selectedCard, form.psaGrade, isManualSubmission]);
 
   // When user selects a tether candidate, populate the price
@@ -319,8 +346,10 @@ export default function AddAssetForm() {
       } else if (form.manualPrice && form.manualPriceValue) {
         currentPrice = parseFloat(form.manualPriceValue);
       } else if (selectedCard) {
-        // Use graded price fetched from Poketrace if available
-        if (form.psaGrade && gradedPrice != null) {
+        // User explicitly picked a source → use that price
+        if (selectedSource && sourceBreakdown[selectedSource] != null) {
+          currentPrice = sourceBreakdown[selectedSource]!;
+        } else if (form.psaGrade && gradedPrice != null) {
           currentPrice = gradedPrice;
         } else if (form.psaGrade) {
           // Grade selected but no graded price found — leave as null (N/A)
@@ -368,6 +397,7 @@ export default function AddAssetForm() {
           is_manual_submission: isManualSubmission,
           poketrace_id: selectedTether?.poketraceId || (selectedCard as unknown as Record<string, unknown>)?.poketraceId || null,
           poketrace_market: selectedTether?.poketraceMarket || (selectedCard as unknown as Record<string, unknown>)?.poketraceMarket || "US",
+          price_source: selectedSource,
         }),
       });
 
@@ -708,6 +738,63 @@ export default function AddAssetForm() {
                       )}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Price Source selector - for API-sourced cards */}
+              {!isManualSubmission && selectedCard && (
+                <div className="bg-surface-hover border border-border rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-text-primary">
+                      Price source
+                    </label>
+                    {breakdownLoading && (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-text-muted" />
+                    )}
+                  </div>
+                  <p className="text-xs text-text-muted mb-3">
+                    {form.psaGrade
+                      ? `Pick which marketplace's ${form.psaGrade} price to use. Leave on Auto to let us pick.`
+                      : "Pick which marketplace's price to use. Leave on Auto to let us pick."}
+                  </p>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {(["auto", "tcgplayer", "ebay", "cardmarket"] as const).map((opt) => {
+                      const isAuto = opt === "auto";
+                      const isSelected = isAuto ? selectedSource === null : selectedSource === opt;
+                      const price = isAuto ? null : sourceBreakdown[opt as PriceSource];
+                      const unavailable = !isAuto && price == null;
+                      const label =
+                        opt === "tcgplayer" ? "TCGPlayer"
+                          : opt === "ebay" ? "eBay"
+                          : opt === "cardmarket" ? "CardMarket"
+                          : "Auto";
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          disabled={unavailable}
+                          onClick={() => setSelectedSource(isAuto ? null : (opt as PriceSource))}
+                          className={`px-3 py-2 rounded-lg border text-left transition-colors ${
+                            isSelected
+                              ? "bg-accent-muted border-accent text-accent-hover"
+                              : unavailable
+                                ? "bg-surface border-border text-text-muted opacity-50 cursor-not-allowed"
+                                : "bg-surface border-border text-text-secondary hover:border-border-hover"
+                          }`}
+                        >
+                          <div className="text-xs font-semibold">{label}</div>
+                          <div className="text-xs mt-0.5">
+                            {isAuto
+                              ? <span className="text-text-muted">Best available</span>
+                              : price != null
+                                ? <span>{formatCurrency(price)}</span>
+                                : <span className="text-text-muted">N/A</span>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 

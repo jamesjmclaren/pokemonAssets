@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { searchCards, searchSealedProducts, fetchPoketracePrice } from "@/lib/pokemon-api";
+import type { PoketraceSource } from "@/lib/poketrace";
 import { extractCardPrice } from "@/lib/format";
+
+function coerceSource(value: unknown): PoketraceSource | undefined {
+  return value === "tcgplayer" || value === "ebay" || value === "cardmarket"
+    ? value
+    : undefined;
+}
 
 const STALE_HOURS = 24;
 
@@ -11,7 +18,7 @@ export async function POST() {
   try {
     const { data: assets, error } = await supabase
       .from("assets")
-      .select("id, external_id, name, asset_type, price_updated_at, manual_price, current_price, poketrace_id, poketrace_market, psa_grade");
+      .select("id, external_id, name, asset_type, price_updated_at, manual_price, current_price, poketrace_id, poketrace_market, psa_grade, price_source");
 
     if (error) {
       console.error("[refresh-prices] Failed to fetch assets:", error.message);
@@ -63,10 +70,12 @@ export async function POST() {
         // Poketrace direct lookup (if linked)
         if (asset.poketrace_id) {
           try {
-            console.log(`[refresh-prices]   Fetching Poketrace price for "${asset.name}" (id: ${asset.poketrace_id})`);
+            const preferredSource = coerceSource(asset.price_source);
+            console.log(`[refresh-prices]   Fetching Poketrace price for "${asset.name}" (id: ${asset.poketrace_id}, source: ${preferredSource || "auto"})`);
             const result = await fetchPoketracePrice(
               asset.poketrace_id,
-              asset.psa_grade || undefined
+              asset.psa_grade || undefined,
+              preferredSource
             );
             if (result) {
               marketPrice = result.price;
