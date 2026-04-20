@@ -331,12 +331,27 @@ export async function PATCH(request: NextRequest) {
       .eq("id", id)
       .single();
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("assets")
       .update(updates)
       .eq("id", id)
       .select()
       .single();
+
+    // If a column doesn't exist yet (migration not applied), retry without it
+    if (error && error.code === "PGRST204" && error.message) {
+      const match = error.message.match(/Could not find the '(\w+)' column/);
+      if (match) {
+        const missingCol = match[1];
+        delete updates[missingCol];
+        ({ data, error } = await supabase
+          .from("assets")
+          .update(updates)
+          .eq("id", id)
+          .select()
+          .single());
+      }
+    }
 
     if (error) throw error;
 
