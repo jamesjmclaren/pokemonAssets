@@ -237,17 +237,14 @@ export default function AddAssetForm() {
   }, [form.psaGrade]);
 
   // Fetch per-source price breakdown (TCGPlayer / eBay / CardMarket) whenever
-  // the selected card or grade changes. Also refreshes gradedPrice for raw-or-
-  // graded display.
+  // the linked card / tether / grade changes. Works for both API-sourced cards
+  // and manual submissions tethered to a Poketrace listing.
   useEffect(() => {
-    if (isManualSubmission || !selectedCard) {
-      setGradedPrice(null);
-      setSourceBreakdown({});
-      setSelectedSource(null);
-      return;
-    }
+    const poketraceId =
+      (!isManualSubmission
+        ? (selectedCard as unknown as Record<string, unknown>)?.poketraceId
+        : selectedTether?.poketraceId) as string | undefined;
 
-    const poketraceId = (selectedCard as unknown as Record<string, unknown>)?.poketraceId as string | undefined;
     if (!poketraceId) {
       setGradedPrice(null);
       setSourceBreakdown({});
@@ -281,7 +278,7 @@ export default function AddAssetForm() {
         setBreakdownLoading(false);
         setGradedPriceLoading(false);
       });
-  }, [selectedCard, form.psaGrade, isManualSubmission]);
+  }, [selectedCard, selectedTether, form.psaGrade, isManualSubmission]);
 
   // When user selects a tether candidate, populate the price
   const handleTetherSelect = useCallback((candidate: TetherCandidate) => {
@@ -341,8 +338,12 @@ export default function AddAssetForm() {
       let currentPrice: number | null = null;
 
       if (hasTether) {
-        const field = getTetherGradeField();
-        currentPrice = selectedTether!.prices[field as keyof typeof selectedTether.prices] ?? null;
+        if (selectedSource && sourceBreakdown[selectedSource] != null) {
+          currentPrice = sourceBreakdown[selectedSource]!;
+        } else {
+          const field = getTetherGradeField();
+          currentPrice = selectedTether!.prices[field as keyof typeof selectedTether.prices] ?? null;
+        }
       } else if (form.manualPrice && form.manualPriceValue) {
         currentPrice = parseFloat(form.manualPriceValue);
       } else if (selectedCard) {
@@ -956,13 +957,68 @@ export default function AddAssetForm() {
                       <p className="text-[10px] text-text-muted mt-1">
                         {getMarketDisclaimer(selectedTether.poketraceMarket, "long")} Prices auto-refresh daily.
                       </p>
+
+                      {/* Price source selector for tethered assets */}
+                      <div className="mt-3 pt-3 border-t border-accent/20">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-medium text-text-primary">
+                            Price source
+                          </p>
+                          {breakdownLoading && (
+                            <Loader2 className="w-3 h-3 animate-spin text-text-muted" />
+                          )}
+                        </div>
+                        <p className="text-[10px] text-text-muted mb-2">
+                          {form.psaGrade
+                            ? `Pick which marketplace's ${form.psaGrade} price to use.`
+                            : "Pick which marketplace's price to use."}
+                        </p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+                          {(["auto", "tcgplayer", "ebay", "cardmarket"] as const).map((opt) => {
+                            const isAuto = opt === "auto";
+                            const isSelected = isAuto ? selectedSource === null : selectedSource === opt;
+                            const price = isAuto ? null : sourceBreakdown[opt as PriceSource];
+                            const unavailable = !isAuto && price == null;
+                            const label =
+                              opt === "tcgplayer" ? "TCGPlayer"
+                                : opt === "ebay" ? "eBay"
+                                : opt === "cardmarket" ? "CardMarket"
+                                : "Auto";
+                            return (
+                              <button
+                                key={opt}
+                                type="button"
+                                disabled={unavailable}
+                                onClick={() => setSelectedSource(isAuto ? null : (opt as PriceSource))}
+                                className={`px-2 py-1.5 rounded-lg border text-left transition-colors ${
+                                  isSelected
+                                    ? "bg-accent-muted border-accent text-accent-hover"
+                                    : unavailable
+                                      ? "bg-surface border-border text-text-muted opacity-50 cursor-not-allowed"
+                                      : "bg-surface border-border text-text-secondary hover:border-border-hover"
+                                }`}
+                              >
+                                <div className="text-[10px] font-semibold">{label}</div>
+                                <div className="text-[10px] mt-0.5">
+                                  {isAuto
+                                    ? <span className="text-text-muted">Best available</span>
+                                    : price != null
+                                      ? <span>{formatCurrency(price)}</span>
+                                      : <span className="text-text-muted">N/A</span>}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedTether(null);
                           setTetherCandidates([]);
                         }}
-                        className="text-[10px] text-danger hover:text-danger mt-1"
+                        className="text-[10px] text-danger hover:text-danger mt-3"
                       >
                         Remove link
                       </button>
