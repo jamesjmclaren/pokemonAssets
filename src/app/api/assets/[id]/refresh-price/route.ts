@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { searchCards, searchSealedProducts, fetchPoketracePrice } from "@/lib/pokemon-api";
+import type { PoketraceSource } from "@/lib/poketrace";
 import { extractCardPrice } from "@/lib/format";
+
+function coerceSource(value: unknown): PoketraceSource | undefined {
+  return value === "tcgplayer" || value === "ebay" || value === "cardmarket"
+    ? value
+    : undefined;
+}
 
 /**
  * POST /api/assets/[id]/refresh-price
@@ -72,10 +79,12 @@ export async function POST(
     // State 1: Poketrace direct lookup (if linked)
     if (asset.poketrace_id) {
       try {
-        console.log(`[refresh-single]   Trying Poketrace by ID: ${asset.poketrace_id} (grade: ${asset.psa_grade || "raw"})`);
+        const preferredSource = coerceSource(asset.price_source);
+        console.log(`[refresh-single]   Trying Poketrace by ID: ${asset.poketrace_id} (grade: ${asset.psa_grade || "raw"}, source: ${preferredSource || "auto"})`);
         const result = await fetchPoketracePrice(
           asset.poketrace_id,
-          asset.psa_grade || undefined
+          asset.psa_grade || undefined,
+          preferredSource
         );
         if (result) {
           marketPrice = result.price;
