@@ -324,12 +324,14 @@ export default function Design1() {
                       <div className="w-10 h-10 rounded-lg bg-accent/5 flex items-center justify-center shrink-0 group-hover:bg-accent/10 transition-colors">
                         <Icon className="w-5 h-5 text-accent/60 group-hover:text-accent transition-colors" />
                       </div>
-                      <div>
-                        <h3 className="text-text-primary text-sm font-medium mb-1" style={{ fontFamily: "Inter, sans-serif" }}>{f.title}</h3>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <h3 className="text-text-primary text-sm font-medium" style={{ fontFamily: "Inter, sans-serif" }}>{f.title}</h3>
+                          <span className="shrink-0 px-2 py-0.5 rounded-full bg-accent/5 text-accent/60 text-[9px] font-bold uppercase tracking-widest" style={{ fontFamily: "Inter, sans-serif" }}>Soon</span>
+                        </div>
                         <p className="text-text-muted text-xs leading-relaxed" style={{ fontFamily: "Inter, sans-serif", fontWeight: 300 }}>{f.description}</p>
                       </div>
                     </div>
-                    <span className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-accent/5 text-accent/60 text-[9px] font-bold uppercase tracking-widest" style={{ fontFamily: "Inter, sans-serif" }}>Soon</span>
                   </div>
                 );
               })}
