@@ -21,6 +21,8 @@ import {
   Send,
   CheckCircle,
   Shield,
+  ShoppingBag,
+  EyeOff,
   Users,
   Star,
   ChevronRight,
@@ -48,6 +50,7 @@ const features: Feature[] = [
   { icon: MessageCircle, title: "Private WhatsApp Trading Group", description: "Gain access to a curated private group of quality investors, buyers, and sellers.", comingSoon: false },
   { icon: Calendar, title: "Private Trade Events", description: "Receive access to exclusive trade events and private opportunities. Subject to availability.", comingSoon: false },
   { icon: TrendingUp, title: "Portfolio Tracking", description: "Monitor the value of your collection with daily real-time pricing updates.", comingSoon: false },
+  { icon: EyeOff, title: "Ad Free", description: "Enjoy a completely ad-free experience across the entire platform.", comingSoon: false },
   { icon: FileBarChart, title: "Portfolio Reporting", description: "Access tailored reports, market trends, and portfolio analytics designed to give you a clearer view of performance.", comingSoon: true },
   { icon: ArrowLeftRight, title: "Buy, Sell & Trade History", description: "Quickly view comparable pricing across online listings and recent market activity.", comingSoon: true },
   { icon: Zap, title: "Advanced Portfolio Tracking", description: "More powerful tools to monitor the performance and movement of your collection.", comingSoon: true },
@@ -58,6 +61,7 @@ const features: Feature[] = [
   { icon: Clock, title: "Daily Sales Recap", description: "Browse verified sales from the previous day in one easy-to-view summary.", comingSoon: true },
   { icon: Camera, title: "Camera Search", description: "Use your camera to search millions of cards instantly.", comingSoon: true },
   { icon: BadgeCheck, title: "Verified Vendor Profiles", description: "Connect with trusted vendors through verified profiles.", comingSoon: true },
+  { icon: ShoppingBag, title: "eBay LotBot", description: "See the total value of eBay lots with multiple items and find lots listed below the market value of everything included.", comingSoon: true },
 ];
 
 export default function Design1() {
