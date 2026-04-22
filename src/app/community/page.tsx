@@ -320,6 +320,9 @@ export default function Design1() {
                 const Icon = f.icon;
                 return (
                   <div key={f.title} className="relative bg-surface border border-border rounded-2xl p-6 hover:border-accent/20 transition-all duration-300 group">
+                    <div className="absolute top-4 right-4">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-bold tracking-widest" style={{ fontFamily: "Inter, sans-serif" }}>* Not Live</span>
+                    </div>
                     <div className="flex items-start gap-4">
                       <div className="w-10 h-10 rounded-lg bg-accent/5 flex items-center justify-center shrink-0 group-hover:bg-accent/10 transition-colors">
                         <Icon className="w-5 h-5 text-accent/60 group-hover:text-accent transition-colors" />
@@ -327,7 +330,6 @@ export default function Design1() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <h3 className="text-text-primary text-sm font-medium" style={{ fontFamily: "Inter, sans-serif" }}>{f.title}</h3>
-                          <span className="shrink-0 px-2 py-0.5 rounded-full bg-accent/5 text-accent/60 text-[9px] font-bold uppercase tracking-widest" style={{ fontFamily: "Inter, sans-serif" }}>Soon</span>
                         </div>
                         <p className="text-text-muted text-xs leading-relaxed" style={{ fontFamily: "Inter, sans-serif", fontWeight: 300 }}>{f.description}</p>
                       </div>
