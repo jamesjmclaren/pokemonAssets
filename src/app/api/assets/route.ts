@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
       pc_grade_field,
       poketrace_id,
       poketrace_market,
+      price_source,
       evidence_url,
     } = body;
 
@@ -174,6 +175,7 @@ export async function POST(request: NextRequest) {
       pc_grade_field: pc_grade_field || null,
       poketrace_id: poketrace_id || null,
       poketrace_market: poketrace_market || "US",
+      price_source: price_source || null,
       evidence_url: evidence_url || null,
     };
 
@@ -250,6 +252,7 @@ export async function PATCH(request: NextRequest) {
       pc_grade_field,
       poketrace_id,
       poketrace_market,
+      price_source,
       evidence_url,
       status,
       sell_price,
@@ -315,6 +318,7 @@ export async function PATCH(request: NextRequest) {
     if (pc_grade_field !== undefined) updates.pc_grade_field = pc_grade_field || null;
     if (poketrace_id !== undefined) updates.poketrace_id = poketrace_id || null;
     if (poketrace_market !== undefined) updates.poketrace_market = poketrace_market || "US";
+    if (price_source !== undefined) updates.price_source = price_source || null;
     if (evidence_url !== undefined) updates.evidence_url = evidence_url || null;
     if (status !== undefined) updates.status = status;
     if (sell_price !== undefined) updates.sell_price = sell_price ? parseFloat(sell_price) : null;

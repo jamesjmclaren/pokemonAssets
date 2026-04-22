@@ -5,7 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { clsx } from "clsx";
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, PenLine } from "lucide-react";
-import { formatCurrency, formatPercentage, fixStorageUrl } from "@/lib/format";
+import { formatPercentage, fixStorageUrl } from "@/lib/format";
+import { useFormatCurrency } from "@/lib/currency-context";
 import type { PortfolioAsset } from "@/types";
 
 interface AssetCardProps {
@@ -13,6 +14,7 @@ interface AssetCardProps {
 }
 
 export default function AssetCard({ asset }: AssetCardProps) {
+  const formatCurrency = useFormatCurrency();
   const qty = asset.quantity || 1;
   const currentPrice = asset.current_price ?? asset.purchase_price;
   const totalValue = currentPrice * qty;

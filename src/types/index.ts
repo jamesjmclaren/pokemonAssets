@@ -86,6 +86,8 @@ export interface PortfolioAsset {
   poketrace_market?: string;
   price_currency?: string;
   is_converted_price?: boolean;
+  // Preferred price source: 'tcgplayer' | 'ebay' | 'cardmarket' | null (auto)
+  price_source?: string | null;
 }
 
 export interface PortfolioSummary {

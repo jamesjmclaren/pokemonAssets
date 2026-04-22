@@ -10,7 +10,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { formatCurrency, formatDateShort } from "@/lib/format";
+import { formatDateShort } from "@/lib/format";
+import { useFormatCurrency } from "@/lib/currency-context";
 import type { PriceHistoryPoint } from "@/types";
 
 interface PriceChartProps {
@@ -39,6 +40,7 @@ export default function PriceChart({
   poketraceId,
   className = "",
 }: PriceChartProps) {
+  const formatCurrency = useFormatCurrency();
   const [data, setData] = useState<PriceHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -28,7 +28,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import PriceChart from "@/components/PriceChart";
-import { formatCurrency, formatPercentage, formatDate, fixStorageUrl } from "@/lib/format";
+import { formatPercentage, formatDate, fixStorageUrl, getMarketDisclaimer } from "@/lib/format";
+import { useFormatCurrency } from "@/lib/currency-context";
 import { clsx } from "clsx";
 import { usePortfolio } from "@/lib/portfolio-context";
 import type { PortfolioAsset } from "@/types";
@@ -85,6 +86,7 @@ interface EditForm {
   manual_price: boolean;
   poketrace_id: string;
   poketrace_market: string;
+  price_source: string;
 }
 
 interface PoketraceCandidate {
@@ -122,6 +124,7 @@ export default function AssetDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const { currentPortfolio, isReadOnly } = usePortfolio();
+  const formatCurrency = useFormatCurrency();
   const [asset, setAsset] = useState<PortfolioAsset | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
@@ -158,6 +161,9 @@ export default function AssetDetailPage({
   }[]>([]);
   const [gradedCurrentGrade, setGradedCurrentGrade] = useState<string | null>(null);
   const [loadingGraded, setLoadingGraded] = useState(false);
+  type PriceSource = "tcgplayer" | "ebay" | "cardmarket";
+  const [sourceBreakdown, setSourceBreakdown] = useState<Partial<Record<PriceSource, number>>>({});
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
 
   useEffect(() => {
     async function fetchAsset() {
@@ -233,6 +239,30 @@ export default function AssetDetailPage({
     return () => { cancelled = true; };
   }, [asset?.id, asset?.poketrace_id]);
 
+  // Fetch per-source price breakdown while editing a Poketrace-linked asset
+  useEffect(() => {
+    if (!editing || !editForm?.poketrace_id) {
+      setSourceBreakdown({});
+      return;
+    }
+    const poketraceId = editForm.poketrace_id;
+    const grade = editForm.psa_grade;
+    setBreakdownLoading(true);
+    const url = `/api/card-price?poketraceId=${encodeURIComponent(poketraceId)}${
+      grade ? `&grade=${encodeURIComponent(grade)}` : ""
+    }`;
+    let cancelled = false;
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setSourceBreakdown((data.breakdown || {}) as Partial<Record<PriceSource, number>>);
+      })
+      .catch(() => { if (!cancelled) setSourceBreakdown({}); })
+      .finally(() => { if (!cancelled) setBreakdownLoading(false); });
+    return () => { cancelled = true; };
+  }, [editing, editForm?.poketrace_id, editForm?.psa_grade]);
+
   const startEditing = () => {
     if (!asset) return;
     setEditForm({
@@ -252,6 +282,7 @@ export default function AssetDetailPage({
       manual_price: asset.manual_price || false,
       poketrace_id: asset.poketrace_id || "",
       poketrace_market: asset.poketrace_market || "US",
+      price_source: asset.price_source || "",
     });
     setPoketraceCandidates([]);
     setPoketraceShowSearch(false);
@@ -267,6 +298,14 @@ export default function AssetDetailPage({
     if (!asset || !editForm) return;
     setSaving(true);
     try {
+      const chosenSource = editForm.price_source as PriceSource | "";
+      const chosenSourcePrice = chosenSource ? sourceBreakdown[chosenSource] : undefined;
+      const priceSourceChanged = (asset.price_source || "") !== (editForm.price_source || "");
+      const nextPrice =
+        priceSourceChanged && chosenSourcePrice != null
+          ? chosenSourcePrice.toString()
+          : (editForm.current_price || undefined);
+
       const res = await fetch("/api/assets", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -284,10 +323,11 @@ export default function AssetDetailPage({
           psa_grade: editForm.psa_grade,
           language: editForm.language,
           storage_location: editForm.storage_location,
-          current_price: editForm.current_price || undefined,
+          current_price: nextPrice,
           manual_price: editForm.manual_price,
           poketrace_id: editForm.poketrace_id || null,
           poketrace_market: editForm.poketrace_market || "US",
+          price_source: editForm.price_source || null,
         }),
       });
       if (!res.ok) {
@@ -771,7 +811,67 @@ export default function AssetDetailPage({
                     <Link2 className="w-3.5 h-3.5 text-accent flex-shrink-0" />
                     <p className="text-xs text-accent truncate">Poketrace ID: {editForm.poketrace_id} ({editForm.poketrace_market})</p>
                   </div>
-                  <p className="text-[10px] text-text-muted mt-1">Prices auto-refresh daily from Poketrace (TCGPlayer + eBay data, USD)</p>
+                  <p className="text-[10px] text-text-muted">
+                    {getMarketDisclaimer(editForm.poketrace_market, "long")} Prices auto-refresh daily.
+                  </p>
+
+                  <div className="pt-2 border-t border-accent/10">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-medium text-text-primary">Price source</p>
+                      {breakdownLoading && (
+                        <RefreshCw className="w-3 h-3 animate-spin text-text-muted" />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-text-muted mb-2">
+                      {editForm.psa_grade
+                        ? `Pick which marketplace's ${editForm.psa_grade} price to use.`
+                        : "Pick which marketplace's price to use."}
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+                      {(["auto", "tcgplayer", "ebay", "cardmarket"] as const).map((opt) => {
+                        const isAuto = opt === "auto";
+                        const currentValue = editForm.price_source || "";
+                        const isSelected = isAuto ? currentValue === "" : currentValue === opt;
+                        const price = isAuto ? null : sourceBreakdown[opt as PriceSource];
+                        const unavailable = !isAuto && price == null;
+                        const label =
+                          opt === "tcgplayer" ? "TCGPlayer"
+                            : opt === "ebay" ? "eBay"
+                            : opt === "cardmarket" ? "CardMarket"
+                            : "Auto";
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            disabled={unavailable}
+                            onClick={() =>
+                              setEditForm({
+                                ...editForm,
+                                price_source: isAuto ? "" : opt,
+                              })
+                            }
+                            className={clsx(
+                              "px-2 py-1.5 rounded-lg border text-left transition-colors",
+                              isSelected
+                                ? "bg-accent-muted border-accent text-accent-hover"
+                                : unavailable
+                                  ? "bg-surface border-border text-text-muted opacity-50 cursor-not-allowed"
+                                  : "bg-surface border-border text-text-secondary hover:border-border-hover"
+                            )}
+                          >
+                            <div className="text-[10px] font-semibold">{label}</div>
+                            <div className="text-[10px] mt-0.5">
+                              {isAuto
+                                ? <span className="text-text-muted">Best available</span>
+                                : price != null
+                                  ? <span>{formatCurrency(price)}</span>
+                                  : <span className="text-text-muted">N/A</span>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div>
@@ -1469,9 +1569,9 @@ export default function AssetDetailPage({
               <p className="text-xs text-text-muted">
                 {asset.poketrace_id ? (
                   <>
-                    Linked to Poketrace (TCGPlayer + eBay data, USD)
+                    Linked to Poketrace · {getMarketDisclaimer(asset.poketrace_market, "short")}
                     {asset.is_converted_price && (
-                      <> · <span className="text-warning">Price converted from EUR</span></>
+                      <> · <span className="text-warning">Converted from EUR to USD</span></>
                     )}
                     {asset.price_updated_at &&
                       ` · Updated ${formatDate(asset.price_updated_at)}`}
@@ -1484,9 +1584,9 @@ export default function AssetDetailPage({
                   </>
                 ) : (
                   <>
-                    Price data from Poketrace
+                    Price data from Poketrace · {getMarketDisclaimer(asset.poketrace_market, "short")}
                     {asset.is_converted_price && (
-                      <> · <span className="text-warning">Converted from EUR</span></>
+                      <> · <span className="text-warning">Converted from EUR to USD</span></>
                     )}
                     {asset.price_updated_at &&
                       ` · Updated ${formatDate(asset.price_updated_at)}`}

@@ -22,7 +22,25 @@ import {
   fixStorageUrl,
 } from "@/lib/format";
 import { usePortfolio } from "@/lib/portfolio-context";
+import { useCurrency } from "@/lib/currency-context";
 import type { PortfolioAsset } from "@/types";
+
+/**
+ * UK tax year runs 6 April → 5 April of the following year.
+ * Returns ISO date bounds for the tax year that contains `anchor`.
+ * If `offset` is -1, returns the previous tax year.
+ */
+function getUkTaxYear(anchor: Date = new Date(), offset: 0 | -1 = 0) {
+  const y = anchor.getFullYear();
+  const taxStartYear =
+    anchor.getMonth() > 2 || (anchor.getMonth() === 3 && anchor.getDate() >= 6)
+      ? y
+      : y - 1;
+  const startYear = taxStartYear + offset;
+  const from = `${startYear}-04-06`;
+  const to = `${startYear + 1}-04-05`;
+  return { from, to };
+}
 
 function getEvidenceLink(asset: PortfolioAsset): {
   label: string;
@@ -76,10 +94,24 @@ const TYPE_BADGE_CLASSES: Record<string, string> = {
 
 export default function ReportPage() {
   const { currentPortfolio, loading: portfolioLoading } = usePortfolio();
+  const { rates, rateFetchedAt } = useCurrency();
   const [assets, setAssets] = useState<PortfolioAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [showGbp, setShowGbp] = useState(false);
+  // Helper: format a USD value with the GBP equivalent appended if the toggle is on.
+  const fmtUsdWithGbp = (usd: number) => {
+    if (!showGbp) return formatCurrency(usd);
+    const gbp = usd * (rates.GBP ?? 0.787);
+    const gbpStr = new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(gbp);
+    return `${formatCurrency(usd)} · ${gbpStr}`;
+  };
   const reportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [sortField, setSortField] = useState<"name" | "type" | "date" | "cost" | "value" | "pl" | "roi">("date");
@@ -478,6 +510,25 @@ export default function ReportPage() {
         y += 4;
       }
 
+      // -- Market / tax disclaimer block (above footer) --
+      if (y > 250) {
+        pdf.addPage();
+        y = margin;
+      }
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(...grey);
+      pdf.text("Disclaimer", margin, y + 4);
+      y += 6;
+      pdf.setFontSize(7);
+      pdf.setFont("helvetica", "normal");
+      const disclaimerLines = pdf.splitTextToSize(
+        "All figures are based on US market pricing from Poketrace (TCGPlayer + eBay, USD). European-market assets are converted from EUR. Any GBP figures in this report are converted at today's FX rate and do not reflect UK market prices. This report is informational only and is not financial or tax advice. For UK self-assessment or any accounting use, consult a qualified accountant.",
+        contentW
+      );
+      pdf.text(disclaimerLines, margin, y + 3);
+      y += disclaimerLines.length * 3 + 4;
+
       // -- Footer on last page --
       pdf.setFontSize(7);
       pdf.setTextColor(...grey);
@@ -495,28 +546,65 @@ export default function ReportPage() {
   };
 
   const handleExportCSV = () => {
-    const headers = ["#", "Name", "Set", "Type", "Grade", "Purchase Date", "Qty", "Cost", "Current Value", "P/L", "ROI %", "Evidence"];
-    const csvRows = [headers.join(",")];
+    const gbpRate = rates.GBP ?? 0.787;
+    const escapeCsv = (s: string) => `"${s.replace(/"/g, '""')}"`;
+    const gbp = (usd: number) => (usd * gbpRate).toFixed(2);
+    const csvRows: string[] = [];
+    // Preamble
+    csvRows.push("West Investments Ltd - Portfolio Report");
+    csvRows.push(`Generated,${new Date().toISOString()}`);
+    if (dateFrom || dateTo) csvRows.push(`Date range,${dateFrom || "All"},${dateTo || "Present"}`);
+    csvRows.push(`FX rate,1 USD = £${gbpRate.toFixed(4)}${rateFetchedAt ? `,fetched,${rateFetchedAt}` : ""}`);
+    csvRows.push("");
+
+    const headers = showGbp
+      ? ["#", "Name", "Set", "Type", "Grade", "Purchase Date", "Qty", "Cost (USD)", "Cost (GBP)", "Current Value (USD)", "Current Value (GBP)", "P/L (USD)", "P/L (GBP)", "ROI %", "Evidence"]
+      : ["#", "Name", "Set", "Type", "Grade", "Purchase Date", "Qty", "Cost", "Current Value", "P/L", "ROI %", "Evidence"];
+    csvRows.push(headers.join(","));
     sortedRows.forEach((row, i) => {
       const evidence = getEvidenceLink(row.asset);
-      const escapeCsv = (s: string) => `"${s.replace(/"/g, '""')}"`;
-      csvRows.push([
-        i + 1,
+      const base = [
+        String(i + 1),
         escapeCsv(row.asset.name),
         escapeCsv(row.asset.set_name || ""),
         row.asset.asset_type,
         row.asset.psa_grade || "",
         row.asset.purchase_date,
-        row.qty,
-        row.cost.toFixed(2),
-        row.value.toFixed(2),
-        row.pl.toFixed(2),
-        row.roi.toFixed(2),
-        evidence.url || evidence.label,
-      ].join(","));
+        String(row.qty),
+      ];
+      const money = showGbp
+        ? [row.cost.toFixed(2), gbp(row.cost), row.value.toFixed(2), gbp(row.value), row.pl.toFixed(2), gbp(row.pl)]
+        : [row.cost.toFixed(2), row.value.toFixed(2), row.pl.toFixed(2)];
+      csvRows.push([...base, ...money, row.roi.toFixed(2), evidence.url || evidence.label].join(","));
     });
     csvRows.push("");
-    csvRows.push(["", "", "", "Totals", "", "", "", totalInvested.toFixed(2), currentValue.toFixed(2), totalProfit.toFixed(2), profitPercent.toFixed(2), ""].join(","));
+    if (showGbp) {
+      csvRows.push(["", "", "", "Totals", "", "", "", totalInvested.toFixed(2), gbp(totalInvested), currentValue.toFixed(2), gbp(currentValue), totalProfit.toFixed(2), gbp(totalProfit), profitPercent.toFixed(2), ""].join(","));
+    } else {
+      csvRows.push(["", "", "", "Totals", "", "", "", totalInvested.toFixed(2), currentValue.toFixed(2), totalProfit.toFixed(2), profitPercent.toFixed(2), ""].join(","));
+    }
+
+    // Realised gains section
+    if (realisedRows.length > 0) {
+      csvRows.push("");
+      csvRows.push("Realised Gains");
+      const rHeaders = showGbp
+        ? ["Name", "Purchase Date", "Cost (USD)", "Cost (GBP)", "Sell Date", "Proceeds (USD)", "Proceeds (GBP)", "P/L (USD)", "P/L (GBP)"]
+        : ["Name", "Purchase Date", "Cost", "Sell Date", "Proceeds", "P/L"];
+      csvRows.push(rHeaders.join(","));
+      realisedRows.forEach((r) => {
+        const base = [escapeCsv(r.asset.name), r.asset.purchase_date || ""];
+        const costs = showGbp ? [r.cost.toFixed(2), gbp(r.cost)] : [r.cost.toFixed(2)];
+        const sell = [r.asset.sell_date || ""];
+        const proceeds = showGbp ? [r.proceeds.toFixed(2), gbp(r.proceeds)] : [r.proceeds.toFixed(2)];
+        const pl = showGbp ? [r.pl.toFixed(2), gbp(r.pl)] : [r.pl.toFixed(2)];
+        csvRows.push([...base, ...costs, ...sell, ...proceeds, ...pl].join(","));
+      });
+      const totals = showGbp
+        ? ["Totals", "", realisedTotals.cost.toFixed(2), gbp(realisedTotals.cost), "", realisedTotals.proceeds.toFixed(2), gbp(realisedTotals.proceeds), realisedTotals.pl.toFixed(2), gbp(realisedTotals.pl)]
+        : ["Totals", "", realisedTotals.cost.toFixed(2), "", realisedTotals.proceeds.toFixed(2), realisedTotals.pl.toFixed(2)];
+      csvRows.push(totals.join(","));
+    }
 
     const convertedCsv = filteredAssets.filter((a) => a.is_converted_price);
     if (convertedCsv.length > 0) {
@@ -526,6 +614,11 @@ export default function ReportPage() {
         csvRows.push(`"${a.name.replace(/"/g, '""')}",${(a.current_price ?? 0).toFixed(2)},~USD`);
       });
     }
+
+    // Disclaimer
+    csvRows.push("");
+    csvRows.push("Disclaimer");
+    csvRows.push('"All figures based on US market pricing from Poketrace (TCGPlayer + eBay, USD). European-market assets are converted from EUR. Any GBP figures are converted at today\'s FX rate and do not reflect UK market prices. Informational only; not financial or tax advice. For UK self-assessment, consult a qualified accountant."');
 
     const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -596,6 +689,33 @@ export default function ReportPage() {
       return { asset: a, qty, cost, value, pl, roi };
     });
   }, [filteredAssets]);
+
+  // Realised gains: SOLD assets whose sell_date lands inside the selected window.
+  const realisedRows = useMemo(() => {
+    return assets
+      .filter((a) => a.status === "SOLD" && a.sell_price != null && a.sell_date)
+      .filter((a) => {
+        if (dateFrom && (a.sell_date || "") < dateFrom) return false;
+        if (dateTo && (a.sell_date || "") > dateTo) return false;
+        return true;
+      })
+      .map((a) => {
+        const qty = a.quantity || 1;
+        const cost = a.purchase_price * qty;
+        const proceeds = (a.sell_price ?? 0) * qty;
+        const pl = proceeds - cost;
+        const roi = cost > 0 ? (pl / cost) * 100 : 0;
+        return { asset: a, qty, cost, proceeds, pl, roi };
+      })
+      .sort((a, b) => (b.asset.sell_date || "").localeCompare(a.asset.sell_date || ""));
+  }, [assets, dateFrom, dateTo]);
+
+  const realisedTotals = useMemo(() => {
+    const cost = realisedRows.reduce((s, r) => s + r.cost, 0);
+    const proceeds = realisedRows.reduce((s, r) => s + r.proceeds, 0);
+    const pl = proceeds - cost;
+    return { cost, proceeds, pl };
+  }, [realisedRows]);
 
   const sortedRows = useMemo(() => {
     const sorted = [...assetRows];
@@ -761,6 +881,9 @@ export default function ReportPage() {
                 </span>
               )}
             </p>
+            <p className="text-[11px] text-text-muted mt-1">
+              All figures based on US market pricing from Poketrace (TCGPlayer + eBay, USD). European-market assets are converted from EUR. Informational only; not financial or tax advice.
+            </p>
           </div>
           <div className="print:hidden flex items-center gap-2">
             <button
@@ -853,6 +976,28 @@ export default function ReportPage() {
               >
                 YTD
               </button>
+              <button
+                onClick={() => {
+                  const r = getUkTaxYear(new Date(), 0);
+                  setDateFrom(r.from);
+                  setDateTo(r.to);
+                }}
+                className="px-3 py-2 bg-surface-hover border border-border rounded-xl text-text-secondary hover:text-text-primary text-xs font-medium"
+                title="UK tax year (6 April – 5 April)"
+              >
+                This Tax Year
+              </button>
+              <button
+                onClick={() => {
+                  const r = getUkTaxYear(new Date(), -1);
+                  setDateFrom(r.from);
+                  setDateTo(r.to);
+                }}
+                className="px-3 py-2 bg-surface-hover border border-border rounded-xl text-text-secondary hover:text-text-primary text-xs font-medium"
+                title="Previous UK tax year (6 April – 5 April)"
+              >
+                Last Tax Year
+              </button>
               {(dateFrom || dateTo) && (
                 <button
                   onClick={() => { setDateFrom(""); setDateTo(""); }}
@@ -868,6 +1013,21 @@ export default function ReportPage() {
               Showing {filteredAssets.length} of {assets.length} assets purchased in this date range
             </p>
           )}
+          <div className="mt-3 pt-3 border-t border-border flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showGbp}
+                onChange={(e) => setShowGbp(e.target.checked)}
+                className="w-4 h-4 accent-accent"
+              />
+              Show GBP alongside USD
+            </label>
+            <p className="text-[11px] text-text-muted">
+              FX rate: 1 USD ≈ £{(rates.GBP ?? 0).toFixed(4)}
+              {rateFetchedAt ? ` · fetched ${new Date(rateFetchedAt).toLocaleDateString()}` : ""}
+            </p>
+          </div>
         </div>
 
         {/* Summary Cards */}
@@ -1264,6 +1424,72 @@ export default function ReportPage() {
                   </div>
                 ))}
             </div>
+          </div>
+        )}
+
+        {/* Realised Gains */}
+        {realisedRows.length > 0 && (
+          <div className="bg-surface border border-border rounded-2xl p-4 md:p-6">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-accent" />
+                  Realised Gains
+                </h2>
+                <p className="text-xs text-text-muted mt-1">
+                  {realisedRows.length} sale{realisedRows.length === 1 ? "" : "s"}
+                  {(dateFrom || dateTo) && " in the selected window"} · USD figures; GBP shown at today&apos;s FX rate when toggled.
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-text-muted uppercase tracking-wider">Net Realised P/L</p>
+                <p className={`text-xl font-bold ${realisedTotals.pl >= 0 ? "text-success" : "text-danger"}`}>
+                  {fmtUsdWithGbp(realisedTotals.pl)}
+                </p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-text-muted text-xs uppercase tracking-wider border-b border-border">
+                    <th className="py-2 pr-3 font-medium">Asset</th>
+                    <th className="py-2 pr-3 font-medium">Purchased</th>
+                    <th className="py-2 pr-3 font-medium text-right">Cost</th>
+                    <th className="py-2 pr-3 font-medium">Sold</th>
+                    <th className="py-2 pr-3 font-medium text-right">Proceeds</th>
+                    <th className="py-2 font-medium text-right">P/L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {realisedRows.map((r) => (
+                    <tr key={r.asset.id} className="border-b border-border/50 last:border-0">
+                      <td className="py-2 pr-3 text-text-primary">{r.asset.name}</td>
+                      <td className="py-2 pr-3 text-text-muted">{r.asset.purchase_date ? formatDate(r.asset.purchase_date) : "—"}</td>
+                      <td className="py-2 pr-3 text-right text-text-secondary">{fmtUsdWithGbp(r.cost)}</td>
+                      <td className="py-2 pr-3 text-text-muted">{r.asset.sell_date ? formatDate(r.asset.sell_date) : "—"}</td>
+                      <td className="py-2 pr-3 text-right text-text-secondary">{fmtUsdWithGbp(r.proceeds)}</td>
+                      <td className={`py-2 text-right font-semibold ${r.pl >= 0 ? "text-success" : "text-danger"}`}>
+                        {fmtUsdWithGbp(r.pl)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="text-sm font-semibold">
+                    <td className="py-3 pr-3" colSpan={2}>Totals</td>
+                    <td className="py-3 pr-3 text-right text-text-primary">{fmtUsdWithGbp(realisedTotals.cost)}</td>
+                    <td className="py-3 pr-3"></td>
+                    <td className="py-3 pr-3 text-right text-text-primary">{fmtUsdWithGbp(realisedTotals.proceeds)}</td>
+                    <td className={`py-3 text-right ${realisedTotals.pl >= 0 ? "text-success" : "text-danger"}`}>
+                      {fmtUsdWithGbp(realisedTotals.pl)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <p className="text-[11px] text-text-muted mt-3">
+              Values based on US market pricing (TCGPlayer + eBay, USD). GBP figures are converted at the FX rate on the date shown above and are for reference only — not financial or tax advice. For UK self-assessment, consult a qualified accountant.
+            </p>
           </div>
         )}
 

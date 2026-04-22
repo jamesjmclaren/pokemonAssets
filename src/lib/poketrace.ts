@@ -101,6 +101,93 @@ export interface PoketraceSet {
   series?: string;
 }
 
+/**
+ * Fetch every Poketrace card in a given set (paginated).
+ * Returns the raw cards so callers can read tier-level fields like avg1d.
+ */
+export async function fetchPoketraceCardsBySet(
+  setSlug: string,
+  market: "US" | "EU" = "US",
+  opts: { pageSize?: number; maxPages?: number; variant?: string } = {}
+): Promise<PoketraceCard[]> {
+  const pageSize = opts.pageSize ?? 100;
+  const maxPages = opts.maxPages ?? 6;
+  const all: PoketraceCard[] = [];
+  let cursor: string | null | undefined;
+  let pages = 0;
+
+  do {
+    const params: Record<string, string> = {
+      set: setSlug,
+      market,
+      limit: String(pageSize),
+    };
+    if (cursor) params.cursor = cursor;
+    if (opts.variant) params.variant = opts.variant;
+    const response: PoketraceSearchResponse = await apiFetch("/v1/cards", params);
+    const batch = response?.data || [];
+    all.push(...batch);
+    cursor = response?.hasMore ? response?.nextCursor : null;
+    pages += 1;
+  } while (cursor && pages < maxPages);
+
+  return all;
+}
+
+/**
+ * Read a specific tier (e.g. NEAR_MINT, PSA_10) from a Poketrace card,
+ * preferring the source that typically carries that tier's data.
+ */
+export function getPoketraceTier(
+  card: PoketraceCard,
+  tier: string
+): { avg: number; avg1d: number | null; avg7d: number | null; avg30d: number | null; saleCount: number | null; source: string } | null {
+  const prices = card.prices || {};
+  const sources = tier.startsWith("PSA_") || tier.startsWith("CGC_") || tier.startsWith("BGS_")
+    ? ["ebay", "tcgplayer"] // graded tiers primarily on eBay
+    : ["tcgplayer", "ebay", "cardmarket"]; // raw/condition tiers primarily on TCGPlayer
+
+  // Build a list of raw-condition aliases to try.  Poketrace isn't consistent
+  // about casing ("NEAR_MINT" vs "Near Mint") across sources and set types.
+  const RAW_ALIASES: Record<string, string[]> = {
+    NEAR_MINT: ["NEAR_MINT", "Near Mint", "NM"],
+    LIGHTLY_PLAYED: ["LIGHTLY_PLAYED", "Lightly Played", "LP"],
+  };
+  const aliases = RAW_ALIASES[tier] ?? [tier];
+
+  for (const source of sources) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sourceMap = (prices as any)[source] as Record<string, PoketracePriceTier> | undefined;
+    if (!sourceMap) continue;
+
+    // Try each alias for the requested tier.
+    let t: PoketracePriceTier | undefined;
+    for (const alias of aliases) {
+      if (sourceMap[alias]?.avg != null && sourceMap[alias]!.avg > 0) {
+        t = sourceMap[alias];
+        break;
+      }
+    }
+
+    if (t?.avg != null && t.avg > 0) {
+      return {
+        avg: t.avg,
+        avg1d: typeof t.avg1d === "number" ? t.avg1d : null,
+        avg7d: typeof t.avg7d === "number" ? t.avg7d : null,
+        avg30d: typeof t.avg30d === "number" ? t.avg30d : null,
+        saleCount:
+          typeof t.saleCount === "number"
+            ? t.saleCount
+            : typeof t.approxSaleCount === "number"
+              ? t.approxSaleCount
+              : null,
+        source,
+      };
+    }
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Sealed product detection
 // ---------------------------------------------------------------------------
@@ -213,6 +300,40 @@ export function extractGradedPrice(
   }
 
   return null;
+}
+
+export type PoketraceSource = "tcgplayer" | "ebay" | "cardmarket";
+
+/**
+ * Extract per-source prices for a specific tier (raw condition or graded).
+ * Returns only sources that actually have a price for that tier.
+ */
+export function extractSourcePrices(
+  card: PoketraceCard,
+  tier: string
+): Partial<Record<PoketraceSource, number>> {
+  const prices = card.prices;
+  if (!prices) return {};
+
+  const RAW_ALIASES: Record<string, string[]> = {
+    NEAR_MINT: ["NEAR_MINT", "Near Mint", "NM"],
+    LIGHTLY_PLAYED: ["LIGHTLY_PLAYED", "Lightly Played", "LP"],
+  };
+  const aliases = RAW_ALIASES[tier] ?? [tier];
+
+  const result: Partial<Record<PoketraceSource, number>> = {};
+  for (const source of ["tcgplayer", "ebay", "cardmarket"] as const) {
+    const sourceMap = prices[source];
+    if (!sourceMap) continue;
+    for (const alias of aliases) {
+      const entry = sourceMap[alias];
+      if (entry?.avg != null && entry.avg > 0) {
+        result[source] = entry.avg;
+        break;
+      }
+    }
+  }
+  return result;
 }
 
 /**
@@ -638,10 +759,22 @@ export async function getPoketraceSets(
   sortBy = "releaseDate",
   sortOrder = "desc"
 ): Promise<{ id: string; name: string; series: string; releaseDate: string; totalCards: number }[]> {
-  const response = await apiFetch("/v1/sets");
-  const sets: PoketraceSet[] = response.data || response || [];
+  const all: PoketraceSet[] = [];
+  let cursor: string | null | undefined;
+  let pages = 0;
+  const maxPages = 20; // 2000 sets is well above Poketrace's actual catalogue size
 
-  const normalized = sets.map((s) => ({
+  do {
+    const params: Record<string, string> = { limit: "100" };
+    if (cursor) params.cursor = cursor;
+    const response = await apiFetch("/v1/sets", params);
+    const batch: PoketraceSet[] = response?.data || [];
+    all.push(...batch);
+    cursor = response?.pagination?.hasMore ? response?.pagination?.nextCursor : null;
+    pages += 1;
+  } while (cursor && pages < maxPages);
+
+  const normalized = all.map((s) => ({
     id: s.slug,
     name: s.name,
     series: s.series || "pokemon",
@@ -668,12 +801,14 @@ export async function getPoketraceSets(
  */
 export async function fetchPoketracePrice(
   poketraceId: string,
-  grade?: string | null
+  grade?: string | null,
+  source?: PoketraceSource | null
 ): Promise<{
   price: number;
   currency: string;
   isConverted: boolean;
   rate?: number;
+  source?: PoketraceSource;
 } | null> {
   const card = await getRawPoketraceCard(poketraceId);
   if (!card) {
@@ -682,7 +817,7 @@ export async function fetchPoketracePrice(
   }
 
   // Log the full price structure for debugging
-  console.log(`[poketrace] fetchPoketracePrice for ${poketraceId}, grade=${grade || "none"}`);
+  console.log(`[poketrace] fetchPoketracePrice for ${poketraceId}, grade=${grade || "none"}, source=${source || "auto"}`);
   const cardPrices = card.prices || {};
   console.log(`[poketrace] Available price sources:`, {
     tcgplayer: cardPrices.tcgplayer ? Object.keys(cardPrices.tcgplayer) : "none",
@@ -691,23 +826,26 @@ export async function fetchPoketracePrice(
   });
 
   let price: number | null = null;
+  let resolvedSource: PoketraceSource | undefined;
 
-  // Try graded price first if a grade is specified
-  if (grade) {
-    const tier = gradeToPoketraceTier(grade);
-    console.log(`[poketrace] Looking for graded tier: ${tier}`);
+  const tier = grade ? gradeToPoketraceTier(grade) : "NEAR_MINT";
+
+  if (source) {
+    const breakdown = extractSourcePrices(card, tier);
+    const p = breakdown[source];
+    if (p != null) {
+      price = p;
+      resolvedSource = source;
+      console.log(`[poketrace] Using preferred source ${source}: ${p}`);
+    } else {
+      console.log(`[poketrace] Preferred source ${source} has no ${tier} price — returning N/A`);
+    }
+  } else if (grade) {
     price = extractGradedPrice(card, grade);
     console.log(`[poketrace] Graded price result: ${price ?? "null (not found)"}`);
-  }
-
-  // Fall back to best raw price only if no grade was requested.
-  // If a grade was specified but its price wasn't found, return null (N/A)
-  // rather than silently substituting the raw price.
-  if (price == null && !grade) {
+  } else {
     price = extractBestPrice(card);
-    console.log(`[poketrace] Falling back to raw price: ${price ?? "null"}`);
-  } else if (price == null && grade) {
-    console.log(`[poketrace] No graded price found for ${grade} – returning N/A (not falling back to raw)`);
+    console.log(`[poketrace] Raw/best price: ${price ?? "null"}`);
   }
 
   if (price == null) return null;
@@ -720,8 +858,45 @@ export async function fetchPoketracePrice(
       currency: "USD",
       isConverted: true,
       rate: converted.rate,
+      source: resolvedSource,
     };
   }
 
-  return { price, currency: card.currency || "USD", isConverted: false };
+  return { price, currency: card.currency || "USD", isConverted: false, source: resolvedSource };
+}
+
+/**
+ * Fetch the per-source price breakdown for a card at a given tier.
+ * Used by the add-asset form to let users pick TCGPlayer vs eBay vs CardMarket.
+ * Converts EUR values to USD so the UI always renders a single currency.
+ */
+export async function fetchPoketracePriceBreakdown(
+  poketraceId: string,
+  grade?: string | null
+): Promise<{
+  tier: string;
+  currency: string;
+  isConverted: boolean;
+  rate?: number;
+  prices: Partial<Record<PoketraceSource, number>>;
+} | null> {
+  const card = await getRawPoketraceCard(poketraceId);
+  if (!card) return null;
+
+  const tier = grade ? gradeToPoketraceTier(grade) : "NEAR_MINT";
+  const raw = extractSourcePrices(card, tier);
+
+  if (card.currency === "EUR") {
+    const entries = await Promise.all(
+      (Object.entries(raw) as [PoketraceSource, number][]).map(async ([src, p]) => {
+        const { usd } = await convertToUsd(p, "EUR");
+        return [src, usd] as [PoketraceSource, number];
+      })
+    );
+    const converted = Object.fromEntries(entries) as Partial<Record<PoketraceSource, number>>;
+    const rate = entries.length > 0 ? (await convertToUsd(1, "EUR")).rate : undefined;
+    return { tier, currency: "USD", isConverted: true, rate, prices: converted };
+  }
+
+  return { tier, currency: card.currency || "USD", isConverted: false, prices: raw };
 }
