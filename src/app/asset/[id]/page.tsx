@@ -131,6 +131,7 @@ export default function AssetDetailPage({
   const [editing, setEditing] = useState(false);
   const [editingPrice, setEditingPrice] = useState(false);
   const [newPrice, setNewPrice] = useState("");
+  const [newEvidenceUrl, setNewEvidenceUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
@@ -374,12 +375,14 @@ export default function AssetDetailPage({
           id: asset.id,
           current_price: newPrice,
           manual_price: true,
+          ...(newEvidenceUrl.trim() && { evidence_url: newEvidenceUrl.trim() }),
         }),
       });
       if (!res.ok) throw new Error("Failed to update");
       const updated = await res.json();
       setAsset(updated);
       setEditingPrice(false);
+      setNewEvidenceUrl("");
     } catch {
       alert("Failed to update price");
     } finally {
@@ -1370,11 +1373,20 @@ export default function AssetDetailPage({
                     {saving ? "Saving..." : "Save"}
                   </button>
                   <button
-                    onClick={() => setEditingPrice(false)}
+                    onClick={() => { setEditingPrice(false); setNewEvidenceUrl(""); }}
                     className="px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-secondary hover:text-text-primary"
                   >
                     Cancel
                   </button>
+                </div>
+                <div className="mt-2">
+                  <input
+                    type="url"
+                    value={newEvidenceUrl}
+                    onChange={(e) => setNewEvidenceUrl(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-text-primary text-sm outline-none focus:border-gold placeholder-text-muted"
+                    placeholder="Evidence URL (optional) — e.g. eBay listing, TCGPlayer sale..."
+                  />
                 </div>
               </div>
             )}

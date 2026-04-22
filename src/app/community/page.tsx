@@ -21,6 +21,8 @@ import {
   Send,
   CheckCircle,
   Shield,
+  ShoppingBag,
+  EyeOff,
   Users,
   Star,
   ChevronRight,
@@ -48,6 +50,7 @@ const features: Feature[] = [
   { icon: MessageCircle, title: "Private WhatsApp Trading Group", description: "Gain access to a curated private group of quality investors, buyers, and sellers.", comingSoon: false },
   { icon: Calendar, title: "Private Trade Events", description: "Receive access to exclusive trade events and private opportunities. Subject to availability.", comingSoon: false },
   { icon: TrendingUp, title: "Portfolio Tracking", description: "Monitor the value of your collection with daily real-time pricing updates.", comingSoon: false },
+  { icon: EyeOff, title: "Ad Free", description: "Enjoy a completely ad-free experience across the entire platform.", comingSoon: false },
   { icon: FileBarChart, title: "Portfolio Reporting", description: "Tailored reports with PDF & CSV export, date-range filtering, and market trend insights. Members get a clearer view of portfolio performance.", comingSoon: false },
   { icon: ArrowLeftRight, title: "Buy, Sell & Trade History", description: "Quickly view comparable pricing across online listings and recent market activity.", comingSoon: true },
   { icon: Zap, title: "Advanced Portfolio Tracking", description: "More powerful tools to monitor the performance and movement of your collection.", comingSoon: true },
@@ -58,6 +61,7 @@ const features: Feature[] = [
   { icon: Clock, title: "Daily Movers", description: "See the biggest day-over-day price changes across your portfolio, powered by daily aggregated market data from Poketrace.", comingSoon: true },
   { icon: Camera, title: "Camera Search", description: "Use your camera to search millions of cards instantly.", comingSoon: true },
   { icon: BadgeCheck, title: "Verified Vendor Profiles", description: "Connect with trusted vendors through verified profiles.", comingSoon: true },
+  { icon: ShoppingBag, title: "eBay LotBot", description: "See the total value of eBay lots with multiple items and find lots listed below the market value of everything included.", comingSoon: true },
 ];
 
 export default function Design1() {
@@ -320,12 +324,14 @@ export default function Design1() {
                       <div className="w-10 h-10 rounded-lg bg-accent/5 flex items-center justify-center shrink-0 group-hover:bg-accent/10 transition-colors">
                         <Icon className="w-5 h-5 text-accent/60 group-hover:text-accent transition-colors" />
                       </div>
-                      <div>
-                        <h3 className="text-text-primary text-sm font-medium mb-1" style={{ fontFamily: "Inter, sans-serif" }}>{f.title}</h3>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <h3 className="text-text-primary text-sm font-medium" style={{ fontFamily: "Inter, sans-serif" }}>{f.title}</h3>
+                          <span className="shrink-0 px-2 py-0.5 rounded-full bg-accent/5 text-accent/60 text-[9px] font-bold uppercase tracking-widest" style={{ fontFamily: "Inter, sans-serif" }}>Soon</span>
+                        </div>
                         <p className="text-text-muted text-xs leading-relaxed" style={{ fontFamily: "Inter, sans-serif", fontWeight: 300 }}>{f.description}</p>
                       </div>
                     </div>
-                    <span className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-accent/5 text-accent/60 text-[9px] font-bold uppercase tracking-widest" style={{ fontFamily: "Inter, sans-serif" }}>Soon</span>
                   </div>
                 );
               })}
