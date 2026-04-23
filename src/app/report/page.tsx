@@ -50,7 +50,7 @@ function getEvidenceLink(asset: PortfolioAsset): {
   if (asset.poketrace_id) {
     return {
       label: "Poketrace",
-      url: `https://poketrace.com/card/${asset.poketrace_id}`,
+      url: "https://poketrace.com",
       color: "text-blue-400 bg-blue-500/10",
     };
   }
