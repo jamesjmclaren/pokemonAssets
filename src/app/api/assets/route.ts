@@ -257,6 +257,8 @@ export async function PATCH(request: NextRequest) {
       status,
       sell_price,
       sell_date,
+      for_sale,
+      sale_price,
     } = body;
 
     if (!id) {
@@ -323,6 +325,8 @@ export async function PATCH(request: NextRequest) {
     if (status !== undefined) updates.status = status;
     if (sell_price !== undefined) updates.sell_price = sell_price ? parseFloat(sell_price) : null;
     if (sell_date !== undefined) updates.sell_date = sell_date || null;
+    if (for_sale !== undefined) updates.for_sale = Boolean(for_sale);
+    if (sale_price !== undefined) updates.sale_price = sale_price ? parseFloat(sale_price) : null;
 
     // Fetch old asset state before update (needed for cash_balance adjustment)
     const { data: oldAsset } = await supabase
