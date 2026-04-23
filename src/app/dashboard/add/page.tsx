@@ -233,10 +233,14 @@ export default function SearchAssetPage() {
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
-  // Build the SelectedCard shape AddAssetForm expects
-  const initialCard: SelectedCard | undefined = selectedResult
-    ? {
+  // Build the SelectedCard shape AddAssetForm expects.
+  // We spread poketraceId as an extra property because AddAssetForm reads it
+  // via an unsafe cast (selectedCard as Record<string, unknown>)?.poketraceId
+  // to drive the per-source price breakdown fetch.
+  const initialCard = selectedResult
+    ? ({
         id: selectedResult.poketraceId,
+        poketraceId: selectedResult.poketraceId,
         name: selectedResult.name,
         number: selectedResult.number,
         rarity: selectedResult.rarity,
@@ -245,7 +249,7 @@ export default function SearchAssetPage() {
         type: selectedResult.type,
         prices: selectedResult.prices,
         marketPrice: selectedResult.marketPrice ?? undefined,
-      }
+      } as SelectedCard)
     : undefined;
 
   // ---------------------------------------------------------------------------
