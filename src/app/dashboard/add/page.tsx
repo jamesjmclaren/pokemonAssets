@@ -484,7 +484,6 @@ export default function SearchAssetPage() {
               poketraceId={detail.id}
               cardName={detail.name}
               assetType={detail.type}
-              className="h-64"
             />
           </section>
         </div>
