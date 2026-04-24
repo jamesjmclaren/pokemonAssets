@@ -102,7 +102,7 @@ export default function SearchModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-surface-elevated border border-border rounded-2xl w-full max-w-2xl max-h-[80vh] sm:max-h-[70vh] flex flex-col shadow-2xl">
+      <div className="relative bg-surface-elevated border border-border rounded-2xl w-full max-w-3xl max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl">
         {/* Search input */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
           <Search className="w-5 h-5 text-text-muted" />
@@ -116,6 +116,9 @@ export default function SearchModal({
             className="flex-1 bg-transparent text-text-primary placeholder-text-muted outline-none text-sm"
           />
           {loading && <Loader2 className="w-5 h-5 text-accent animate-spin" />}
+          {results.length > 0 && !loading && (
+            <span className="text-xs text-text-muted">{results.length} results</span>
+          )}
           <button
             onClick={onClose}
             className="p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-hover"
@@ -125,7 +128,7 @@ export default function SearchModal({
         </div>
 
         {/* Results */}
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-y-auto p-4">
           {!searched && (
             <div className="flex items-center justify-center py-16">
               <p className="text-text-muted text-sm">
@@ -151,110 +154,98 @@ export default function SearchModal({
             </div>
           )}
 
-          {/* Manual entry option at top when results exist */}
-          {searched && !loading && results.length > 0 && onManualEntry && (
-            <button
-              onClick={() => onManualEntry(query)}
-              className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-surface-hover text-left border border-dashed border-border mb-1"
-            >
-              <div className="w-14 h-20 bg-warning/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                <PlusCircle className="w-6 h-6 text-warning" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-warning">
-                  Can&apos;t find your card?
-                </p>
-                <p className="text-xs text-text-muted mt-0.5">
-                  Add it manually with your own title and photo
-                </p>
-              </div>
-            </button>
-          )}
-
-          {results.map((item) => {
-            const isCard = item.type === "card";
-            const rawPrice = item.prices?.raw || item.prices?.market || item.marketPrice;
-            const psa10 = item.prices?.psa10;
-            const psa9 = item.prices?.psa9;
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSelect(item)}
-                className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-surface-hover text-left"
-              >
-                {/* Image */}
-                <div className="w-14 h-20 bg-background rounded-lg overflow-hidden flex-shrink-0 relative">
-                  {item.imageUrl ? (
-                    <Image
-                      src={item.imageUrl}
-                      alt={item.name}
-                      fill
-                      className="object-contain p-1"
-                      sizes="56px"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-text-muted">
-                      {isCard ? (
-                        <CreditCard className="w-6 h-6" />
-                      ) : (
-                        <Package className="w-6 h-6" />
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-text-primary truncate">
-                      {item.name}
-                    </p>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      isCard 
-                        ? "bg-blue-500/10 text-blue-400" 
-                        : "bg-purple-500/10 text-purple-400"
-                    }`}>
-                      {isCard ? "Card" : "Sealed"}
-                    </span>
+          {/* Grid of results */}
+          {(searched && !loading && results.length > 0) && (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+              {/* Manual entry tile */}
+              {onManualEntry && (
+                <button
+                  onClick={() => onManualEntry(query)}
+                  className="flex flex-col items-center gap-2 p-2 rounded-xl border border-dashed border-border hover:bg-surface-hover text-center"
+                >
+                  <div className="w-full aspect-[2/3] bg-warning/10 rounded-lg flex items-center justify-center">
+                    <PlusCircle className="w-7 h-7 text-warning" />
                   </div>
-                  <p className="text-xs text-text-muted mt-0.5">
-                    {item.setName}
-                    {item.number ? ` #${item.number}` : ""}
-                    {item.rarity ? ` · ${item.rarity}` : ""}
-                  </p>
-                  
-                  {/* Graded prices for cards */}
-                  {isCard && (psa10 || psa9) && (
-                    <div className="flex gap-3 mt-1.5">
-                      {psa10 && (
-                        <span className="text-xs text-text-muted">
-                          <span className="text-amber-400">PSA 10:</span>{" "}
-                          {formatCurrency(psa10)}
-                        </span>
-                      )}
-                      {psa9 && (
-                        <span className="text-xs text-text-muted">
-                          <span className="text-amber-400/70">PSA 9:</span>{" "}
-                          {formatCurrency(psa9)}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
+                  <div>
+                    <p className="text-xs font-semibold text-warning leading-tight">
+                      Add manually
+                    </p>
+                    <p className="text-[10px] text-text-muted mt-0.5 leading-tight">
+                      Custom title &amp; photo
+                    </p>
+                  </div>
+                </button>
+              )}
 
-                {/* Raw/Market Price */}
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-bold text-text-primary">
-                    {rawPrice ? formatCurrency(rawPrice) : "N/A"}
-                  </p>
-                  <p className="text-xs text-text-muted">
-                    {isCard ? "Raw" : "Market"}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
+              {results.map((item) => {
+                const isCard = item.type === "card";
+                const rawPrice = item.prices?.raw || item.prices?.market || item.marketPrice;
+                const psa10 = item.prices?.psa10;
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onSelect(item)}
+                    className="flex flex-col gap-2 p-2 rounded-xl hover:bg-surface-hover text-left group"
+                  >
+                    {/* Card image */}
+                    <div className="w-full aspect-[2/3] bg-background rounded-lg overflow-hidden relative flex-shrink-0">
+                      {item.imageUrl ? (
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.name}
+                          fill
+                          className="object-contain p-1 group-hover:scale-105 transition-transform duration-200"
+                          sizes="(max-width: 640px) 30vw, 160px"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-text-muted">
+                          {isCard ? (
+                            <CreditCard className="w-8 h-8" />
+                          ) : (
+                            <Package className="w-8 h-8" />
+                          )}
+                        </div>
+                      )}
+                      {/* Type badge */}
+                      <span className={`absolute top-1 right-1 text-[9px] px-1 py-0.5 rounded font-medium leading-none ${
+                        isCard
+                          ? "bg-blue-500/80 text-white"
+                          : "bg-purple-500/80 text-white"
+                      }`}>
+                        {isCard ? "Card" : "Sealed"}
+                      </span>
+                    </div>
+
+                    {/* Info below image */}
+                    <div className="w-full min-w-0">
+                      <p className="text-xs font-semibold text-text-primary leading-tight line-clamp-2">
+                        {item.name}
+                      </p>
+                      {item.setName && (
+                        <p className="text-[10px] text-text-muted mt-0.5 truncate">
+                          {item.setName}{item.number ? ` #${item.number}` : ""}
+                        </p>
+                      )}
+                      <div className="mt-1 flex flex-col gap-0.5">
+                        {rawPrice && (
+                          <p className="text-xs font-bold text-text-primary">
+                            {formatCurrency(rawPrice)}
+                          </p>
+                        )}
+                        {psa10 && (
+                          <p className="text-[10px] text-text-muted">
+                            <span className="text-amber-400">PSA 10</span>{" "}
+                            {formatCurrency(psa10)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
