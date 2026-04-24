@@ -88,31 +88,41 @@ function DeltaBadge({ delta }: { delta: number | null }) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SearchDropdown({
+function SearchResults({
   results,
   loading,
+  query,
   onSelect,
 }: {
   results: SearchResult[];
   loading: boolean;
+  query: string;
   onSelect: (r: SearchResult) => void;
 }) {
+  if (!query || query.length < 2) return null;
+
   if (loading) {
     return (
-      <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border rounded-xl shadow-lg z-30 p-4 flex items-center justify-center">
+      <div className="mt-4 flex items-center justify-center py-8">
         <Loader2 className="w-5 h-5 animate-spin text-text-muted" />
       </div>
     );
   }
-  if (results.length === 0) return null;
+  if (results.length === 0) {
+    return (
+      <p className="mt-4 text-center text-sm text-text-muted py-8">
+        No results for &ldquo;{query}&rdquo;
+      </p>
+    );
+  }
 
   return (
-    <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border rounded-xl shadow-lg z-30 overflow-hidden max-h-96 overflow-y-auto">
+    <div className="mt-4 bg-surface border border-border rounded-2xl overflow-hidden divide-y divide-border">
       {results.map((r) => (
         <button
           key={r.id}
           onClick={() => onSelect(r)}
-          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-hover transition-colors text-left border-b border-border last:border-0"
+          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-hover transition-colors text-left"
         >
           <div className="relative w-10 h-12 flex-shrink-0 bg-background rounded overflow-hidden">
             {r.imageUrl ? (
@@ -185,15 +195,13 @@ export default function SearchAssetPage() {
   const [cardDetail, setCardDetail] = useState<CardDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounced search
   const doSearch = useCallback(async (q: string) => {
-    if (q.length < 2) { setSearchResults([]); setDropdownOpen(false); return; }
+    if (q.length < 2) { setSearchResults([]); return; }
     setSearchLoading(true);
-    setDropdownOpen(true);
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&type=all`);
       const data = res.ok ? await res.json() : [];
@@ -213,7 +221,6 @@ export default function SearchAssetPage() {
   // Load full card detail when a result is selected
   const handleSelectResult = useCallback(async (result: SearchResult) => {
     setSelectedResult(result);
-    setDropdownOpen(false);
     setSearchResults([]);
     setCardDetail(null);
     setDetailLoading(true);
@@ -230,6 +237,8 @@ export default function SearchAssetPage() {
     setSelectedResult(null);
     setCardDetail(null);
     setShowAddForm(false);
+    setQuery("");
+    setSearchResults([]);
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
@@ -265,36 +274,33 @@ export default function SearchAssetPage() {
           </p>
         </div>
 
-        <div className="relative">
-          <div className="relative flex items-center">
-            <Search className="absolute left-4 w-5 h-5 text-text-muted pointer-events-none" />
-            <input
-              ref={inputRef}
-              autoFocus
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search cards or sealed products…"
-              className="w-full pl-12 pr-10 py-4 bg-surface border border-border rounded-2xl text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors shadow-sm"
-            />
-            {query && (
-              <button
-                onClick={() => { setQuery(""); setSearchResults([]); setDropdownOpen(false); }}
-                className="absolute right-4 p-1 text-text-muted hover:text-text-primary"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {dropdownOpen && (
-            <SearchDropdown
-              results={searchResults}
-              loading={searchLoading}
-              onSelect={handleSelectResult}
-            />
+        <div className="relative flex items-center">
+          <Search className="absolute left-4 w-5 h-5 text-text-muted pointer-events-none" />
+          <input
+            ref={inputRef}
+            autoFocus
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search cards or sealed products…"
+            className="w-full pl-12 pr-10 py-4 bg-surface border border-border rounded-2xl text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors shadow-sm"
+          />
+          {query && (
+            <button
+              onClick={() => { setQuery(""); setSearchResults([]); }}
+              className="absolute right-4 p-1 text-text-muted hover:text-text-primary"
+            >
+              <X className="w-4 h-4" />
+            </button>
           )}
         </div>
+
+        <SearchResults
+          results={searchResults}
+          loading={searchLoading}
+          query={query}
+          onSelect={handleSelectResult}
+        />
 
         {!query && (
           <p className="text-center text-sm text-text-muted mt-12 opacity-60">
