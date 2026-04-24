@@ -75,13 +75,20 @@ const LANGUAGES = [
   "Indonesian",
 ];
 
-export default function AddAssetForm() {
+export type { SelectedCard };
+
+interface AddAssetFormProps {
+  initialCard?: SelectedCard;
+  onSuccess?: () => void;
+}
+
+export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormProps = {}) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { currentPortfolio, portfolios, setCurrentPortfolio, loading: portfolioLoading, isReadOnly } = usePortfolio();
 
   const [searchOpen, setSearchOpen] = useState(false);
-  const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null);
+  const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(initialCard ?? null);
   const [isManualSubmission, setIsManualSubmission] = useState(false);
   const [customImage, setCustomImage] = useState<File | null>(null);
   const [customImagePreview, setCustomImagePreview] = useState<string | null>(
@@ -118,6 +125,20 @@ export default function AddAssetForm() {
   const [tetherCandidates, setTetherCandidates] = useState<TetherCandidate[]>([]);
   const [selectedTether, setSelectedTether] = useState<TetherCandidate | null>(null);
   const [tetherLoading, setTetherLoading] = useState(false);
+
+  // Pre-fill form when an initialCard is provided
+  useEffect(() => {
+    if (initialCard) {
+      const price = initialCard.marketPrice || extractCardPrice(initialCard as unknown as Record<string, unknown>);
+      setForm((f) => ({
+        ...f,
+        ...(price && !f.purchasePrice ? { purchasePrice: price.toFixed(2) } : {}),
+        assetType: initialCard.type,
+        condition: initialCard.type === "sealed" ? "Sealed" : f.condition,
+      }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [tetherSearchQuery, setTetherSearchQuery] = useState("");
 
   const [form, setForm] = useState({
@@ -409,7 +430,11 @@ export default function AddAssetForm() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push("/collection");
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          router.push("/collection");
+        }
       }, 1500);
     } catch (error) {
       console.error("Submit error:", error);

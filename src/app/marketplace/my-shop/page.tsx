@@ -1,0 +1,462 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
+import { Store, Pencil, Tag, Loader2, ChevronRight, ArrowLeft, CheckCircle2, X } from "lucide-react";
+import { clsx } from "clsx";
+import { fixStorageUrl } from "@/lib/format";
+import type { Vendor, PortfolioAsset } from "@/types";
+
+type ListingFilter = "all" | "listed" | "unlisted";
+
+export default function MyShopPage() {
+  const router = useRouter();
+
+  const [vendor, setVendor] = useState<Vendor | null>(null);
+  const [assets, setAssets] = useState<PortfolioAsset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<ListingFilter>("all");
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [salePrices, setSalePrices] = useState<Record<string, string>>({});
+  const [pausing, setPausing] = useState(false);
+  const [soldModal, setSoldModal] = useState<{
+    asset: PortfolioAsset;
+    sellPrice: string;
+    sellDate: string;
+  } | null>(null);
+  const [soldSaving, setSoldSaving] = useState(false);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const [vendorRes, listingsRes] = await Promise.all([
+      fetch("/api/vendors/me"),
+      fetch("/api/marketplace/my-listings"),
+    ]);
+    const v = vendorRes.ok ? await vendorRes.json() : null;
+    const a = listingsRes.ok ? await listingsRes.json() : [];
+
+    if (!v) {
+      router.push("/marketplace/become-vendor");
+      return;
+    }
+
+    setVendor(v);
+    setAssets(a);
+    // Pre-fill sale price inputs from existing data
+    const prices: Record<string, string> = {};
+    for (const asset of a) {
+      if (asset.sale_price != null) prices[asset.id] = String(asset.sale_price);
+    }
+    setSalePrices(prices);
+    setLoading(false);
+  }, [router]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  async function toggleForSale(asset: PortfolioAsset) {
+    setSavingId(asset.id);
+    const newForSale = !asset.for_sale;
+    const salePrice = salePrices[asset.id] ? parseFloat(salePrices[asset.id]) : null;
+
+    const res = await fetch("/api/assets", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: asset.id,
+        for_sale: newForSale,
+        sale_price: newForSale ? salePrice : null,
+      }),
+    });
+
+    if (res.ok) {
+      setAssets((prev) =>
+        prev.map((a) =>
+          a.id === asset.id
+            ? { ...a, for_sale: newForSale, sale_price: newForSale ? salePrice : null }
+            : a
+        )
+      );
+    }
+    setSavingId(null);
+  }
+
+  async function updateSalePrice(asset: PortfolioAsset, price: string) {
+    if (!asset.for_sale) return;
+    setSavingId(asset.id);
+    await fetch("/api/assets", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: asset.id, sale_price: price ? parseFloat(price) : null }),
+    });
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.id === asset.id ? { ...a, sale_price: price ? parseFloat(price) : null } : a
+      )
+    );
+    setSavingId(null);
+  }
+
+  async function markAsSold() {
+    if (!soldModal || !soldModal.sellPrice) return;
+    setSoldSaving(true);
+    const res = await fetch("/api/assets", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: soldModal.asset.id,
+        status: "SOLD",
+        sell_price: soldModal.sellPrice,
+        sell_date: soldModal.sellDate,
+        for_sale: false,
+      }),
+    });
+    if (res.ok) {
+      setAssets((prev) => prev.filter((a) => a.id !== soldModal.asset.id));
+      setSoldModal(null);
+    }
+    setSoldSaving(false);
+  }
+
+  async function togglePaused() {
+    if (!vendor) return;
+    setPausing(true);
+    const newActive = !vendor.is_active;
+    const res = await fetch(`/api/vendors/${vendor.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: newActive }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setVendor(updated);
+    }
+    setPausing(false);
+  }
+
+  const filtered = assets.filter((a) => {
+    if (filter === "listed") return a.for_sale;
+    if (filter === "unlisted") return !a.for_sale;
+    return true;
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-text-muted" />
+      </div>
+    );
+  }
+
+  if (!vendor) return null;
+
+  return (
+    <div className="max-w-5xl mx-auto">
+      <Link href="/marketplace" className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary mb-4 transition-colors">
+        <ArrowLeft className="w-4 h-4" />
+        Marketplace
+      </Link>
+
+      {/* Shop status slider */}
+      <div className={clsx(
+        "mb-4 p-4 rounded-2xl border flex items-center gap-4",
+        vendor.is_active
+          ? "bg-surface border-border"
+          : "bg-amber-500/10 border-amber-500/30"
+      )}>
+        <div className="flex-1 min-w-0">
+          <p className={clsx(
+            "text-sm font-semibold",
+            vendor.is_active ? "text-text-primary" : "text-amber-300"
+          )}>
+            {vendor.is_active ? "Shop is live" : "Shop is paused"}
+          </p>
+          <p className={clsx(
+            "text-xs mt-0.5",
+            vendor.is_active ? "text-text-muted" : "text-amber-300/80"
+          )}>
+            {vendor.is_active
+              ? "Your shop and all listings are visible on the marketplace. Pause to hide them without losing your settings."
+              : "Your shop and all listings are hidden from the marketplace. Flip the toggle to go live again."}
+          </p>
+        </div>
+        <button
+          onClick={togglePaused}
+          disabled={pausing}
+          aria-label={vendor.is_active ? "Pause shop" : "Resume shop"}
+          className={clsx(
+            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 flex-shrink-0",
+            vendor.is_active ? "bg-accent" : "bg-border"
+          )}
+        >
+          {pausing ? (
+            <Loader2 className="w-4 h-4 animate-spin text-white mx-auto" />
+          ) : (
+            <span className={clsx(
+              "inline-block h-5 w-5 rounded-full bg-white shadow transition-transform",
+              vendor.is_active ? "translate-x-[22px]" : "translate-x-0.5"
+            )} />
+          )}
+        </button>
+      </div>
+
+      {/* Vendor profile summary */}
+      <div className="flex flex-col sm:flex-row gap-4 sm:items-center mb-6 p-4 bg-surface border border-border rounded-2xl">
+        <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-background flex-shrink-0">
+          {vendor.shop_image_url ? (
+            <Image
+              src={fixStorageUrl(vendor.shop_image_url) || vendor.shop_image_url}
+              alt={vendor.shop_name}
+              fill
+              className="object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Store className="w-7 h-7 text-text-muted" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-bold text-text-primary">{vendor.shop_name}</h1>
+          {vendor.description && (
+            <p className="text-sm text-text-muted mt-0.5 line-clamp-2">{vendor.description}</p>
+          )}
+          <div className="mt-1.5 flex items-center gap-3 text-xs text-text-muted flex-wrap">
+            {vendor.whatsapp_number && <span>WhatsApp: {vendor.whatsapp_number}</span>}
+            {vendor.ebay_url && <span>eBay listed</span>}
+            {vendor.website_url && <span>Website linked</span>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Link
+            href="/marketplace/become-vendor"
+            className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-xl text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Edit Profile
+          </Link>
+          <Link
+            href={`/marketplace/vendors/${vendor.id}`}
+            className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-xl text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors"
+          >
+            View Shop
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex gap-1 p-1 bg-surface border border-border rounded-xl">
+          {(["all", "listed", "unlisted"] as ListingFilter[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={clsx(
+                "px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors",
+                filter === f
+                  ? "bg-accent/10 text-accent"
+                  : "text-text-secondary hover:text-text-primary"
+              )}
+            >
+              {f}
+              <span className="ml-1.5 text-xs opacity-60">
+                {f === "all" ? assets.length : f === "listed" ? assets.filter((a) => a.for_sale).length : assets.filter((a) => !a.for_sale).length}
+              </span>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-text-muted">
+          {assets.filter((a) => a.for_sale).length} of {assets.length} listed
+        </p>
+      </div>
+
+      {/* Assets table */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 text-text-muted">
+          <Tag className="w-8 h-8 mx-auto mb-3 opacity-40" />
+          <p className="text-sm">
+            {filter === "listed"
+              ? "You haven't listed any items yet."
+              : filter === "unlisted"
+              ? "All your items are listed!"
+              : "No active assets in your portfolios."}
+          </p>
+          {filter !== "listed" && (
+            <Link
+              href="/dashboard/add"
+              className="inline-block mt-3 text-sm text-accent hover:underline"
+            >
+              Add assets to your collection
+            </Link>
+          )}
+        </div>
+      ) : (
+        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-muted">Item</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-muted hidden sm:table-cell">Condition</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-muted hidden md:table-cell">Market Price</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-muted">Sale Price</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-text-muted">Listed</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.map((asset) => (
+                <tr key={asset.id} className="hover:bg-surface-hover transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-8 h-10 flex-shrink-0 bg-background rounded overflow-hidden">
+                        {(asset.custom_image_url || asset.image_url) && (
+                          <Image
+                            src={fixStorageUrl(asset.custom_image_url) || asset.image_url || ""}
+                            alt={asset.name}
+                            fill
+                            className="object-contain"
+                          />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-text-primary truncate max-w-[140px] sm:max-w-xs">{asset.name}</p>
+                        <p className="text-xs text-text-muted truncate">{asset.set_name}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 hidden sm:table-cell text-text-secondary">
+                    {asset.psa_grade || asset.condition || "—"}
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell text-text-secondary">
+                    {asset.current_price != null ? `$${asset.current_price.toFixed(2)}` : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={salePrices[asset.id] ?? ""}
+                      onChange={(e) => setSalePrices((prev) => ({ ...prev, [asset.id]: e.target.value }))}
+                      onBlur={(e) => {
+                        if (asset.for_sale) updateSalePrice(asset, e.target.value);
+                      }}
+                      className="w-24 px-2 py-1 bg-background border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {savingId === asset.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-text-muted mx-auto" />
+                    ) : (
+                      <button
+                        onClick={() => toggleForSale(asset)}
+                        className={clsx(
+                          "relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none",
+                          asset.for_sale ? "bg-accent" : "bg-border"
+                        )}
+                      >
+                        <span
+                          className={clsx(
+                            "inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform",
+                            asset.for_sale ? "translate-x-4.5" : "translate-x-0.5"
+                          )}
+                        />
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => setSoldModal({
+                        asset,
+                        sellPrice: salePrices[asset.id] ?? (asset.sale_price != null ? String(asset.sale_price) : ""),
+                        sellDate: new Date().toISOString().split("T")[0],
+                      })}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-muted border border-border hover:border-green-500/50 hover:text-green-400 hover:bg-green-500/5 transition-colors whitespace-nowrap"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Mark Sold
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Mark as Sold modal */}
+      {soldModal && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setSoldModal(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-surface border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl">
+              <div className="flex items-start justify-between mb-4">
+                <div className="min-w-0 pr-2">
+                  <h3 className="text-base font-semibold text-text-primary">Mark as Sold</h3>
+                  <p className="text-xs text-text-muted mt-0.5 truncate">{soldModal.asset.name}</p>
+                </div>
+                <button onClick={() => setSoldModal(null)} className="text-text-muted hover:text-text-primary flex-shrink-0">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-text-muted mb-1.5">Sell Price *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      autoFocus
+                      placeholder="0.00"
+                      value={soldModal.sellPrice}
+                      onChange={(e) => setSoldModal((prev) => prev ? { ...prev, sellPrice: e.target.value } : null)}
+                      className="w-full pl-7 pr-3 py-2.5 bg-background border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-text-muted mb-1.5">Sell Date</label>
+                  <input
+                    type="date"
+                    value={soldModal.sellDate}
+                    onChange={(e) => setSoldModal((prev) => prev ? { ...prev, sellDate: e.target.value } : null)}
+                    className="w-full px-3 py-2.5 bg-background border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:border-accent"
+                  />
+                </div>
+                {soldModal.asset.purchase_price != null && (
+                  <div className="flex items-center justify-between text-xs p-3 bg-surface-hover rounded-xl">
+                    <span className="text-text-muted">Purchase price</span>
+                    <span className="text-text-secondary font-medium">${soldModal.asset.purchase_price.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={() => setSoldModal(null)}
+                  className="flex-1 px-4 py-2.5 border border-border rounded-xl text-sm text-text-secondary hover:bg-surface-hover transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={markAsSold}
+                  disabled={!soldModal.sellPrice || soldSaving}
+                  className="flex-1 px-4 py-2.5 bg-accent text-black rounded-xl text-sm font-semibold hover:bg-accent-hover transition-colors disabled:opacity-50"
+                >
+                  {soldSaving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Mark as Sold"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

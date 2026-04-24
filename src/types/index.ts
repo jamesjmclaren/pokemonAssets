@@ -81,6 +81,9 @@ export interface PortfolioAsset {
   status?: 'ACTIVE' | 'SOLD';
   sell_price?: number | null;
   sell_date?: string | null;
+  // Marketplace fields
+  for_sale?: boolean;
+  sale_price?: number | null;
   // Poketrace fields
   poketrace_id?: string | null;
   poketrace_market?: string;
@@ -105,6 +108,25 @@ export interface SearchFilters {
   query: string;
   setId?: string;
   type?: "card" | "sealed" | "all";
+}
+
+export interface Vendor {
+  id: string;
+  user_id: string;
+  shop_name: string;
+  description: string | null;
+  shop_image_url: string | null;
+  website_url: string | null;
+  ebay_url: string | null;
+  whatsapp_number: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  item_count?: number;
+}
+
+export interface MarketplaceItem extends PortfolioAsset {
+  vendor: Vendor;
 }
 
 export interface ApiSet {
