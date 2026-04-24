@@ -197,6 +197,7 @@ export default function SearchAssetPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addFormRef = useRef<HTMLDivElement>(null);
 
   // Debounced search
   const doSearch = useCallback(async (q: string) => {
@@ -339,11 +340,16 @@ export default function SearchAssetPage() {
             Track Card
           </button>
           <button
-            onClick={() => setShowAddForm(true)}
+            onClick={() => {
+              setShowAddForm(true);
+              setTimeout(() => {
+                addFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 50);
+            }}
             className="flex items-center gap-2 px-5 py-2.5 bg-accent text-black rounded-xl text-sm font-semibold hover:bg-accent-hover transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Add Asset
+            {showAddForm ? "Jump to Form" : "Add Asset"}
           </button>
         </div>
       </div>
@@ -503,42 +509,29 @@ export default function SearchAssetPage() {
         </div>
       )}
 
-      {/* Add Asset modal */}
+      {/* Add Asset — inline section */}
       {showAddForm && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-black/70 z-40 backdrop-blur-sm"
-            onClick={() => setShowAddForm(false)}
-          />
-          {/* Modal — full screen on mobile, centered scrollable box on desktop */}
-          <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center sm:p-6 overflow-y-auto">
-            <div className="relative w-full sm:max-w-2xl bg-surface sm:rounded-2xl sm:border sm:border-border shadow-2xl min-h-screen sm:min-h-0">
-              {/* Header */}
-              <div className="sticky top-0 bg-surface sm:rounded-t-2xl border-b border-border px-5 py-4 flex items-center justify-between z-10">
-                <div>
-                  <h2 className="font-semibold text-text-primary">Add Asset</h2>
-                  {selectedResult && (
-                    <p className="text-xs text-text-muted mt-0.5 truncate max-w-xs">{selectedResult.name}</p>
-                  )}
-                </div>
-                <button
-                  onClick={() => setShowAddForm(false)}
-                  className="p-2 rounded-xl hover:bg-surface-hover transition-colors text-text-muted hover:text-text-primary"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              {/* Form body */}
-              <div className="p-5 pb-10">
-                <AddAssetForm
-                  initialCard={initialCard}
-                  onSuccess={() => setShowAddForm(false)}
-                />
-              </div>
+        <section ref={addFormRef} className="mt-10 pt-8 border-t border-border scroll-mt-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-text-primary">Add to Collection</h2>
+              <p className="text-sm text-text-muted mt-0.5">
+                Fill in purchase details to add this asset to your portfolio.
+              </p>
             </div>
+            <button
+              onClick={() => setShowAddForm(false)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Cancel
+            </button>
           </div>
-        </>
+          <AddAssetForm
+            initialCard={initialCard}
+            onSuccess={() => setShowAddForm(false)}
+          />
+        </section>
       )}
     </div>
   );
