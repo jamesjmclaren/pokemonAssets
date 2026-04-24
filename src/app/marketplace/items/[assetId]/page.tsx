@@ -99,7 +99,7 @@ export default function MarketplaceItemPage() {
             </span>
             {item.psa_grade && (
               <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-500/15 text-yellow-400 uppercase tracking-wide">
-                PSA {item.psa_grade}
+                {item.psa_grade}
               </span>
             )}
             {item.rarity && (

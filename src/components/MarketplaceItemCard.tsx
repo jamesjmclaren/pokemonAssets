@@ -58,7 +58,7 @@ export default function MarketplaceItemCard({ item }: MarketplaceItemCardProps) 
           {item.psa_grade && (
             <div className="absolute top-2 right-2">
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/20 text-yellow-400 uppercase tracking-wide">
-                PSA {item.psa_grade}
+                {item.psa_grade}
               </span>
             </div>
           )}
