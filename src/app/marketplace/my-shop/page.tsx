@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Store, Pencil, Tag, Loader2, ChevronRight, ArrowLeft } from "lucide-react";
+import { Store, Pencil, Tag, Loader2, ChevronRight, ArrowLeft, CheckCircle2, X } from "lucide-react";
 import { clsx } from "clsx";
 import { fixStorageUrl } from "@/lib/format";
 import type { Vendor, PortfolioAsset } from "@/types";
@@ -21,6 +21,12 @@ export default function MyShopPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [salePrices, setSalePrices] = useState<Record<string, string>>({});
   const [pausing, setPausing] = useState(false);
+  const [soldModal, setSoldModal] = useState<{
+    asset: PortfolioAsset;
+    sellPrice: string;
+    sellDate: string;
+  } | null>(null);
+  const [soldSaving, setSoldSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -92,6 +98,27 @@ export default function MyShopPage() {
       )
     );
     setSavingId(null);
+  }
+
+  async function markAsSold() {
+    if (!soldModal || !soldModal.sellPrice) return;
+    setSoldSaving(true);
+    const res = await fetch("/api/assets", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: soldModal.asset.id,
+        status: "SOLD",
+        sell_price: soldModal.sellPrice,
+        sell_date: soldModal.sellDate,
+        for_sale: false,
+      }),
+    });
+    if (res.ok) {
+      setAssets((prev) => prev.filter((a) => a.id !== soldModal.asset.id));
+      setSoldModal(null);
+    }
+    setSoldSaving(false);
   }
 
   async function togglePaused() {
@@ -277,6 +304,7 @@ export default function MyShopPage() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-text-muted hidden md:table-cell">Market Price</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-text-muted">Sale Price</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-text-muted">Listed</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -340,6 +368,19 @@ export default function MyShopPage() {
                       </button>
                     )}
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => setSoldModal({
+                        asset,
+                        sellPrice: salePrices[asset.id] ?? (asset.sale_price != null ? String(asset.sale_price) : ""),
+                        sellDate: new Date().toISOString().split("T")[0],
+                      })}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-muted border border-border hover:border-green-500/50 hover:text-green-400 hover:bg-green-500/5 transition-colors whitespace-nowrap"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Mark Sold
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -347,6 +388,75 @@ export default function MyShopPage() {
         </div>
       )}
 
+      {/* Mark as Sold modal */}
+      {soldModal && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setSoldModal(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-surface border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl">
+              <div className="flex items-start justify-between mb-4">
+                <div className="min-w-0 pr-2">
+                  <h3 className="text-base font-semibold text-text-primary">Mark as Sold</h3>
+                  <p className="text-xs text-text-muted mt-0.5 truncate">{soldModal.asset.name}</p>
+                </div>
+                <button onClick={() => setSoldModal(null)} className="text-text-muted hover:text-text-primary flex-shrink-0">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-text-muted mb-1.5">Sell Price *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      autoFocus
+                      placeholder="0.00"
+                      value={soldModal.sellPrice}
+                      onChange={(e) => setSoldModal((prev) => prev ? { ...prev, sellPrice: e.target.value } : null)}
+                      className="w-full pl-7 pr-3 py-2.5 bg-background border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-text-muted mb-1.5">Sell Date</label>
+                  <input
+                    type="date"
+                    value={soldModal.sellDate}
+                    onChange={(e) => setSoldModal((prev) => prev ? { ...prev, sellDate: e.target.value } : null)}
+                    className="w-full px-3 py-2.5 bg-background border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:border-accent"
+                  />
+                </div>
+                {soldModal.asset.purchase_price != null && (
+                  <div className="flex items-center justify-between text-xs p-3 bg-surface-hover rounded-xl">
+                    <span className="text-text-muted">Purchase price</span>
+                    <span className="text-text-secondary font-medium">${soldModal.asset.purchase_price.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={() => setSoldModal(null)}
+                  className="flex-1 px-4 py-2.5 border border-border rounded-xl text-sm text-text-secondary hover:bg-surface-hover transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={markAsSold}
+                  disabled={!soldModal.sellPrice || soldSaving}
+                  className="flex-1 px-4 py-2.5 bg-accent text-black rounded-xl text-sm font-semibold hover:bg-accent-hover transition-colors disabled:opacity-50"
+                >
+                  {soldSaving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Mark as Sold"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
