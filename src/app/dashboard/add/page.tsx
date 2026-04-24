@@ -55,55 +55,72 @@ function SearchResults({
 
   if (loading) {
     return (
-      <div className="mt-4 flex items-center justify-center py-8">
+      <div className="mt-6 flex items-center justify-center py-8">
         <Loader2 className="w-5 h-5 animate-spin text-text-muted" />
       </div>
     );
   }
   if (results.length === 0) {
     return (
-      <p className="mt-4 text-center text-sm text-text-muted py-8">
+      <p className="mt-6 text-center text-sm text-text-muted py-8">
         No results for &ldquo;{query}&rdquo;
       </p>
     );
   }
 
   return (
-    <div className="mt-4 bg-surface border border-border rounded-2xl overflow-hidden divide-y divide-border">
-      {results.map((r) => (
-        <button
-          key={r.id}
-          onClick={() => onSelect(r)}
-          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-hover transition-colors text-left"
-        >
-          <div className="relative w-10 h-12 flex-shrink-0 bg-background rounded overflow-hidden">
-            {r.imageUrl ? (
-              <Image src={r.imageUrl} alt={r.name} fill className="object-contain" />
-            ) : (
-              <div className="absolute inset-0 bg-surface-hover" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-text-primary truncate">{r.name}</p>
-            <p className="text-xs text-text-muted truncate">
-              {r.setName}
-              {r.number ? ` · #${r.number}` : ""}
-              {r.rarity ? ` · ${r.rarity}` : ""}
-            </p>
-          </div>
-          <div className="text-right flex-shrink-0">
-            <span className={clsx(
-              "text-xs px-1.5 py-0.5 rounded-full font-medium",
-              r.type === "card" ? "bg-blue-500/15 text-blue-400" : "bg-purple-500/15 text-purple-400"
-            )}>
-              {r.type}
-            </span>
-            {r.marketPrice != null && (
-              <p className="text-xs font-semibold text-text-primary mt-0.5">${r.marketPrice.toFixed(2)}</p>
-            )}
-          </div>
-        </button>
-      ))}
+    <div className="mt-6">
+      <p className="text-xs text-text-muted mb-3">{results.length} results</p>
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+        {results.map((r) => (
+          <button
+            key={r.id}
+            onClick={() => onSelect(r)}
+            className="flex flex-col gap-2 p-2 rounded-xl hover:bg-surface-hover transition-colors text-left group"
+          >
+            {/* Card image */}
+            <div className="relative w-full aspect-[2/3] bg-surface border border-border rounded-lg overflow-hidden">
+              {r.imageUrl ? (
+                <Image
+                  src={r.imageUrl}
+                  alt={r.name}
+                  fill
+                  className="object-contain p-1 group-hover:scale-105 transition-transform duration-200"
+                  sizes="(max-width: 640px) 30vw, 160px"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-surface-hover" />
+              )}
+              <span className={clsx(
+                "absolute top-1 right-1 text-[9px] px-1 py-0.5 rounded font-medium leading-none",
+                r.type === "card" ? "bg-blue-500/80 text-white" : "bg-purple-500/80 text-white"
+              )}>
+                {r.type}
+              </span>
+            </div>
+
+            {/* Info */}
+            <div className="min-w-0 w-full">
+              <p className="text-xs font-semibold text-text-primary leading-tight line-clamp-2">
+                {r.name}
+              </p>
+              <p className="text-[10px] text-text-muted mt-0.5 truncate">
+                {r.setName}{r.number ? ` #${r.number}` : ""}
+              </p>
+              {r.marketPrice != null && (
+                <p className="text-xs font-bold text-text-primary mt-1">
+                  ${r.marketPrice.toFixed(2)}
+                </p>
+              )}
+              {r.prices?.psa10 && (
+                <p className="text-[10px] text-text-muted">
+                  <span className="text-amber-400">PSA 10</span> ${r.prices.psa10.toFixed(2)}
+                </p>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
