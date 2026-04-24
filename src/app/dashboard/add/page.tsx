@@ -8,46 +8,15 @@ import {
   Loader2,
   Plus,
   BookmarkX,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   ChevronLeft,
-  ArrowUpRight,
 } from "lucide-react";
 import { clsx } from "clsx";
-import PriceChart from "@/components/PriceChart";
 import AddAssetForm, { type SelectedCard } from "@/components/AddAssetForm";
+import CardAnalytics from "@/components/CardAnalytics";
 
 // ---------------------------------------------------------------------------
-// Types matching /api/card-detail response
+// Search result type
 // ---------------------------------------------------------------------------
-
-interface TierSummary {
-  tier: string;
-  label: string;
-  source: string;
-  avg: number;
-  low?: number;
-  high?: number;
-  saleCount?: number;
-  avg1d?: number | null;
-  avg7d?: number | null;
-  avg30d?: number | null;
-}
-
-interface CardDetail {
-  id: string;
-  name: string;
-  setName: string;
-  cardNumber: string | null;
-  rarity: string | null;
-  image: string | null;
-  type: "card" | "sealed";
-  currency: string;
-  isConverted: boolean;
-  rawPrices: Record<string, TierSummary>;
-  gradedPrices: TierSummary[];
-}
 
 interface SearchResult {
   id: string;
@@ -65,23 +34,6 @@ interface SearchResult {
     psa9?: number;
   };
   poketraceId: string;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function priceDelta(current: number | null | undefined, previous: number | null | undefined): number | null {
-  if (current == null || previous == null || previous === 0) return null;
-  return ((current - previous) / previous) * 100;
-}
-
-function DeltaBadge({ delta }: { delta: number | null }) {
-  if (delta == null) return null;
-  const abs = Math.abs(delta).toFixed(1);
-  if (delta > 0.5) return <span className="text-xs text-green-400 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />+{abs}%</span>;
-  if (delta < -0.5) return <span className="text-xs text-red-400 flex items-center gap-0.5"><TrendingDown className="w-3 h-3" />-{abs}%</span>;
-  return <span className="text-xs text-text-muted flex items-center gap-0.5"><Minus className="w-3 h-3" />{abs}%</span>;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,33 +108,6 @@ function SearchResults({
   );
 }
 
-function RawPriceCard({ label, data }: { label: string; data?: TierSummary }) {
-  if (!data) {
-    return (
-      <div className="bg-surface-hover border border-border rounded-xl p-4 opacity-40">
-        <p className="text-xs text-text-muted mb-1">{label}</p>
-        <p className="text-lg font-bold text-text-muted">—</p>
-      </div>
-    );
-  }
-  const delta7d = priceDelta(data.avg, data.avg7d);
-  return (
-    <div className="bg-surface border border-border rounded-xl p-4">
-      <p className="text-xs text-text-muted mb-1">{label}</p>
-      <p className="text-xl font-bold text-text-primary">${data.avg.toFixed(2)}</p>
-      <div className="mt-1 flex items-center justify-between">
-        <p className="text-xs text-text-muted">
-          {data.low != null && data.high != null ? `$${data.low.toFixed(2)} – $${data.high.toFixed(2)}` : ""}
-        </p>
-        <DeltaBadge delta={delta7d} />
-      </div>
-      {data.saleCount != null && (
-        <p className="text-xs text-text-muted mt-1">~{data.saleCount} sales</p>
-      )}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
@@ -192,8 +117,6 @@ export default function SearchAssetPage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
-  const [cardDetail, setCardDetail] = useState<CardDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -219,24 +142,13 @@ export default function SearchAssetPage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query, doSearch]);
 
-  // Load full card detail when a result is selected
-  const handleSelectResult = useCallback(async (result: SearchResult) => {
+  const handleSelectResult = useCallback((result: SearchResult) => {
     setSelectedResult(result);
     setSearchResults([]);
-    setCardDetail(null);
-    setDetailLoading(true);
-    try {
-      const res = await fetch(`/api/card-detail?poketraceId=${encodeURIComponent(result.poketraceId)}`);
-      if (res.ok) setCardDetail(await res.json());
-    } catch {
-      // keep null
-    }
-    setDetailLoading(false);
   }, []);
 
   function clearSelection() {
     setSelectedResult(null);
-    setCardDetail(null);
     setShowAddForm(false);
     setQuery("");
     setSearchResults([]);
@@ -315,8 +227,6 @@ export default function SearchAssetPage() {
   // ---------------------------------------------------------------------------
   // Render — card detail state
   // ---------------------------------------------------------------------------
-  const detail = cardDetail;
-
   return (
     <div className="max-w-5xl mx-auto">
       {/* Top bar */}
@@ -382,132 +292,21 @@ export default function SearchAssetPage() {
             {selectedResult.rarity && (
               <span className="px-2.5 py-1 rounded-full text-xs bg-surface-hover text-text-muted">{selectedResult.rarity}</span>
             )}
-            {detail?.isConverted && (
-              <span className="px-2.5 py-1 rounded-full text-xs bg-surface-hover text-text-muted">EUR→USD</span>
-            )}
           </div>
           <h1 className="text-2xl font-bold text-text-primary leading-tight">{selectedResult.name}</h1>
           <p className="text-sm text-text-muted mt-1">
             {selectedResult.setName}
             {selectedResult.number ? ` · #${selectedResult.number}` : ""}
           </p>
-          {detail && (
-            <p className="text-xs text-text-muted mt-1">
-              Poketrace ID: <span className="font-mono">{detail.id}</span>
-            </p>
-          )}
         </div>
       </div>
 
-      {detailLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-6 h-6 animate-spin text-text-muted" />
-        </div>
-      ) : detail ? (
-        <div className="space-y-6">
-          {/* Raw prices */}
-          <section>
-            <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">
-              Raw / Ungraded Prices
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <RawPriceCard label="TCGPlayer" data={detail.rawPrices["tcgplayer"]} />
-              <RawPriceCard label="eBay" data={detail.rawPrices["ebay"]} />
-              <RawPriceCard label="CardMarket" data={detail.rawPrices["cardmarket"]} />
-            </div>
-          </section>
+      <CardAnalytics
+        poketraceId={selectedResult.poketraceId}
+        cardName={selectedResult.name}
+        assetType={selectedResult.type}
+      />
 
-          {/* Graded prices */}
-          {detail.gradedPrices.length > 0 && (
-            <section>
-              <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">
-                Graded Prices
-              </h2>
-              <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left px-4 py-3 text-xs font-medium text-text-muted">Grade</th>
-                        <th className="text-right px-4 py-3 text-xs font-medium text-text-muted">Avg Price</th>
-                        <th className="text-right px-4 py-3 text-xs font-medium text-text-muted hidden sm:table-cell">Low</th>
-                        <th className="text-right px-4 py-3 text-xs font-medium text-text-muted hidden sm:table-cell">High</th>
-                        <th className="text-right px-4 py-3 text-xs font-medium text-text-muted hidden md:table-cell">7d Avg</th>
-                        <th className="text-right px-4 py-3 text-xs font-medium text-text-muted hidden md:table-cell">30d Avg</th>
-                        <th className="text-right px-4 py-3 text-xs font-medium text-text-muted">Sales</th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-text-muted hidden lg:table-cell">Source</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {detail.gradedPrices.map((tier) => {
-                        const delta7d = priceDelta(tier.avg, tier.avg7d);
-                        return (
-                          <tr key={tier.tier} className="hover:bg-surface-hover transition-colors">
-                            <td className="px-4 py-3">
-                              <span className="font-semibold text-text-primary">{tier.label}</span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <div className="flex flex-col items-end gap-0.5">
-                                <span className="font-bold text-text-primary">${tier.avg.toFixed(2)}</span>
-                                <DeltaBadge delta={delta7d} />
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-right text-text-muted hidden sm:table-cell">
-                              {tier.low != null ? `$${tier.low.toFixed(2)}` : "—"}
-                            </td>
-                            <td className="px-4 py-3 text-right text-text-muted hidden sm:table-cell">
-                              {tier.high != null ? `$${tier.high.toFixed(2)}` : "—"}
-                            </td>
-                            <td className="px-4 py-3 text-right text-text-muted hidden md:table-cell">
-                              {tier.avg7d != null ? `$${tier.avg7d.toFixed(2)}` : "—"}
-                            </td>
-                            <td className="px-4 py-3 text-right text-text-muted hidden md:table-cell">
-                              {tier.avg30d != null ? `$${tier.avg30d.toFixed(2)}` : "—"}
-                            </td>
-                            <td className="px-4 py-3 text-right text-text-muted">
-                              {tier.saleCount != null ? `~${tier.saleCount}` : "—"}
-                            </td>
-                            <td className="px-4 py-3 hidden lg:table-cell">
-                              <span className="text-xs text-text-muted capitalize">{tier.source}</span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Price history chart */}
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">
-                Price History (Near Mint)
-              </h2>
-              <a
-                href={`https://poketrace.com/cards/${detail.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-text-muted hover:text-accent transition-colors"
-              >
-                View on Poketrace <ArrowUpRight className="w-3 h-3" />
-              </a>
-            </div>
-            <PriceChart
-              externalId={detail.id}
-              poketraceId={detail.id}
-              cardName={detail.name}
-              assetType={detail.type}
-            />
-          </section>
-        </div>
-      ) : (
-        <div className="text-center py-12 text-text-muted text-sm">
-          Failed to load card details.
-        </div>
-      )}
 
       {/* Add Asset — inline section */}
       {showAddForm && (

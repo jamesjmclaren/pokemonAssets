@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Store, Globe, ShoppingBag, MessageCircle, Loader2, Package, AlertTriangle, Info } from "lucide-react";
+import { ArrowLeft, Store, Globe, ShoppingBag, MessageCircle, Loader2, Package, AlertTriangle, Info, BarChart3 } from "lucide-react";
 import { clsx } from "clsx";
 import { fixStorageUrl } from "@/lib/format";
+import CardAnalytics from "@/components/CardAnalytics";
 import type { MarketplaceItem } from "@/types";
 
 export default function MarketplaceItemPage() {
@@ -15,6 +16,7 @@ export default function MarketplaceItemPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
     fetch("/api/marketplace/items")
@@ -254,6 +256,51 @@ export default function MarketplaceItemPage() {
           </div>
         </div>
       </div>
+
+      {/* Market analytics toggle */}
+      {item.poketrace_id && (
+        <div className="mt-10 pt-8 border-t border-border">
+          {!showAnalytics ? (
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-text-primary">Market Analytics</h2>
+                <p className="text-sm text-text-muted mt-0.5">
+                  See raw, graded, and historical pricing data from Poketrace to help you make an informed decision.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAnalytics(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-accent text-black rounded-xl text-sm font-semibold hover:bg-accent-hover transition-colors flex-shrink-0"
+              >
+                <BarChart3 className="w-4 h-4" />
+                View Market Analytics
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-bold text-text-primary">Market Analytics</h2>
+                  <p className="text-sm text-text-muted mt-0.5">
+                    Pricing data from Poketrace — raw, graded, and historical.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAnalytics(false)}
+                  className="px-4 py-2 rounded-xl text-sm text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors flex-shrink-0"
+                >
+                  Hide
+                </button>
+              </div>
+              <CardAnalytics
+                poketraceId={item.poketrace_id}
+                cardName={item.name}
+                assetType={item.asset_type}
+              />
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
