@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Store, Upload, X, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Store, Upload, X, Loader2, ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { fixStorageUrl } from "@/lib/format";
 
@@ -123,6 +124,10 @@ export default function BecomeVendorPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      <Link href="/marketplace" className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary mb-4 transition-colors">
+        <ArrowLeft className="w-4 h-4" />
+        Marketplace
+      </Link>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
           <Store className="w-6 h-6" />

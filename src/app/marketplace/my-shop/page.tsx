@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Store, Pencil, Tag, Loader2, ChevronRight, Pause, Play, EyeOff } from "lucide-react";
+import { Store, Pencil, Tag, Loader2, ChevronRight, Pause, Play, EyeOff, ArrowLeft } from "lucide-react";
 import { clsx } from "clsx";
 import { fixStorageUrl } from "@/lib/format";
 import type { Vendor, PortfolioAsset } from "@/types";
@@ -128,6 +128,11 @@ export default function MyShopPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
+      <Link href="/marketplace" className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary mb-4 transition-colors">
+        <ArrowLeft className="w-4 h-4" />
+        Marketplace
+      </Link>
+
       {/* Paused banner */}
       {!vendor.is_active && (
         <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-3">
@@ -150,7 +155,7 @@ export default function MyShopPage() {
       )}
 
       {/* Vendor profile summary */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start mb-6 p-4 bg-surface border border-border rounded-2xl">
+      <div className="flex flex-col sm:flex-row gap-4 sm:items-center mb-6 p-4 bg-surface border border-border rounded-2xl">
         <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-background flex-shrink-0">
           {vendor.shop_image_url ? (
             <Image
@@ -274,7 +279,7 @@ export default function MyShopPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell text-text-secondary">
-                    {asset.psa_grade ? `PSA ${asset.psa_grade}` : asset.condition || "—"}
+                    {asset.psa_grade || asset.condition || "—"}
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell text-text-secondary">
                     {asset.current_price != null ? `$${asset.current_price.toFixed(2)}` : "—"}

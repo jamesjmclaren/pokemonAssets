@@ -259,7 +259,7 @@ export default function MarketplaceItemPage() {
 
       {/* Market analytics toggle */}
       {item.poketrace_id && (
-        <div className="mt-10 pt-8 border-t border-border">
+        <div className="mt-8 pt-6 border-t border-border">
           {!showAnalytics ? (
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="min-w-0">

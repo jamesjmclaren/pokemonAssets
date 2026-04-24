@@ -75,7 +75,7 @@ export default function MarketplacePage() {
       </div>
 
       {/* Tabs + filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
         <div className="flex gap-1 p-1 bg-surface border border-border rounded-xl">
           <button
             onClick={() => setTab("items")}

@@ -179,7 +179,7 @@ export default function SearchAssetPage() {
   // ---------------------------------------------------------------------------
   if (!selectedResult) {
     return (
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-text-primary">Search Asset</h1>
           <p className="text-sm text-text-muted mt-1">
