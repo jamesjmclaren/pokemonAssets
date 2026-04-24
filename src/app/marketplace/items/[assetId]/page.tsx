@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Store, Globe, ShoppingBag, MessageCircle, Loader2, Package } from "lucide-react";
+import { ArrowLeft, Store, Globe, ShoppingBag, MessageCircle, Loader2, Package, AlertTriangle, Info } from "lucide-react";
 import { clsx } from "clsx";
 import { fixStorageUrl } from "@/lib/format";
 import type { MarketplaceItem } from "@/types";
@@ -52,6 +52,16 @@ export default function MarketplaceItemPage() {
 
   const displayPrice = item.sale_price ?? item.current_price ?? item.purchase_price;
   const vendor = item.vendor;
+
+  const priceSourceLabel = item.manual_price
+    ? "Manually set"
+    : item.price_source === "tcgplayer"
+    ? "TCGPlayer (via Poketrace)"
+    : item.price_source === "ebay"
+    ? "eBay (via Poketrace)"
+    : item.price_source === "cardmarket"
+    ? "CardMarket (via Poketrace)"
+    : "Poketrace (auto)";
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -144,10 +154,29 @@ export default function MarketplaceItemPage() {
             {item.current_price != null && (
               <div className="flex justify-between py-2 border-b border-border">
                 <span className="text-text-muted">Market Price</span>
-                <span className="text-text-secondary">${item.current_price.toFixed(2)}</span>
+                <div className="text-right">
+                  <span className="text-text-secondary">${item.current_price.toFixed(2)}</span>
+                  <p className="text-xs text-text-muted mt-0.5 flex items-center justify-end gap-1">
+                    <Info className="w-3 h-3" />
+                    {priceSourceLabel}
+                  </p>
+                </div>
               </div>
             )}
           </div>
+
+          {/* Manual price warning */}
+          {item.manual_price && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-300">
+                <p className="font-semibold mb-0.5">Market price was manually set by the vendor</p>
+                <p className="text-amber-300/80">
+                  This is not an auto-sourced market rate. Please do your own research before purchasing — check TCGPlayer, eBay sold listings, or Poketrace to verify a fair price.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Vendor card */}
           <div className="p-4 bg-surface border border-border rounded-xl">

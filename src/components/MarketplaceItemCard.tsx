@@ -3,13 +3,23 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Store } from "lucide-react";
+import { Store, Info } from "lucide-react";
 import { clsx } from "clsx";
 import { fixStorageUrl } from "@/lib/format";
 import type { MarketplaceItem } from "@/types";
 
 interface MarketplaceItemCardProps {
   item: MarketplaceItem;
+}
+
+function priceSourceShortLabel(item: MarketplaceItem): { label: string; manual: boolean } {
+  if (item.manual_price) return { label: "Manual", manual: true };
+  switch (item.price_source) {
+    case "tcgplayer": return { label: "TCGPlayer", manual: false };
+    case "ebay": return { label: "eBay", manual: false };
+    case "cardmarket": return { label: "CardMarket", manual: false };
+    default: return { label: "Poketrace", manual: false };
+  }
 }
 
 export default function MarketplaceItemCard({ item }: MarketplaceItemCardProps) {
@@ -24,6 +34,7 @@ export default function MarketplaceItemCard({ item }: MarketplaceItemCardProps) 
   };
 
   const displayPrice = item.sale_price ?? item.current_price ?? item.purchase_price;
+  const source = priceSourceShortLabel(item);
 
   return (
     <Link href={`/marketplace/items/${item.id}`}>
@@ -71,9 +82,21 @@ export default function MarketplaceItemCard({ item }: MarketplaceItemCardProps) 
             <p className="text-xs text-text-muted mt-0.5 line-clamp-1">{item.set_name}</p>
           )}
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-base font-bold text-accent">
-              ${displayPrice?.toFixed(2) ?? "—"}
-            </span>
+            <div className="flex flex-col">
+              <span className="text-base font-bold text-accent leading-tight">
+                ${displayPrice?.toFixed(2) ?? "—"}
+              </span>
+              <span
+                className={clsx(
+                  "text-[10px] mt-0.5 flex items-center gap-0.5",
+                  source.manual ? "text-amber-400" : "text-text-muted"
+                )}
+                title={source.manual ? "Market price was manually set by the vendor — do your own research." : `Market price sourced from ${source.label}`}
+              >
+                {source.manual && <Info className="w-2.5 h-2.5" />}
+                {source.manual ? "Manual price" : `via ${source.label}`}
+              </span>
+            </div>
             {item.condition && (
               <span className="text-[10px] text-text-muted bg-surface-hover px-2 py-0.5 rounded-full">
                 {item.condition}

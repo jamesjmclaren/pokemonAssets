@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Store, Pencil, Tag, X, Loader2, ChevronRight } from "lucide-react";
+import { Store, Pencil, Tag, Loader2, ChevronRight, Pause, Play, EyeOff } from "lucide-react";
 import { clsx } from "clsx";
 import { fixStorageUrl } from "@/lib/format";
 import type { Vendor, PortfolioAsset } from "@/types";
@@ -20,6 +20,7 @@ export default function MyShopPage() {
   const [filter, setFilter] = useState<ListingFilter>("all");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [salePrices, setSalePrices] = useState<Record<string, string>>({});
+  const [pausing, setPausing] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -93,6 +94,22 @@ export default function MyShopPage() {
     setSavingId(null);
   }
 
+  async function togglePaused() {
+    if (!vendor) return;
+    setPausing(true);
+    const newActive = !vendor.is_active;
+    const res = await fetch(`/api/vendors/${vendor.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: newActive }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setVendor(updated);
+    }
+    setPausing(false);
+  }
+
   const filtered = assets.filter((a) => {
     if (filter === "listed") return a.for_sale;
     if (filter === "unlisted") return !a.for_sale;
@@ -111,6 +128,27 @@ export default function MyShopPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
+      {/* Paused banner */}
+      {!vendor.is_active && (
+        <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-3">
+          <EyeOff className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-300">Your shop is paused</p>
+            <p className="text-xs text-amber-300/80 mt-0.5">
+              Your listings and shop profile are hidden from the marketplace. Resume anytime to make them visible again.
+            </p>
+          </div>
+          <button
+            onClick={togglePaused}
+            disabled={pausing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-black rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 flex-shrink-0"
+          >
+            {pausing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+            Resume Shop
+          </button>
+        </div>
+      )}
+
       {/* Vendor profile summary */}
       <div className="flex flex-col sm:flex-row gap-4 items-start mb-6 p-4 bg-surface border border-border rounded-2xl">
         <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-background flex-shrink-0">
@@ -282,19 +320,39 @@ export default function MyShopPage() {
         </div>
       )}
 
-      {/* Deactivate shop */}
+      {/* Pause / resume shop */}
       <div className="mt-8 pt-6 border-t border-border">
-        <button
-          onClick={async () => {
-            if (!confirm("Are you sure you want to deactivate your shop? Your listings will be hidden from the marketplace.")) return;
-            await fetch(`/api/vendors/${vendor.id}`, { method: "DELETE" });
-            router.push("/marketplace");
-          }}
-          className="flex items-center gap-2 text-sm text-danger hover:text-danger/80 transition-colors"
-        >
-          <X className="w-4 h-4" />
-          Deactivate Shop
-        </button>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-text-primary">
+              {vendor.is_active ? "Shop is live" : "Shop is paused"}
+            </p>
+            <p className="text-xs text-text-muted mt-0.5 max-w-md">
+              {vendor.is_active
+                ? "Pausing your shop hides your profile and all listings from the marketplace. Your settings and listings are preserved — you can resume anytime."
+                : "Your shop is hidden from the marketplace. Resume to make it visible again."}
+            </p>
+          </div>
+          <button
+            onClick={togglePaused}
+            disabled={pausing}
+            className={clsx(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 flex-shrink-0",
+              vendor.is_active
+                ? "border border-border text-text-secondary hover:bg-surface-hover"
+                : "bg-accent text-black hover:bg-accent-hover"
+            )}
+          >
+            {pausing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : vendor.is_active ? (
+              <Pause className="w-4 h-4" />
+            ) : (
+              <Play className="w-4 h-4" />
+            )}
+            {vendor.is_active ? "Pause Shop" : "Resume Shop"}
+          </button>
+        </div>
       </div>
     </div>
   );
