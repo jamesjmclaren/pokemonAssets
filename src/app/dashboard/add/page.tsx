@@ -497,28 +497,39 @@ export default function SearchAssetPage() {
         </div>
       )}
 
-      {/* Add Asset slide-over */}
+      {/* Add Asset modal */}
       {showAddForm && (
         <>
+          {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 bg-black/70 z-40 backdrop-blur-sm"
             onClick={() => setShowAddForm(false)}
           />
-          <div className="fixed right-0 top-0 h-full w-full max-w-xl bg-surface border-l border-border z-50 overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-surface border-b border-border px-5 py-4 flex items-center justify-between z-10">
-              <h2 className="font-semibold text-text-primary">Add Asset</h2>
-              <button
-                onClick={() => setShowAddForm(false)}
-                className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors text-text-muted hover:text-text-primary"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5">
-              <AddAssetForm
-                initialCard={initialCard}
-                onSuccess={() => setShowAddForm(false)}
-              />
+          {/* Modal — full screen on mobile, centered scrollable box on desktop */}
+          <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center sm:p-6 overflow-y-auto">
+            <div className="relative w-full sm:max-w-2xl bg-surface sm:rounded-2xl sm:border sm:border-border shadow-2xl min-h-screen sm:min-h-0">
+              {/* Header */}
+              <div className="sticky top-0 bg-surface sm:rounded-t-2xl border-b border-border px-5 py-4 flex items-center justify-between z-10">
+                <div>
+                  <h2 className="font-semibold text-text-primary">Add Asset</h2>
+                  {selectedResult && (
+                    <p className="text-xs text-text-muted mt-0.5 truncate max-w-xs">{selectedResult.name}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowAddForm(false)}
+                  className="p-2 rounded-xl hover:bg-surface-hover transition-colors text-text-muted hover:text-text-primary"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              {/* Form body */}
+              <div className="p-5 pb-10">
+                <AddAssetForm
+                  initialCard={initialCard}
+                  onSuccess={() => setShowAddForm(false)}
+                />
+              </div>
             </div>
           </div>
         </>
