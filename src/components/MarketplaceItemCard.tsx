@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Store, Info } from "lucide-react";
+import { Store, Info, BadgeCheck } from "lucide-react";
 import { clsx } from "clsx";
 import { fixStorageUrl } from "@/lib/format";
 import type { MarketplaceItem } from "@/types";
@@ -119,6 +119,9 @@ export default function MarketplaceItemCard({ item }: MarketplaceItemCardProps) 
               <Store className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
             )}
             <span className="text-xs text-text-muted truncate">{item.vendor.shop_name}</span>
+            {item.vendor.is_verified && (
+              <BadgeCheck className="w-3.5 h-3.5 text-blue-400 shrink-0" title="Verified Vendor" />
+            )}
           </div>
         </div>
       </div>

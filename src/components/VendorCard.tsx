@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Store } from "lucide-react";
+import { Store, BadgeCheck } from "lucide-react";
 import type { Vendor } from "@/types";
 
 interface VendorCardProps {
@@ -33,9 +33,14 @@ export default function VendorCard({ vendor }: VendorCardProps) {
         {/* Info */}
         <div className="p-4">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-text-primary text-sm leading-tight line-clamp-1">
-              {vendor.shop_name}
-            </h3>
+            <div className="flex items-center gap-1 min-w-0">
+              <h3 className="font-semibold text-text-primary text-sm leading-tight line-clamp-1">
+                {vendor.shop_name}
+              </h3>
+              {vendor.is_verified && (
+                <BadgeCheck className="w-4 h-4 text-blue-400 shrink-0" title="Verified Vendor" />
+              )}
+            </div>
             <span className="flex-shrink-0 px-2 py-0.5 bg-accent/10 text-accent rounded-full text-xs font-medium">
               {vendor.item_count ?? 0} {vendor.item_count === 1 ? "item" : "items"}
             </span>

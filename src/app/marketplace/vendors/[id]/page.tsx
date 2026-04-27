@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Store, Globe, ShoppingBag, MessageCircle, ArrowLeft, Loader2, Package } from "lucide-react";
+import { Store, Globe, ShoppingBag, MessageCircle, ArrowLeft, Loader2, Package, BadgeCheck } from "lucide-react";
 import { fixStorageUrl } from "@/lib/format";
 import MarketplaceItemCard from "@/components/MarketplaceItemCard";
 import type { Vendor, MarketplaceItem } from "@/types";
@@ -76,7 +76,12 @@ export default function VendorStorefrontPage() {
         <div className="p-5">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-text-primary">{vendor.shop_name}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-text-primary">{vendor.shop_name}</h1>
+                {vendor.is_verified && (
+                  <BadgeCheck className="w-6 h-6 text-blue-400 shrink-0" title="Verified Vendor" />
+                )}
+              </div>
               {vendor.description && (
                 <p className="mt-1 text-sm text-text-muted max-w-xl">{vendor.description}</p>
               )}

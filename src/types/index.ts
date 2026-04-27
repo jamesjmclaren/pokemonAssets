@@ -120,6 +120,7 @@ export interface Vendor {
   ebay_url: string | null;
   whatsapp_number: string | null;
   is_active: boolean;
+  is_verified: boolean;
   created_at: string;
   updated_at: string;
   item_count?: number;
