@@ -28,6 +28,9 @@ import {
   ChevronRight,
   Menu,
   X,
+  Package,
+  PoundSterling,
+  DollarSign,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -50,6 +53,7 @@ const features: Feature[] = [
   { icon: MessageCircle, title: "Private WhatsApp Trading Group", description: "Gain access to a curated private group of quality investors, buyers, and sellers.", comingSoon: false },
   { icon: Calendar, title: "Private Trade Events", description: "Receive access to exclusive trade events and private opportunities. Subject to availability.", comingSoon: false },
   { icon: TrendingUp, title: "Portfolio Tracking", description: "Monitor the value of your collection with daily real-time pricing updates.", comingSoon: false },
+  { icon: DollarSign, title: "USD Tracking via Poketrace", description: "Live USD market prices sourced directly from Poketrace, refreshed daily so your portfolio always reflects current market value.", comingSoon: false },
   { icon: EyeOff, title: "Ad Free", description: "Enjoy a completely ad-free experience across the entire platform.", comingSoon: false },
   { icon: FileBarChart, title: "Portfolio Reporting", description: "Tailored reports with PDF & CSV export, date-range filtering, and market trend insights. Members get a clearer view of portfolio performance.", comingSoon: false },
   { icon: ArrowLeftRight, title: "Buy, Sell & Trade History", description: "Quickly view comparable pricing across online listings and recent market activity.", comingSoon: true },
@@ -58,10 +62,12 @@ const features: Feature[] = [
   { icon: Calculator, title: "Trade Calculator", description: "Analyse, compare, and record trades with greater accuracy and confidence.", comingSoon: true },
   { icon: BarChart3, title: "Enhanced Reports, Trends & Analytics", description: "Deeper insights to support more informed collecting and trading decisions.", comingSoon: true },
   { icon: Receipt, title: "Tax Reporting Support", description: "UK tax-year presets (6 April – 5 April), realised-gains breakdown, and GBP conversion alongside USD for accounting preparation.", comingSoon: false },
+  { icon: Package, title: "Consignment", description: "Entrust your items to West Investments and benefit from our established online platform and private global buyer network. Clients typically receive between 80–90% of the final sale value, delivered through a discreet, efficient, and professionally managed process.", comingSoon: false },
   { icon: Clock, title: "Daily Movers", description: "See the biggest day-over-day price changes across your portfolio, powered by daily aggregated market data from Poketrace.", comingSoon: true },
   { icon: Camera, title: "Camera Search", description: "Use your camera to search millions of cards instantly.", comingSoon: true },
-  { icon: BadgeCheck, title: "Verified Vendor Profiles", description: "Connect with trusted vendors through verified profiles.", comingSoon: true },
+  { icon: BadgeCheck, title: "Verified Vendor Profiles", description: "Connect with trusted vendors through verified profiles.", comingSoon: false },
   { icon: ShoppingBag, title: "eBay LotBot", description: "See the total value of eBay lots with multiple items and find lots listed below the market value of everything included.", comingSoon: true },
+  { icon: PoundSterling, title: "Native GBP Pricing", description: "View market prices natively in GBP using UK-specific data sources (Cardmarket UK, eBay UK) alongside today's USD-converted figures.", comingSoon: true },
 ];
 
 export default function Design1() {

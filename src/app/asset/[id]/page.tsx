@@ -29,7 +29,9 @@ import {
 } from "lucide-react";
 import PriceChart from "@/components/PriceChart";
 import { formatPercentage, formatDate, fixStorageUrl, getMarketDisclaimer } from "@/lib/format";
-import { useFormatCurrency } from "@/lib/currency-context";
+import { useFormatCurrency, useCurrency, SUPPORTED_CURRENCIES, type DisplayCurrency } from "@/lib/currency-context";
+
+const CURRENCY_SYMBOL: Record<DisplayCurrency, string> = { USD: "$", GBP: "£", EUR: "€" };
 import { clsx } from "clsx";
 import { usePortfolio } from "@/lib/portfolio-context";
 import type { PortfolioAsset } from "@/types";
@@ -74,6 +76,7 @@ interface EditForm {
   set_name: string;
   asset_type: "card" | "sealed";
   purchase_price: string;
+  purchase_currency: DisplayCurrency;
   purchase_date: string;
   purchase_location: string;
   condition: string;
@@ -125,6 +128,40 @@ export default function AssetDetailPage({
   const router = useRouter();
   const { currentPortfolio, isReadOnly } = usePortfolio();
   const formatCurrency = useFormatCurrency();
+  const { rates: fxRates } = useCurrency();
+
+  const editToUsd = (amount: number, fromCurrency: DisplayCurrency): number => {
+    if (!Number.isFinite(amount)) return 0;
+    if (fromCurrency === "USD") return amount;
+    const rate = fxRates[fromCurrency];
+    if (!rate || rate <= 0) return amount;
+    return Math.round((amount / rate) * 100) / 100;
+  };
+
+  const editFromUsd = (usd: number, toCurrency: DisplayCurrency): number => {
+    if (!Number.isFinite(usd)) return 0;
+    if (toCurrency === "USD") return usd;
+    const rate = fxRates[toCurrency];
+    if (!rate || rate <= 0) return usd;
+    return Math.round(usd * rate * 100) / 100;
+  };
+
+  const handleEditCurrencyChange = (next: DisplayCurrency) => {
+    setEditForm((f) => {
+      if (!f || f.purchase_currency === next) return f;
+      const amount = parseFloat(f.purchase_price);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return { ...f, purchase_currency: next };
+      }
+      const usd = editToUsd(amount, f.purchase_currency);
+      const converted = editFromUsd(usd, next);
+      return {
+        ...f,
+        purchase_currency: next,
+        purchase_price: converted ? converted.toFixed(2) : "",
+      };
+    });
+  };
   const [asset, setAsset] = useState<PortfolioAsset | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
@@ -270,6 +307,7 @@ export default function AssetDetailPage({
       set_name: asset.set_name || "",
       asset_type: asset.asset_type,
       purchase_price: String(asset.purchase_price),
+      purchase_currency: "USD",
       purchase_date: asset.purchase_date,
       purchase_location: asset.purchase_location || "",
       condition: asset.condition || "Near Mint",
@@ -306,6 +344,8 @@ export default function AssetDetailPage({
           ? chosenSourcePrice.toString()
           : (editForm.current_price || undefined);
 
+      const purchasePriceUsd = editToUsd(parseFloat(editForm.purchase_price) || 0, editForm.purchase_currency);
+
       const res = await fetch("/api/assets", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -314,7 +354,7 @@ export default function AssetDetailPage({
           name: editForm.name,
           set_name: editForm.set_name,
           asset_type: editForm.asset_type,
-          purchase_price: editForm.purchase_price,
+          purchase_price: purchasePriceUsd,
           purchase_date: editForm.purchase_date,
           purchase_location: editForm.purchase_location,
           condition: editForm.condition,
@@ -663,17 +703,39 @@ export default function AssetDetailPage({
             {/* Purchase Price */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">Purchase Price (per unit)</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={editForm.purchase_price}
-                  onChange={(e) => setEditForm({ ...editForm, purchase_price: e.target.value })}
-                  className="w-full pl-8 pr-4 py-2.5 bg-background border border-border rounded-xl text-text-primary text-sm outline-none focus:border-accent"
-                />
+              <div className="flex">
+                <select
+                  value={editForm.purchase_currency}
+                  onChange={(e) => handleEditCurrencyChange(e.target.value as DisplayCurrency)}
+                  className="bg-background border border-border border-r-0 rounded-l-xl px-3 text-text-primary text-sm outline-none focus:border-accent cursor-pointer"
+                  aria-label="Purchase price currency"
+                >
+                  {SUPPORTED_CURRENCIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
+                    {CURRENCY_SYMBOL[editForm.purchase_currency]}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editForm.purchase_price}
+                    onChange={(e) => setEditForm({ ...editForm, purchase_price: e.target.value })}
+                    className="w-full pl-7 pr-3 py-2.5 bg-background border border-border rounded-r-xl text-text-primary text-sm outline-none focus:border-accent"
+                  />
+                </div>
               </div>
+              {editForm.purchase_currency !== "USD" && parseFloat(editForm.purchase_price) > 0 && (
+                <p className="mt-1 text-[11px] text-accent/80">
+                  ≈ ${editToUsd(parseFloat(editForm.purchase_price), editForm.purchase_currency).toFixed(2)} USD will be saved at today&apos;s rate.
+                </p>
+              )}
+              <p className="mt-1.5 text-[11px] text-text-muted leading-relaxed">
+                All market prices are sourced from Poketrace in USD. Enter your purchase price in any currency — it will be converted and stored in USD at today&apos;s exchange rate.
+              </p>
             </div>
 
             {/* Purchase Date */}

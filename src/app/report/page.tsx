@@ -99,7 +99,7 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [showGbp, setShowGbp] = useState(false);
+  const [showGbp, setShowGbp] = useState(true);
   // Helper: format a USD value with the GBP equivalent appended if the toggle is on.
   const fmtUsdWithGbp = (usd: number) => {
     if (!showGbp) return formatCurrency(usd);
