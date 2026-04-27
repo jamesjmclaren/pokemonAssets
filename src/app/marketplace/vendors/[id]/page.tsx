@@ -79,7 +79,7 @@ export default function VendorStorefrontPage() {
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold text-text-primary">{vendor.shop_name}</h1>
                 {vendor.is_verified && (
-                  <BadgeCheck className="w-6 h-6 text-blue-400 shrink-0" title="Verified Vendor" />
+                  <BadgeCheck className="w-6 h-6 text-blue-400 shrink-0" aria-label="Verified Vendor" />
                 )}
               </div>
               {vendor.description && (

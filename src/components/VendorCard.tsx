@@ -38,7 +38,7 @@ export default function VendorCard({ vendor }: VendorCardProps) {
                 {vendor.shop_name}
               </h3>
               {vendor.is_verified && (
-                <BadgeCheck className="w-4 h-4 text-blue-400 shrink-0" title="Verified Vendor" />
+                <BadgeCheck className="w-4 h-4 text-blue-400 shrink-0" aria-label="Verified Vendor" />
               )}
             </div>
             <span className="flex-shrink-0 px-2 py-0.5 bg-accent/10 text-accent rounded-full text-xs font-medium">

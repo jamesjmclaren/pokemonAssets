@@ -120,7 +120,7 @@ export default function MarketplaceItemCard({ item }: MarketplaceItemCardProps) 
             )}
             <span className="text-xs text-text-muted truncate">{item.vendor.shop_name}</span>
             {item.vendor.is_verified && (
-              <BadgeCheck className="w-3.5 h-3.5 text-blue-400 shrink-0" title="Verified Vendor" />
+              <BadgeCheck className="w-3.5 h-3.5 text-blue-400 shrink-0" aria-label="Verified Vendor" />
             )}
           </div>
         </div>
