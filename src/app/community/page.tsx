@@ -30,6 +30,7 @@ import {
   X,
   Package,
   PoundSterling,
+  DollarSign,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -52,6 +53,7 @@ const features: Feature[] = [
   { icon: MessageCircle, title: "Private WhatsApp Trading Group", description: "Gain access to a curated private group of quality investors, buyers, and sellers.", comingSoon: false },
   { icon: Calendar, title: "Private Trade Events", description: "Receive access to exclusive trade events and private opportunities. Subject to availability.", comingSoon: false },
   { icon: TrendingUp, title: "Portfolio Tracking", description: "Monitor the value of your collection with daily real-time pricing updates.", comingSoon: false },
+  { icon: DollarSign, title: "USD Tracking via Poketrace", description: "Live USD market prices sourced directly from Poketrace, refreshed daily so your portfolio always reflects current market value.", comingSoon: false },
   { icon: EyeOff, title: "Ad Free", description: "Enjoy a completely ad-free experience across the entire platform.", comingSoon: false },
   { icon: FileBarChart, title: "Portfolio Reporting", description: "Tailored reports with PDF & CSV export, date-range filtering, and market trend insights. Members get a clearer view of portfolio performance.", comingSoon: false },
   { icon: ArrowLeftRight, title: "Buy, Sell & Trade History", description: "Quickly view comparable pricing across online listings and recent market activity.", comingSoon: true },
