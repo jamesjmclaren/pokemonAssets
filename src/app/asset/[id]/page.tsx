@@ -662,7 +662,7 @@ export default function AssetDetailPage({
 
             {/* Purchase Price */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">Purchase Price (per unit)</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">Purchase Price (per unit, USD)</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">$</span>
                 <input
@@ -674,6 +674,9 @@ export default function AssetDetailPage({
                   className="w-full pl-8 pr-4 py-2.5 bg-background border border-border rounded-xl text-text-primary text-sm outline-none focus:border-accent"
                 />
               </div>
+              <p className="mt-1.5 text-[11px] text-text-muted leading-relaxed">
+                Enter the price in USD. All market prices are sourced from Poketrace in USD; GBP support coming soon.
+              </p>
             </div>
 
             {/* Purchase Date */}

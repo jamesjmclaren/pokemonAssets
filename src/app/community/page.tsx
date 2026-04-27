@@ -29,6 +29,7 @@ import {
   Menu,
   X,
   Package,
+  PoundSterling,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -64,6 +65,7 @@ const features: Feature[] = [
   { icon: Camera, title: "Camera Search", description: "Use your camera to search millions of cards instantly.", comingSoon: true },
   { icon: BadgeCheck, title: "Verified Vendor Profiles", description: "Connect with trusted vendors through verified profiles.", comingSoon: false },
   { icon: ShoppingBag, title: "eBay LotBot", description: "See the total value of eBay lots with multiple items and find lots listed below the market value of everything included.", comingSoon: true },
+  { icon: PoundSterling, title: "GBP Support", description: "Add purchase prices in GBP and view your portfolio natively in pounds. Market prices remain USD-sourced from Poketrace, with live FX conversion alongside.", comingSoon: true },
 ];
 
 export default function Design1() {

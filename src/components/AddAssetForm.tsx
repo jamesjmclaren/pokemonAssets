@@ -1092,7 +1092,7 @@ export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormPro
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Purchase Price (per unit) *
+                    Purchase Price (per unit, USD) *
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">
@@ -1114,6 +1114,9 @@ export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormPro
                       placeholder="0.00"
                     />
                   </div>
+                  <p className="mt-1.5 text-[11px] text-text-muted leading-relaxed">
+                    Enter the price in USD. All market prices are sourced from Poketrace in USD; GBP support coming soon.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">
