@@ -17,7 +17,10 @@ import {
 import { formatCurrency, extractCardPrice, fixStorageUrl, getMarketDisclaimer } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import { usePortfolio } from "@/lib/portfolio-context";
+import { useCurrency, SUPPORTED_CURRENCIES, type DisplayCurrency } from "@/lib/currency-context";
 import SearchModal from "./SearchModal";
+
+const CURRENCY_SYMBOL: Record<DisplayCurrency, string> = { USD: "$", GBP: "£", EUR: "€" };
 
 interface SelectedCard {
   id: string;
@@ -86,6 +89,29 @@ export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormPro
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { currentPortfolio, portfolios, setCurrentPortfolio, loading: portfolioLoading, isReadOnly } = usePortfolio();
+  const { currency: displayCurrency, rates: fxRates } = useCurrency();
+
+  const convertToUsd = useCallback(
+    (amount: number, fromCurrency: DisplayCurrency): number => {
+      if (!Number.isFinite(amount)) return 0;
+      if (fromCurrency === "USD") return amount;
+      const rate = fxRates[fromCurrency];
+      if (!rate || rate <= 0) return amount;
+      return Math.round((amount / rate) * 100) / 100;
+    },
+    [fxRates]
+  );
+
+  const convertFromUsd = useCallback(
+    (usd: number, toCurrency: DisplayCurrency): number => {
+      if (!Number.isFinite(usd)) return 0;
+      if (toCurrency === "USD") return usd;
+      const rate = fxRates[toCurrency];
+      if (!rate || rate <= 0) return usd;
+      return Math.round(usd * rate * 100) / 100;
+    },
+    [fxRates]
+  );
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(initialCard ?? null);
@@ -130,12 +156,17 @@ export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormPro
   useEffect(() => {
     if (initialCard) {
       const price = initialCard.marketPrice || extractCardPrice(initialCard as unknown as Record<string, unknown>);
-      setForm((f) => ({
-        ...f,
-        ...(price && !f.purchasePrice ? { purchasePrice: price.toFixed(2) } : {}),
-        assetType: initialCard.type,
-        condition: initialCard.type === "sealed" ? "Sealed" : f.condition,
-      }));
+      setForm((f) => {
+        const updates: Partial<typeof f> = {
+          assetType: initialCard.type,
+          condition: initialCard.type === "sealed" ? "Sealed" : f.condition,
+        };
+        if (price && !f.purchasePrice) {
+          const inDisplay = convertFromUsd(price, f.purchaseCurrency);
+          updates.purchasePrice = inDisplay.toFixed(2);
+        }
+        return { ...f, ...updates };
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -145,6 +176,7 @@ export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormPro
     manualName: "",
     manualSetName: "",
     purchasePrice: "",
+    purchaseCurrency: "USD" as DisplayCurrency,
     purchaseDate: new Date().toISOString().split("T")[0],
     purchaseLocation: "",
     condition: "Near Mint",
@@ -159,6 +191,34 @@ export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormPro
     storageLocation: "",
   });
 
+  // Sync the purchase currency to the user's selected display currency once it loads.
+  useEffect(() => {
+    setForm((f) =>
+      f.purchasePrice || f.purchaseCurrency !== "USD"
+        ? f
+        : { ...f, purchaseCurrency: displayCurrency }
+    );
+    // Only run when the user's display currency first becomes known.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayCurrency]);
+
+  const handlePurchaseCurrencyChange = (next: DisplayCurrency) => {
+    setForm((f) => {
+      if (f.purchaseCurrency === next) return f;
+      const amount = parseFloat(f.purchasePrice);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return { ...f, purchaseCurrency: next };
+      }
+      const usd = convertToUsd(amount, f.purchaseCurrency);
+      const converted = convertFromUsd(usd, next);
+      return {
+        ...f,
+        purchaseCurrency: next,
+        purchasePrice: converted ? converted.toFixed(2) : "",
+      };
+    });
+  };
+
   const handleCardSelect = (card: SelectedCard) => {
     setSelectedCard(card);
     setIsManualSubmission(false);
@@ -166,7 +226,8 @@ export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormPro
     const price = card.marketPrice || extractCardPrice(card as unknown as Record<string, unknown>);
     const updates: Partial<typeof form> = {};
     if (price && !form.purchasePrice) {
-      updates.purchasePrice = price.toFixed(2);
+      const inDisplay = convertFromUsd(price, form.purchaseCurrency);
+      updates.purchasePrice = inDisplay.toFixed(2);
     }
     if (card.type === "sealed") {
       updates.assetType = "sealed";
@@ -387,6 +448,8 @@ export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormPro
         ? false
         : (form.manualPrice || isManualSubmission);
 
+      const purchasePriceUsd = convertToUsd(parseFloat(form.purchasePrice) || 0, form.purchaseCurrency);
+
       const res = await fetch("/api/assets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -402,7 +465,7 @@ export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormPro
             : (selectedCard!.type === "sealed" ? "sealed" : form.assetType),
           image_url: isManualSubmission ? null : (selectedCard!.imageUrl || null),
           custom_image_url: customImageUrl,
-          purchase_price: form.purchasePrice,
+          purchase_price: purchasePriceUsd,
           purchase_date: form.purchaseDate,
           purchase_location: form.purchaseLocation,
           condition: form.condition,
@@ -1092,30 +1155,47 @@ export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormPro
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Purchase Price (per unit, USD) *
+                    Purchase Price (per unit) *
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">
-                      $
-                    </span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      required
-                      value={form.purchasePrice}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          purchasePrice: e.target.value,
-                        }))
-                      }
-                      className="w-full pl-8 pr-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
-                      placeholder="0.00"
-                    />
+                  <div className="flex">
+                    <select
+                      value={form.purchaseCurrency}
+                      onChange={(e) => handlePurchaseCurrencyChange(e.target.value as DisplayCurrency)}
+                      className="bg-surface border border-border border-r-0 rounded-l-xl px-3 text-text-primary text-sm outline-none focus:border-accent cursor-pointer"
+                      aria-label="Purchase price currency"
+                    >
+                      {SUPPORTED_CURRENCIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
+                        {CURRENCY_SYMBOL[form.purchaseCurrency]}
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={form.purchasePrice}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            purchasePrice: e.target.value,
+                          }))
+                        }
+                        className="w-full pl-7 pr-3 py-3 bg-surface border border-border rounded-r-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                        placeholder="0.00"
+                      />
+                    </div>
                   </div>
+                  {form.purchaseCurrency !== "USD" && parseFloat(form.purchasePrice) > 0 && (
+                    <p className="mt-1 text-[11px] text-accent/80">
+                      ≈ ${convertToUsd(parseFloat(form.purchasePrice), form.purchaseCurrency).toFixed(2)} USD will be saved at today&apos;s rate.
+                    </p>
+                  )}
                   <p className="mt-1.5 text-[11px] text-text-muted leading-relaxed">
-                    Enter the price in USD. All market prices are sourced from Poketrace in USD; GBP support coming soon.
+                    All market prices are sourced from Poketrace in USD. Enter your purchase price in any currency — it will be converted and stored in USD at today&apos;s exchange rate.
                   </p>
                 </div>
                 <div>
