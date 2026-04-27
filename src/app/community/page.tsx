@@ -62,7 +62,7 @@ const features: Feature[] = [
   { icon: Package, title: "Consignment", description: "Entrust your items to West Investments and benefit from our established online platform and private global buyer network. Clients typically receive between 80–90% of the final sale value, delivered through a discreet, efficient, and professionally managed process.", comingSoon: false },
   { icon: Clock, title: "Daily Movers", description: "See the biggest day-over-day price changes across your portfolio, powered by daily aggregated market data from Poketrace.", comingSoon: true },
   { icon: Camera, title: "Camera Search", description: "Use your camera to search millions of cards instantly.", comingSoon: true },
-  { icon: BadgeCheck, title: "Verified Vendor Profiles", description: "Connect with trusted vendors through verified profiles.", comingSoon: true },
+  { icon: BadgeCheck, title: "Verified Vendor Profiles", description: "Connect with trusted vendors through verified profiles.", comingSoon: false },
   { icon: ShoppingBag, title: "eBay LotBot", description: "See the total value of eBay lots with multiple items and find lots listed below the market value of everything included.", comingSoon: true },
 ];
 
