@@ -2,28 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Bell, Trash2, Edit2, X, Loader2, Plus, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { Bell, Trash2, Pencil, X, Loader2, Plus, ArrowUpRight, ArrowDownLeft, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/format";
 import type { PriceAlert } from "@/types";
 
 function tierLabel(tier: string): string {
-  // Convert Poketrace tier key to display label
   if (tier.startsWith("PSA_")) return `PSA ${tier.slice(4)}`;
   if (tier.startsWith("CGC_")) return `CGC ${tier.slice(4)}`;
   if (tier.startsWith("BGS_")) return `BGS ${tier.slice(4)}`;
   return tier.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function SourceBadge({ label, price }: { label: string; price: number | null }) {
-  return (
-    <div className="flex flex-col items-center px-3 py-1.5 bg-surface-hover rounded-lg min-w-[80px]">
-      <span className="text-[10px] text-text-muted uppercase tracking-wide">{label}</span>
-      <span className="text-sm font-semibold text-text-primary mt-0.5">
-        {price != null ? formatCurrency(price) : <span className="text-text-muted text-xs">N/A</span>}
-      </span>
-    </div>
-  );
 }
 
 interface EditModalProps {
@@ -50,11 +38,14 @@ function EditModal({ alert, onClose, onSave }: EditModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-surface border border-border rounded-2xl w-full max-w-sm shadow-2xl">
         <div className="flex items-center justify-between p-5 border-b border-border">
-          <h3 className="font-bold text-text-primary text-sm">Edit Alert — {alert.card_name}</h3>
-          <button onClick={onClose} className="p-1.5 text-text-muted hover:text-text-primary rounded-lg">
+          <div>
+            <h3 className="font-bold text-text-primary text-sm">{alert.card_name}</h3>
+            <p className="text-xs text-text-muted mt-0.5">{alert.set_name} · {tierLabel(alert.condition_tier)}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-text-muted hover:text-text-primary rounded-lg transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -73,12 +64,12 @@ function EditModal({ alert, onClose, onSave }: EditModalProps) {
           </label>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-text-secondary flex items-center gap-1.5">
+            <label className="text-xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
               <ArrowDownLeft className="w-3.5 h-3.5 text-success" />
               Alert when drops below
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
               <input
                 type="number"
                 step="0.01"
@@ -86,18 +77,18 @@ function EditModal({ alert, onClose, onSave }: EditModalProps) {
                 value={lowPrice}
                 onChange={(e) => setLowPrice(e.target.value)}
                 placeholder="No threshold"
-                className="w-full pl-7 pr-4 py-2.5 bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                className="w-full pl-7 pr-4 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm transition-colors"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-text-secondary flex items-center gap-1.5">
+            <label className="text-xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
               <ArrowUpRight className="w-3.5 h-3.5 text-warning" />
               Alert when rises above
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
               <input
                 type="number"
                 step="0.01"
@@ -105,7 +96,7 @@ function EditModal({ alert, onClose, onSave }: EditModalProps) {
                 value={highPrice}
                 onChange={(e) => setHighPrice(e.target.value)}
                 placeholder="No threshold"
-                className="w-full pl-7 pr-4 py-2.5 bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                className="w-full pl-7 pr-4 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm transition-colors"
               />
             </div>
           </div>
@@ -123,9 +114,129 @@ function EditModal({ alert, onClose, onSave }: EditModalProps) {
               className="flex-1 py-2.5 bg-accent hover:bg-accent-hover text-black rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Save
+              Save Changes
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AlertCard({ alert, onEdit, onDelete }: { alert: PriceAlert; onEdit: () => void; onDelete: () => void }) {
+  const prices = [
+    alert.track_tcgplayer ? alert.last_price_tcgplayer : null,
+    alert.track_ebay ? alert.last_price_ebay : null,
+    alert.track_cardmarket ? alert.last_price_cardmarket : null,
+  ].filter((p): p is number => p != null);
+
+  const lowestPrice = prices.length > 0 ? Math.min(...prices) : null;
+
+  return (
+    <div className="bg-surface border border-border rounded-2xl overflow-hidden flex flex-col hover:border-accent/30 transition-colors group">
+      {/* Image area */}
+      <div className="relative bg-gradient-to-b from-surface-hover to-background flex items-center justify-center h-48">
+        {alert.image_url ? (
+          <div className="relative w-28 h-40 drop-shadow-xl">
+            <Image
+              src={alert.image_url}
+              alt={alert.card_name}
+              fill
+              className="object-contain"
+              sizes="112px"
+              unoptimized
+            />
+          </div>
+        ) : (
+          <div className="w-28 h-40 bg-surface-hover rounded-xl flex items-center justify-center">
+            <TrendingUp className="w-8 h-8 text-text-muted opacity-30" />
+          </div>
+        )}
+        {/* Action buttons */}
+        <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={onEdit}
+            className="p-1.5 bg-surface/90 backdrop-blur-sm text-text-muted hover:text-text-primary rounded-lg border border-border shadow-sm transition-colors"
+            title="Edit alert"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-1.5 bg-surface/90 backdrop-blur-sm text-text-muted hover:text-danger rounded-lg border border-border shadow-sm transition-colors"
+            title="Remove alert"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {/* Condition badge */}
+        <div className="absolute bottom-3 left-3">
+          <span className="px-2.5 py-1 bg-black/60 backdrop-blur-sm text-white rounded-full text-[11px] font-semibold">
+            {tierLabel(alert.condition_tier)}
+          </span>
+        </div>
+      </div>
+
+      {/* Card info */}
+      <div className="p-4 flex-1 flex flex-col gap-3">
+        <div>
+          <p className="font-bold text-text-primary text-sm leading-tight">{alert.card_name}</p>
+          <p className="text-xs text-text-muted mt-0.5">{alert.set_name}</p>
+        </div>
+
+        {/* Prices */}
+        <div className="flex flex-col gap-1.5">
+          {alert.track_tcgplayer && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-text-muted font-medium">TCGPlayer</span>
+              <span className="text-sm font-bold text-text-primary">
+                {alert.last_price_tcgplayer != null ? formatCurrency(alert.last_price_tcgplayer) : <span className="text-text-muted font-normal text-xs">N/A</span>}
+              </span>
+            </div>
+          )}
+          {alert.track_ebay && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-text-muted font-medium">eBay</span>
+              <span className="text-sm font-bold text-text-primary">
+                {alert.last_price_ebay != null ? formatCurrency(alert.last_price_ebay) : <span className="text-text-muted font-normal text-xs">N/A</span>}
+              </span>
+            </div>
+          )}
+          {alert.track_cardmarket && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-text-muted font-medium">CardMarket</span>
+              <span className="text-sm font-bold text-text-primary">
+                {alert.last_price_cardmarket != null ? formatCurrency(alert.last_price_cardmarket) : <span className="text-text-muted font-normal text-xs">N/A</span>}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Alert badges */}
+        <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border mt-auto">
+          {alert.alert_daily_digest && (
+            <span className="px-2 py-0.5 bg-accent/10 text-accent rounded-full text-[10px] font-medium flex items-center gap-1">
+              <Bell className="w-2.5 h-2.5" />
+              Daily
+            </span>
+          )}
+          {alert.target_low_price != null && (
+            <span className="px-2 py-0.5 bg-success/10 text-success rounded-full text-[10px] font-medium flex items-center gap-1">
+              <ArrowDownLeft className="w-2.5 h-2.5" />
+              {formatCurrency(alert.target_low_price)}
+            </span>
+          )}
+          {alert.target_high_price != null && (
+            <span className="px-2 py-0.5 bg-warning/10 text-warning rounded-full text-[10px] font-medium flex items-center gap-1">
+              <ArrowUpRight className="w-2.5 h-2.5" />
+              {formatCurrency(alert.target_high_price)}
+            </span>
+          )}
+          {lowestPrice != null && alert.target_low_price != null && lowestPrice <= alert.target_low_price && (
+            <span className="px-2 py-0.5 bg-success/20 text-success rounded-full text-[10px] font-bold animate-pulse">
+              Triggered!
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -176,7 +287,7 @@ export default function TrackingPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Price Tracking</h1>
@@ -194,12 +305,14 @@ export default function TrackingPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
+        <div className="flex items-center justify-center py-24">
           <Loader2 className="w-6 h-6 animate-spin text-text-muted" />
         </div>
       ) : alerts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Bell className="w-12 h-12 text-text-muted mb-4 opacity-40" />
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-surface-hover flex items-center justify-center mb-4">
+            <Bell className="w-8 h-8 text-text-muted opacity-40" />
+          </div>
           <h2 className="text-lg font-semibold text-text-primary mb-2">No tracked cards yet</h2>
           <p className="text-sm text-text-muted mb-6 max-w-sm">
             Search for a card and click &ldquo;Track Card&rdquo; to start monitoring prices and receive alerts.
@@ -213,95 +326,19 @@ export default function TrackingPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-3">
-          {alerts.map((alert) => (
-            <div
-              key={alert.id}
-              className="bg-surface border border-border rounded-2xl p-4 flex flex-col sm:flex-row gap-4"
-            >
-              {/* Card image */}
-              {alert.image_url && (
-                <div className="relative w-14 h-20 flex-shrink-0 bg-background rounded-lg overflow-hidden self-center sm:self-start">
-                  <Image
-                    src={alert.image_url}
-                    alt={alert.card_name}
-                    fill
-                    className="object-contain p-0.5"
-                    sizes="56px"
-                    unoptimized
-                  />
-                </div>
-              )}
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <div>
-                    <p className="font-semibold text-text-primary text-sm">{alert.card_name}</p>
-                    <p className="text-xs text-text-muted">{alert.set_name}</p>
-                    <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      <span className="px-2 py-0.5 bg-surface-hover rounded-full text-[10px] text-text-secondary font-medium">
-                        {tierLabel(alert.condition_tier)}
-                      </span>
-                      <span className="px-2 py-0.5 bg-surface-hover rounded-full text-[10px] text-text-secondary font-medium">
-                        {alert.market}
-                      </span>
-                      {alert.alert_daily_digest && (
-                        <span className="px-2 py-0.5 bg-accent/10 text-accent rounded-full text-[10px] font-medium flex items-center gap-1">
-                          <Bell className="w-2.5 h-2.5" />
-                          Daily digest
-                        </span>
-                      )}
-                      {alert.target_low_price != null && (
-                        <span className="px-2 py-0.5 bg-success/10 text-success rounded-full text-[10px] font-medium flex items-center gap-1">
-                          <ArrowDownLeft className="w-2.5 h-2.5" />
-                          Below {formatCurrency(alert.target_low_price)}
-                        </span>
-                      )}
-                      {alert.target_high_price != null && (
-                        <span className="px-2 py-0.5 bg-warning/10 text-warning rounded-full text-[10px] font-medium flex items-center gap-1">
-                          <ArrowUpRight className="w-2.5 h-2.5" />
-                          Above {formatCurrency(alert.target_high_price)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={() => setEditingAlert(alert)}
-                      className="p-2 text-text-muted hover:text-text-primary hover:bg-surface-hover rounded-lg transition-colors"
-                      title="Edit alert"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(alert.id)}
-                      className="p-2 text-text-muted hover:text-danger hover:bg-danger/10 rounded-lg transition-colors"
-                      title="Remove alert"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Current prices */}
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {alert.track_tcgplayer && (
-                    <SourceBadge label="TCGPlayer" price={alert.last_price_tcgplayer} />
-                  )}
-                  {alert.track_ebay && (
-                    <SourceBadge label="eBay" price={alert.last_price_ebay} />
-                  )}
-                  {alert.track_cardmarket && (
-                    <SourceBadge label="CardMarket" price={alert.last_price_cardmarket} />
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <>
+          <p className="text-xs text-text-muted mb-4">{alerts.length} card{alerts.length !== 1 ? "s" : ""} tracked · Prices updated daily at 7am UTC</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {alerts.map((alert) => (
+              <AlertCard
+                key={alert.id}
+                alert={alert}
+                onEdit={() => setEditingAlert(alert)}
+                onDelete={() => handleDelete(alert.id)}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {editingAlert && (
