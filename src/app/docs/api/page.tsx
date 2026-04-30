@@ -107,6 +107,50 @@ res.raise_for_status()
 print(res.json()["portfolios"])`,
   };
 
+  const priceAlertsSamples = {
+    curl: `curl -X GET "${apiBase}/price-alerts?limit=50" \\
+  -H "Authorization: Bearer $API_KEY"`,
+    javascript: `const res = await fetch("${apiBase}/price-alerts?limit=50", {
+  headers: { Authorization: \`Bearer \${process.env.API_KEY}\` },
+});
+const { priceAlerts, nextCursor } = await res.json();`,
+    python: `import os, requests
+
+res = requests.get(
+    "${apiBase}/price-alerts",
+    params={"limit": 50},
+    headers={"Authorization": f"Bearer {os.environ['API_KEY']}"},
+)
+print(res.json()["priceAlerts"])`,
+  };
+
+  const priceAlertsExample = `{
+  "priceAlerts": [
+    {
+      "id": "a1b2c3d4-1234-4c6f-8fda-1a2b3c4d5e6f",
+      "poketraceId": "sv3-199",
+      "cardName": "Charizard ex",
+      "setName": "Obsidian Flames",
+      "conditionTier": "NEAR_MINT",
+      "trackTcgplayer": true,
+      "trackEbay": true,
+      "trackCardmarket": false,
+      "market": "US",
+      "currency": "USD",
+      "alertDailyDigest": true,
+      "targetLowPriceUsd": 45.00,
+      "targetHighPriceUsd": null,
+      "lastPriceTcgplayerUsd": 52.18,
+      "lastPriceEbayUsd": 48.75,
+      "lastPriceCardmarketUsd": null,
+      "lastNotifiedAt": null,
+      "isActive": true,
+      "createdAt": "2026-04-20T10:00:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}`;
+
   const assetsSamples = {
     curl: `curl -X GET "${apiBase}/assets?limit=50" \\
   -H "Authorization: Bearer $API_KEY"`,
@@ -202,6 +246,11 @@ print(res.json()["assets"])`,
               <li>
                 <a href="#get-assets" className="text-text-secondary hover:text-accent">
                   <Method verb="GET" /> <span className="ml-1 font-mono">/assets</span>
+                </a>
+              </li>
+              <li>
+                <a href="#get-price-alerts" className="text-text-secondary hover:text-accent">
+                  <Method verb="GET" /> <span className="ml-1 font-mono">/price-alerts</span>
                 </a>
               </li>
             </ul>
@@ -462,6 +511,94 @@ print(res.json()["assets"])`,
                     description: "optional",
                     placeholder: "uuid",
                   },
+                  {
+                    name: "limit",
+                    required: false,
+                    description: "1–200",
+                    placeholder: "50",
+                    defaultValue: "50",
+                  },
+                  { name: "cursor", required: false, description: "pagination" },
+                ]}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* GET /price-alerts */}
+        <section id="get-price-alerts" className="space-y-4 scroll-mt-6">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Method verb="GET" />
+            <h2 className="text-xl font-semibold text-text-primary font-mono">
+              /price-alerts
+            </h2>
+          </div>
+          <p className="text-sm text-text-secondary">
+            Returns all active price alerts (your watchlist) for the authenticated user.
+            Alerts track price movements across TCGPlayer, eBay, and CardMarket and
+            trigger email notifications when thresholds are reached or as a daily digest.
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-text-muted mb-2">
+                  Query parameters
+                </p>
+                <ParamTable
+                  params={[
+                    {
+                      name: "limit",
+                      type: "integer (1–200)",
+                      description: "Page size. Defaults to 50.",
+                    },
+                    {
+                      name: "cursor",
+                      type: "string (ISO-8601)",
+                      description: "Pass nextCursor from the previous page.",
+                    },
+                  ]}
+                />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-text-muted mb-2">
+                  Response fields
+                </p>
+                <div className="border border-border rounded-xl px-3 bg-surface">
+                  <ResponseField name="priceAlerts[].id" type="string (uuid)" description="Alert identifier." />
+                  <ResponseField name="priceAlerts[].cardName" type="string" description="Card or product name." />
+                  <ResponseField name="priceAlerts[].setName" type="string" description="Set name." />
+                  <ResponseField name="priceAlerts[].conditionTier" type="string" description='Poketrace tier key, e.g. "NEAR_MINT" or "PSA_10".' />
+                  <ResponseField name="priceAlerts[].trackTcgplayer" type="boolean" description="Whether TCGPlayer is being tracked." />
+                  <ResponseField name="priceAlerts[].trackEbay" type="boolean" description="Whether eBay is being tracked." />
+                  <ResponseField name="priceAlerts[].trackCardmarket" type="boolean" description="Whether CardMarket is being tracked (EU only)." />
+                  <ResponseField name="priceAlerts[].market" type='"US" | "EU"' description="Poketrace market region." />
+                  <ResponseField name="priceAlerts[].alertDailyDigest" type="boolean" description="Whether this card is included in your daily digest email." />
+                  <ResponseField name="priceAlerts[].targetLowPriceUsd" type="number | null" description="Email fires when any tracked source drops below this." />
+                  <ResponseField name="priceAlerts[].targetHighPriceUsd" type="number | null" description="Email fires when any tracked source rises above this." />
+                  <ResponseField name="priceAlerts[].lastPriceTcgplayerUsd" type="number | null" description="Most recent TCGPlayer price (USD)." />
+                  <ResponseField name="priceAlerts[].lastPriceEbayUsd" type="number | null" description="Most recent eBay price (USD)." />
+                  <ResponseField name="priceAlerts[].lastPriceCardmarketUsd" type="number | null" description="Most recent CardMarket price (USD)." />
+                  <ResponseField name="priceAlerts[].lastNotifiedAt" type="string | null" description="ISO-8601 timestamp of the last threshold email sent." />
+                  <ResponseField name="nextCursor" type="string | null" description="Pass to cursor on the next call; null when exhausted." />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <CodeSamples samples={priceAlertsSamples} />
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-text-muted mb-1">
+                  Example response · 200
+                </p>
+                <pre className="bg-[#0d1117] border border-border rounded-xl p-3 text-xs font-mono text-text-primary overflow-x-auto max-h-96 overflow-y-auto">
+                  <code>{priceAlertsExample}</code>
+                </pre>
+              </div>
+              <TryIt
+                method="GET"
+                path="/api/v1/price-alerts"
+                queryParams={[
                   {
                     name: "limit",
                     required: false,

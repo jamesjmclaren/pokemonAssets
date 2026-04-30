@@ -138,3 +138,44 @@ export interface ApiSet {
   totalCards: number;
   imageUrl?: string;
 }
+
+export interface PriceAlert {
+  id: string;
+  user_id: string;
+  poketrace_id: string;
+  card_name: string;
+  set_name: string;
+  image_url: string | null;
+  condition_tier: string;
+  track_tcgplayer: boolean;
+  track_ebay: boolean;
+  track_cardmarket: boolean;
+  market: "US" | "EU";
+  currency: string;
+  alert_daily_digest: boolean;
+  target_low_price: number | null;
+  target_high_price: number | null;
+  last_price_tcgplayer: number | null;
+  last_price_ebay: number | null;
+  last_price_cardmarket: number | null;
+  last_notified_at: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreatePriceAlertPayload {
+  poketrace_id: string;
+  card_name: string;
+  set_name?: string;
+  image_url?: string | null;
+  condition_tier: string;
+  track_tcgplayer: boolean;
+  track_ebay: boolean;
+  track_cardmarket: boolean;
+  market?: "US" | "EU";
+  currency?: string;
+  alert_daily_digest: boolean;
+  target_low_price?: number | null;
+  target_high_price?: number | null;
+}

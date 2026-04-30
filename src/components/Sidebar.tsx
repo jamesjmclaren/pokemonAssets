@@ -17,6 +17,7 @@ import {
   Shield,
   Settings,
   Store,
+  Bell,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { usePortfolio, Portfolio } from "@/lib/portfolio-context";
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/collection", label: "Collection", icon: FolderOpen, adminOnly: false },
   { href: "/marketplace", label: "Marketplace", icon: Store, adminOnly: false },
   { href: "/dashboard/add", label: "Search Asset", icon: Search, adminOnly: true },
+  { href: "/dashboard/tracking", label: "Tracking", icon: Bell, adminOnly: false },
   { href: "/report", label: "Report", icon: FileText, adminOnly: false },
   { href: "/team", label: "Team", icon: Users, adminOnly: false },
   { href: "/settings/api-keys", label: "Settings", icon: Settings, adminOnly: false },

@@ -7,12 +7,13 @@ import {
   X,
   Loader2,
   Plus,
-  BookmarkX,
+  Bell,
   ChevronLeft,
 } from "lucide-react";
 import { clsx } from "clsx";
 import AddAssetForm, { type SelectedCard } from "@/components/AddAssetForm";
 import CardAnalytics from "@/components/CardAnalytics";
+import TrackCardModal from "@/components/TrackCardModal";
 
 // ---------------------------------------------------------------------------
 // Search result type
@@ -135,6 +136,7 @@ export default function SearchAssetPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showTrackModal, setShowTrackModal] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addFormRef = useRef<HTMLDivElement>(null);
@@ -259,11 +261,10 @@ export default function SearchAssetPage() {
         {/* Action buttons */}
         <div className="flex items-center gap-3">
           <button
-            disabled
-            className="flex items-center gap-2 px-5 py-2.5 border border-border rounded-xl text-sm font-semibold text-text-muted bg-surface-hover opacity-50 cursor-not-allowed"
-            title="Coming soon"
+            onClick={() => setShowTrackModal(true)}
+            className="flex items-center gap-2 px-5 py-2.5 border border-border rounded-xl text-sm font-semibold text-text-secondary bg-surface hover:bg-surface-hover hover:text-text-primary transition-colors"
           >
-            <BookmarkX className="w-4 h-4" />
+            <Bell className="w-4 h-4" />
             Track Card
           </button>
           <button
@@ -324,6 +325,20 @@ export default function SearchAssetPage() {
         assetType={selectedResult.type}
       />
 
+
+      {/* Track Card modal */}
+      {showTrackModal && (
+        <TrackCardModal
+          card={{
+            poketraceId: selectedResult.poketraceId,
+            name: selectedResult.name,
+            setName: selectedResult.setName,
+            imageUrl: selectedResult.imageUrl,
+          }}
+          onClose={() => setShowTrackModal(false)}
+          onSuccess={() => setShowTrackModal(false)}
+        />
+      )}
 
       {/* Add Asset — inline section */}
       {showAddForm && (
