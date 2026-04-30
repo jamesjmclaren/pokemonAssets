@@ -27,7 +27,7 @@ import { usePortfolio } from "@/lib/portfolio-context";
 import { useFormatCurrency } from "@/lib/currency-context";
 import type { PortfolioAsset } from "@/types";
 
-type SortField = "name" | "set_name" | "purchase_price" | "current_price" | "profit" | "purchase_date" | "performance" | "quantity";
+type SortField = "name" | "set_name" | "purchase_price" | "current_price" | "profit" | "purchase_date" | "performance" | "quantity" | "gain_7d" | "gain_30d";
 type SortDir = "asc" | "desc";
 type ViewMode = "grid" | "table";
 type TypeTab = "all" | "raw" | "graded" | "sealed" | "sold";
@@ -53,6 +53,8 @@ export default function CollectionPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [view, setView] = useState<ViewMode>("table");
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  const [recentGains, setRecentGains] = useState<Record<string, number | null>>({});
+  const [recentGainsLoading, setRecentGainsLoading] = useState(false);
 
   useEffect(() => {
     async function fetchAssets() {
@@ -80,6 +82,22 @@ export default function CollectionPage() {
       setLoading(false);
     }
   }, [currentPortfolio, portfolioLoading]);
+
+  // Fetch recent gain data when gain sort is selected
+  useEffect(() => {
+    if (!currentPortfolio || (sortField !== "gain_7d" && sortField !== "gain_30d")) return;
+    const days = sortField === "gain_7d" ? 7 : 30;
+    setRecentGainsLoading(true);
+    fetch(`/api/assets/recent-changes?portfolioId=${currentPortfolio.id}&days=${days}`)
+      .then((r) => r.json())
+      .then((data: { asset_id: string; change_pct: number | null }[]) => {
+        const map: Record<string, number | null> = {};
+        for (const item of data) map[item.asset_id] = item.change_pct;
+        setRecentGains(map);
+      })
+      .catch(console.error)
+      .finally(() => setRecentGainsLoading(false));
+  }, [sortField, currentPortfolio]);
 
   // Close action menu on outside click
   useEffect(() => {
@@ -145,6 +163,16 @@ export default function CollectionPage() {
           valA = qtyA;
           valB = qtyB;
           break;
+        case "gain_7d":
+        case "gain_30d": {
+          const gA = recentGains[a.id];
+          const gB = recentGains[b.id];
+          // Assets with no snapshot data sort to the bottom
+          if (gA == null && gB == null) return 0;
+          if (gA == null) return 1;
+          if (gB == null) return -1;
+          return sortDir === "asc" ? gA - gB : gB - gA;
+        }
         case "purchase_price":
           valA = a.purchase_price * qtyA;
           valB = b.purchase_price * qtyB;
@@ -176,7 +204,7 @@ export default function CollectionPage() {
     });
 
     return result;
-  }, [assets, search, typeTab, sortField, sortDir]);
+  }, [assets, search, typeTab, sortField, sortDir, recentGains]);
 
   // Footer totals — active assets only (or sold tab uses sell prices)
   const footerAssets = typeTab === "sold"
@@ -330,6 +358,9 @@ export default function CollectionPage() {
         <div className="flex items-center gap-2">
           {/* Sort controls — always on mobile, also on desktop in grid view */}
           <div className={`flex items-center gap-2 ${view === "grid" ? "flex" : "flex md:hidden"}`}>
+            {recentGainsLoading && (
+              <span className="w-3 h-3 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+            )}
             <SlidersHorizontal className="w-4 h-4 text-text-muted" />
             <select
               value={sortField}
@@ -341,9 +372,11 @@ export default function CollectionPage() {
               <option value="set_name">Set</option>
               <option value="quantity">Quantity</option>
               <option value="purchase_price">Invested</option>
-              <option value="current_price">Value</option>
+              <option value="current_price">Market Price</option>
               <option value="profit">Profit/Loss</option>
               <option value="performance">Performance</option>
+              <option value="gain_7d">7-Day Gain</option>
+              <option value="gain_30d">30-Day Gain</option>
             </select>
             <button
               onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
