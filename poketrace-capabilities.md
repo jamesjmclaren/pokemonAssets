@@ -2,19 +2,26 @@
 
 **Base URL:** `https://api.poketrace.com/v1`  
 **Auth:** `X-API-Key` header (all endpoints except `/health`)  
-**API key:** https://poketrace.com/dashboard
+**API key:** https://poketrace.com/dashboard  
+**Active plan: Pro**
 
 ---
 
 ## Plans
 
-| Plan  | Daily Limit | Burst Rate          | Markets    | Graded Prices | Real-Time |
-|-------|-------------|---------------------|------------|---------------|-----------|
-| Free  | 250 req/day | 1 req / 2 sec       | US only    | Raw only      | No        |
-| Pro   | 10,000/day  | 30 req / 10 sec     | US + EU    | PSA, BGS, CGC | No        |
-| Scale | 100,000/day | 60 req / 10 sec     | US + EU    | All graders   | WebSocket |
+| Plan      | Daily Limit | Burst Rate          | Markets    | Graded Prices | Real-Time |
+|-----------|-------------|---------------------|------------|---------------|-----------|
+| Free      | 250 req/day | 1 req / 2 sec       | US only    | Raw only      | No        |
+| **Pro ✓** | **10,000/day** | **30 req / 10 sec** | **US + EU** | **PSA, BGS, CGC** | **No** |
+| Scale     | 100,000/day | 60 req / 10 sec     | US + EU    | All graders   | WebSocket |
 
 Limits reset at midnight UTC. Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `X-Plan`.
+
+### What Pro unlocks in this app
+- **EU market** — Cardmarket Price Trend (`cardmarket`) and active listings (`cardmarket_unsold`) with country/language breakdown
+- **Graded prices** — PSA, BGS, CGC tiers on eBay (graders like ACE, TAG, PCA, SFG, CGS require Scale)
+- **10,000 requests/day** — sufficient for scheduled price snapshots, cron jobs, and on-demand refreshes
+- WebSocket real-time updates are **not available** on Pro (Scale only)
 
 ---
 
