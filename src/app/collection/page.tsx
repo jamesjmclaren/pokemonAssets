@@ -27,7 +27,7 @@ import { usePortfolio } from "@/lib/portfolio-context";
 import { useFormatCurrency } from "@/lib/currency-context";
 import type { PortfolioAsset } from "@/types";
 
-type SortField = "name" | "purchase_price" | "current_price" | "profit" | "purchase_date" | "performance";
+type SortField = "name" | "set_name" | "purchase_price" | "current_price" | "profit" | "purchase_date" | "performance" | "quantity";
 type SortDir = "asc" | "desc";
 type ViewMode = "grid" | "table";
 type TypeTab = "all" | "raw" | "graded" | "sealed" | "sold";
@@ -137,6 +137,14 @@ export default function CollectionPage() {
           return sortDir === "asc"
             ? a.name.localeCompare(b.name)
             : b.name.localeCompare(a.name);
+        case "set_name":
+          return sortDir === "asc"
+            ? a.set_name.localeCompare(b.set_name)
+            : b.set_name.localeCompare(a.set_name);
+        case "quantity":
+          valA = qtyA;
+          valB = qtyB;
+          break;
         case "purchase_price":
           valA = a.purchase_price * qtyA;
           valB = b.purchase_price * qtyB;
@@ -320,8 +328,8 @@ export default function CollectionPage() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          {/* Sort (mobile only) */}
-          <div className="flex md:hidden items-center gap-2">
+          {/* Sort controls — always on mobile, also on desktop in grid view */}
+          <div className={`flex items-center gap-2 ${view === "grid" ? "flex" : "flex md:hidden"}`}>
             <SlidersHorizontal className="w-4 h-4 text-text-muted" />
             <select
               value={sortField}
@@ -330,6 +338,8 @@ export default function CollectionPage() {
             >
               <option value="purchase_date">Date Added</option>
               <option value="name">Name</option>
+              <option value="set_name">Set</option>
+              <option value="quantity">Quantity</option>
               <option value="purchase_price">Invested</option>
               <option value="current_price">Value</option>
               <option value="profit">Profit/Loss</option>
@@ -338,8 +348,9 @@ export default function CollectionPage() {
             <button
               onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
               className="p-2 bg-surface border border-border rounded-xl text-text-secondary hover:text-text-primary"
+              title={sortDir === "asc" ? "Ascending" : "Descending"}
             >
-              <ArrowUpDown className="w-4 h-4" />
+              {sortDir === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
           </div>
 
