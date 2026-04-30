@@ -18,6 +18,7 @@ import {
   Settings,
   Store,
   Bell,
+  BarChart2,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { usePortfolio, Portfolio } from "@/lib/portfolio-context";
@@ -31,6 +32,7 @@ const PLATFORM_ADMIN_EMAILS = [
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
   { href: "/collection", label: "Collection", icon: FolderOpen, adminOnly: false },
+  { href: "/set-trends", label: "Set Trends", icon: BarChart2, adminOnly: false },
   { href: "/marketplace", label: "Marketplace", icon: Store, adminOnly: false },
   { href: "/dashboard/add", label: "Search Asset", icon: Search, adminOnly: true },
   { href: "/dashboard/tracking", label: "Tracking", icon: Bell, adminOnly: false },
