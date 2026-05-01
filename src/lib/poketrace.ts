@@ -124,10 +124,15 @@ export async function fetchPoketraceCardsBySet(
     };
     if (cursor) params.cursor = cursor;
     if (opts.variant) params.variant = opts.variant;
-    const response: PoketraceSearchResponse = await apiFetch("/v1/cards", params);
-    const batch = response?.data || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response: any = await apiFetch("/v1/cards", params);
+    const batch: PoketraceCard[] = response?.data || [];
     all.push(...batch);
-    cursor = response?.hasMore ? response?.nextCursor : null;
+    // Poketrace nests pagination under `pagination` for both /sets and /cards
+    // — fall back to the top-level fields just in case.
+    const hasMore = response?.pagination?.hasMore ?? response?.hasMore;
+    const nextCursor = response?.pagination?.nextCursor ?? response?.nextCursor;
+    cursor = hasMore ? nextCursor : null;
     pages += 1;
   } while (cursor && pages < maxPages);
 
