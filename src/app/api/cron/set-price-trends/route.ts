@@ -33,6 +33,14 @@ const JUNK_NAME_PATTERN =
 // These are always processed regardless of what /sets returns.
 // Ordered newest-first so the most relevant sets are prioritised.
 const SUPPLEMENTAL_SETS: { slug: string; name: string }[] = [
+  // Newest first (2026 era)
+  { slug: "sv-scarlet-and-violet-ascended-heroes", name: "Ascended Heroes" },
+  { slug: "sv-scarlet-and-violet-mega-evolution", name: "Mega Evolution" },
+  { slug: "sv-scarlet-and-violet-white-flare", name: "White Flare" },
+  { slug: "sv-scarlet-and-violet-black-bolt", name: "Black Bolt" },
+  { slug: "sv-scarlet-and-violet-destined-rivals", name: "Destined Rivals" },
+  { slug: "sv-scarlet-and-violet-journey-together", name: "Journey Together" },
+  // 2025 era
   { slug: "sv-scarlet-and-violet-prismatic-evolutions", name: "Prismatic Evolutions" },
   { slug: "sv-scarlet-and-violet-surging-sparks", name: "Surging Sparks" },
   { slug: "sv-scarlet-and-violet-stellar-crown", name: "Stellar Crown" },
@@ -44,9 +52,6 @@ const SUPPLEMENTAL_SETS: { slug: string; name: string }[] = [
   { slug: "sv-scarlet-and-violet-obsidian-flames", name: "Obsidian Flames" },
   { slug: "sv-scarlet-and-violet-paldea-evolved", name: "Paldea Evolved" },
   { slug: "sv-scarlet-and-violet-base-set", name: "Scarlet & Violet Base Set" },
-  { slug: "sv-scarlet-and-violet-journey-together", name: "Journey Together" },
-  { slug: "sv-scarlet-and-violet-destined-rivals", name: "Destined Rivals" },
-  { slug: "sv-scarlet-and-violet-black-bolt", name: "Black Bolt & White Flare" },
 ];
 
 function computeTrendCard(card: PoketraceCard, tier: string, period: "1d" | "7d"): TrendCard | null {

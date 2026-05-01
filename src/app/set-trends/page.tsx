@@ -54,6 +54,12 @@ export default function SetTrendsPage() {
         // Long-form slugs first (what the cron inserts for modern SV sets),
         // then the short-form aliases as fallback in case Poketrace fixes them.
         const PREFERRED_SLUGS = [
+          "sv-scarlet-and-violet-ascended-heroes",
+          "sv-scarlet-and-violet-mega-evolution",
+          "sv-scarlet-and-violet-white-flare",
+          "sv-scarlet-and-violet-black-bolt",
+          "sv-scarlet-and-violet-destined-rivals",
+          "sv-scarlet-and-violet-journey-together",
           "sv-scarlet-and-violet-prismatic-evolutions",
           "sv-scarlet-and-violet-surging-sparks",
           "sv-scarlet-and-violet-stellar-crown",
@@ -62,13 +68,6 @@ export default function SetTrendsPage() {
           "sv-scarlet-and-violet-paldean-fates",
           "sv-scarlet-and-violet-paradox-rift",
           "sv-scarlet-and-violet-151",
-          "prismatic-evolutions",
-          "surging-sparks",
-          "stellar-crown",
-          "twilight-masquerade",
-          "temporal-forces",
-          "paldean-fates",
-          "paradox-rift",
         ];
         // Preserve the user's selection if it's still in the new list,
         // otherwise pick a sensible default.
