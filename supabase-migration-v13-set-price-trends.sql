@@ -2,6 +2,13 @@
 -- Stores nightly snapshots of the top N cards per set, per tier (raw NM and PSA 10),
 -- per trend period (1d and 7d). The /api/set-trends route reads from this table
 -- first and falls back to a live Poketrace fetch when no fresh row exists.
+--
+-- Run order:
+--   1. CREATE TABLE + INDEX below
+--   2. ALTER TABLE ... ENABLE ROW LEVEL SECURITY
+--   3. CREATE POLICY "Public read access" (below)
+--   4. Cron writes use the service-role key (see src/lib/supabase-admin.ts),
+--      which bypasses RLS — no INSERT policy needed.
 
 CREATE TABLE IF NOT EXISTS set_price_trends (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -24,10 +31,12 @@ CREATE TABLE IF NOT EXISTS set_price_trends (
   recorded_at   timestamptz NOT NULL DEFAULT now()
 );
 
--- Fast lookups: latest snapshot for a set + period + tier
 CREATE INDEX IF NOT EXISTS idx_set_price_trends_lookup
   ON set_price_trends (set_slug, period, tier_type, recorded_at DESC);
 
--- Allow the API route to quickly find today's rows
-CREATE INDEX IF NOT EXISTS idx_set_price_trends_date
-  ON set_price_trends (set_slug, (recorded_at::date));
+ALTER TABLE set_price_trends ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read access"
+  ON set_price_trends
+  FOR SELECT
+  USING (true);
