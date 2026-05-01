@@ -168,7 +168,11 @@ export async function GET(request: NextRequest) {
 
   let cards: PoketraceCard[];
   try {
-    cards = await fetchPoketraceCardsBySet(setSlug, "US", { pageSize: 100, maxPages: 6 });
+    // Poketrace API caps `limit` at 20 per page. Use 20 explicitly and bump
+    // maxPages so we cover sets with secret rares numbered well above the
+    // printed card count (e.g. #294/217). 20 pages × 20 = 400 cards max.
+    cards = await fetchPoketraceCardsBySet(setSlug, "US", { pageSize: 20, maxPages: 20 });
+    console.log(`[set-trends] Fetched ${cards.length} cards for set "${setSlug}"`);
   } catch (err) {
     console.error("[set-trends] fetchPoketraceCardsBySet failed:", err);
     return NextResponse.json({ error: "Failed to fetch set cards" }, { status: 502 });

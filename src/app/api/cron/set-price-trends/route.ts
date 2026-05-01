@@ -51,12 +51,14 @@ async function processSet(
 ): Promise<{ inserted: number; skipped: number }> {
   let cards: PoketraceCard[];
   try {
-    cards = await fetchPoketraceCardsBySet(setSlug, "US", { pageSize: 100, maxPages: 6 });
+    // Poketrace API caps `limit` at 20. Use 20 pages × 20 = 400 cards max.
+    cards = await fetchPoketraceCardsBySet(setSlug, "US", { pageSize: 20, maxPages: 20 });
   } catch (err) {
     console.warn(`[cron/set-price-trends] Failed to fetch cards for "${setSlug}":`, err);
     return { inserted: 0, skipped: 1 };
   }
 
+  console.log(`[cron/set-price-trends]   ${setSlug}: ${cards.length} cards fetched`);
   if (cards.length === 0) return { inserted: 0, skipped: 1 };
 
   const periods: Array<"1d" | "7d"> = ["1d", "7d"];
