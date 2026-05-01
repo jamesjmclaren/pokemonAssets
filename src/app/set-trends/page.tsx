@@ -130,7 +130,7 @@ export default function SetTrendsPage() {
 
         {/* Refresh */}
         <button
-          onClick={() => selectedSet && fetchTrends(selectedSet, period)}
+          onClick={() => selectedSet && fetchTrends(selectedSet, period, selectedRarities)}
           disabled={loading || !selectedSet}
           className="self-start sm:self-auto flex items-center gap-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-40"
         >
