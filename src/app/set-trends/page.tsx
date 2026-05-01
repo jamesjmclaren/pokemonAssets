@@ -51,7 +51,17 @@ export default function SetTrendsPage() {
         // Prefer a recognisable English flagship set as the default landing
         // experience. Fall back to the first non-promo set, then the first
         // available set.
+        // Long-form slugs first (what the cron inserts for modern SV sets),
+        // then the short-form aliases as fallback in case Poketrace fixes them.
         const PREFERRED_SLUGS = [
+          "sv-scarlet-and-violet-prismatic-evolutions",
+          "sv-scarlet-and-violet-surging-sparks",
+          "sv-scarlet-and-violet-stellar-crown",
+          "sv-scarlet-and-violet-twilight-masquerade",
+          "sv-scarlet-and-violet-temporal-forces",
+          "sv-scarlet-and-violet-paldean-fates",
+          "sv-scarlet-and-violet-paradox-rift",
+          "sv-scarlet-and-violet-151",
           "prismatic-evolutions",
           "surging-sparks",
           "stellar-crown",

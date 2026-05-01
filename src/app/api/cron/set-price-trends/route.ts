@@ -28,6 +28,27 @@ const MIN_CARDS_FOR_INSERT = 8;
 const JUNK_NAME_PATTERN =
   /\b(japanese|additionals?|commemorat|promo card pack|movie commemoration|battle academy|battle strength deck|battle starter deck|half deck|trainer kit|deck kit|gift box|burger king|theme deck)\b/i;
 
+// Modern English flagship sets that Poketrace indexes under long-form
+// "sv-scarlet-and-violet-{name}" slugs not surfaced by the /sets catalogue.
+// These are always processed regardless of what /sets returns.
+// Ordered newest-first so the most relevant sets are prioritised.
+const SUPPLEMENTAL_SETS: { slug: string; name: string }[] = [
+  { slug: "sv-scarlet-and-violet-prismatic-evolutions", name: "Prismatic Evolutions" },
+  { slug: "sv-scarlet-and-violet-surging-sparks", name: "Surging Sparks" },
+  { slug: "sv-scarlet-and-violet-stellar-crown", name: "Stellar Crown" },
+  { slug: "sv-scarlet-and-violet-shrouded-fable", name: "Shrouded Fable" },
+  { slug: "sv-scarlet-and-violet-twilight-masquerade", name: "Twilight Masquerade" },
+  { slug: "sv-scarlet-and-violet-temporal-forces", name: "Temporal Forces" },
+  { slug: "sv-scarlet-and-violet-paldean-fates", name: "Paldean Fates" },
+  { slug: "sv-scarlet-and-violet-paradox-rift", name: "Paradox Rift" },
+  { slug: "sv-scarlet-and-violet-obsidian-flames", name: "Obsidian Flames" },
+  { slug: "sv-scarlet-and-violet-paldea-evolved", name: "Paldea Evolved" },
+  { slug: "sv-scarlet-and-violet-base-set", name: "Scarlet & Violet Base Set" },
+  { slug: "sv-scarlet-and-violet-journey-together", name: "Journey Together" },
+  { slug: "sv-scarlet-and-violet-destined-rivals", name: "Destined Rivals" },
+  { slug: "sv-scarlet-and-violet-black-bolt", name: "Black Bolt & White Flare" },
+];
+
 function computeTrendCard(card: PoketraceCard, tier: string, period: "1d" | "7d"): TrendCard | null {
   const tierData = getPoketraceTier(card, tier);
   if (!tierData) return null;
@@ -215,9 +236,16 @@ export async function GET(request: NextRequest) {
       console.error("[cron/set-price-trends] Failed to fetch set list:", err);
       return NextResponse.json({ error: "Failed to fetch sets" }, { status: 502 });
     }
+
+    // Merge supplemental sets first (they take priority) then append catalogue
+    // slugs that aren't already covered. This ensures modern flagship sets are
+    // always attempted even if the /sets catalogue only exposes broken aliases.
+    const seenSlugs = new Set(SUPPLEMENTAL_SETS.map((s) => s.slug));
+    const catalogueOnly = setsToProcess.filter((s) => !seenSlugs.has(s.slug));
+    setsToProcess = [...SUPPLEMENTAL_SETS, ...catalogueOnly];
   }
 
-  console.log(`[cron/set-price-trends] Processing ${setsToProcess.length} sets`);
+  console.log(`[cron/set-price-trends] Processing ${setsToProcess.length} sets (${SUPPLEMENTAL_SETS.length} supplemental + catalogue)`);
 
   // Process 5 sets concurrently to respect the 30 req/10 sec burst limit.
   const results = await processBatch(setsToProcess, 5, async ({ slug, name }) => {
