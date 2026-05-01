@@ -8,11 +8,15 @@ import {
 } from "@/lib/poketrace";
 import type { TrendCard } from "@/app/api/set-trends/route";
 
-// How many sets to process per run. Adjust down if the cron hits the
-// 10,000 req/day Pro limit on days with many other operations.
-const MAX_SETS = 30;
+// Default ceiling on sets per run. Pro plan is 10k req/day; ~150 sets ×
+// ~11 pages ≈ 1,650 requests, well within budget. Override with
+// ?max=N if you need to throttle.
+const DEFAULT_MAX_SETS = 250;
 // Top N cards to store per tier per period per set.
 const TOP_N = 10;
+// Minimum cards-with-prices to keep a set's results. Below this we skip
+// the insert entirely so the dropdown stays clean.
+const MIN_CARDS_FOR_INSERT = 3;
 
 function computeTrendCard(card: PoketraceCard, tier: string, period: "1d" | "7d"): TrendCard | null {
   const tierData = getPoketraceTier(card, tier);
@@ -68,6 +72,19 @@ async function processSet(
   ];
 
   const rows: Record<string, unknown>[] = [];
+
+  // Quick check: if there aren't enough cards with NM or PSA_10 prices,
+  // don't bother inserting — it'll just clutter the dropdown.
+  let rawWithPrice = 0;
+  let psa10WithPrice = 0;
+  for (const card of cards) {
+    if (computeTrendCard(card, "NEAR_MINT", "7d")) rawWithPrice++;
+    if (computeTrendCard(card, "PSA_10", "7d")) psa10WithPrice++;
+  }
+  if (rawWithPrice < MIN_CARDS_FOR_INSERT && psa10WithPrice < MIN_CARDS_FOR_INSERT) {
+    console.log(`[cron/set-price-trends]   ${setSlug}: skipping (raw=${rawWithPrice}, psa10=${psa10WithPrice} below threshold)`);
+    return { inserted: 0, skipped: 1 };
+  }
 
   for (const period of periods) {
     for (const { key, tierType } of tierDefs) {
@@ -134,6 +151,8 @@ export async function GET(request: NextRequest) {
   // Allow caller to supply a comma-separated override list of set slugs,
   // otherwise default to the most recently released sets.
   const slugOverride = request.nextUrl.searchParams.get("sets");
+  const maxOverride = Number(request.nextUrl.searchParams.get("max") ?? "");
+  const maxSets = Number.isFinite(maxOverride) && maxOverride > 0 ? maxOverride : DEFAULT_MAX_SETS;
   let setsToProcess: { slug: string; name: string }[];
 
   if (slugOverride) {
@@ -141,7 +160,7 @@ export async function GET(request: NextRequest) {
   } else {
     try {
       const allSets = await getPoketraceSets("releaseDate", "desc");
-      setsToProcess = allSets.slice(0, MAX_SETS).map((s) => ({ slug: s.id, name: s.name }));
+      setsToProcess = allSets.slice(0, maxSets).map((s) => ({ slug: s.id, name: s.name }));
     } catch (err) {
       console.error("[cron/set-price-trends] Failed to fetch set list:", err);
       return NextResponse.json({ error: "Failed to fetch sets" }, { status: 502 });

@@ -27,6 +27,7 @@ export default function SetTrendsPage() {
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [setQuery, setSetQuery] = useState("");
+  const [showAllSets, setShowAllSets] = useState(false);
 
   const [selectedRarities, setSelectedRarities] = useState<string[]>([]);
 
@@ -35,11 +36,13 @@ export default function SetTrendsPage() {
     setSelectedRarities([]);
   }, [selectedSet]);
 
-  // Load set list once on mount
+  // Load set list whenever the data-only filter toggle changes
   useEffect(() => {
     async function loadSets() {
+      setSetsLoading(true);
       try {
-        const res = await fetch("/api/sets");
+        const url = showAllSets ? "/api/sets" : "/api/sets?onlyWithData=true";
+        const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load sets");
         const json = await res.json();
         const list: SetOption[] = Array.isArray(json) ? json : json.sets ?? [];
@@ -57,14 +60,19 @@ export default function SetTrendsPage() {
           "paldean-fates",
           "paradox-rift",
         ];
-        const preferred = PREFERRED_SLUGS.map((s) => list.find((l) => l.id === s)).find(Boolean);
-        const firstNonPromo = list.find(
-          (l) =>
-            !/promo|commemoration|movie/i.test(l.name) &&
-            !/japanese/i.test(l.name)
-        );
-        const defaultSet = preferred ?? firstNonPromo ?? list[0];
-        if (defaultSet) setSelectedSet(defaultSet.id);
+        // Preserve the user's selection if it's still in the new list,
+        // otherwise pick a sensible default.
+        setSelectedSet((current) => {
+          if (current && list.some((l) => l.id === current)) return current;
+          const preferred = PREFERRED_SLUGS.map((s) => list.find((l) => l.id === s)).find(Boolean);
+          const firstNonPromo = list.find(
+            (l) =>
+              !/promo|commemoration|movie/i.test(l.name) &&
+              !/japanese/i.test(l.name)
+          );
+          const defaultSet = preferred ?? firstNonPromo ?? list[0];
+          return defaultSet?.id ?? "";
+        });
       } catch {
         setSetsLoading(false);
       } finally {
@@ -72,7 +80,7 @@ export default function SetTrendsPage() {
       }
     }
     loadSets();
-  }, []);
+  }, [showAllSets]);
 
   const fetchTrends = useCallback(async (setSlug: string, p: Period, rarities: string[]) => {
     if (!setSlug) return;
@@ -163,7 +171,7 @@ export default function SetTrendsPage() {
               : sets;
             return (
               <div className="absolute z-20 top-full mt-1 w-full bg-surface-elevated border border-border rounded-xl shadow-xl overflow-hidden">
-                <div className="p-2 border-b border-border">
+                <div className="p-2 border-b border-border space-y-2">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
                     <input
@@ -175,6 +183,15 @@ export default function SetTrendsPage() {
                       className="w-full bg-surface border border-border focus:border-accent rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors"
                     />
                   </div>
+                  <label className="flex items-center gap-2 px-1 text-xs text-text-muted cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showAllSets}
+                      onChange={(e) => setShowAllSets(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-accent cursor-pointer"
+                    />
+                    <span>Show all sets (including ones without trend data)</span>
+                  </label>
                 </div>
                 <div className="max-h-72 overflow-y-auto">
                   {filtered.length === 0 ? (
