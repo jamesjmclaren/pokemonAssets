@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { TrendingUp, ChevronDown, RefreshCw, AlertCircle } from "lucide-react";
+import { TrendingUp, ChevronDown, RefreshCw, AlertCircle, Search } from "lucide-react";
 import { clsx } from "clsx";
 import SetTrendsList from "@/components/SetTrendsList";
 import type { SetTrendsResponse } from "@/app/api/set-trends/route";
@@ -26,6 +26,7 @@ export default function SetTrendsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [setQuery, setSetQuery] = useState("");
 
   // Load set list once on mount
   useEffect(() => {
@@ -139,30 +140,58 @@ export default function SetTrendsPage() {
             <ChevronDown className={clsx("w-4 h-4 text-text-muted shrink-0 transition-transform", dropdownOpen && "rotate-180")} />
           </button>
 
-          {dropdownOpen && sets.length > 0 && (
-            <div className="absolute z-20 top-full mt-1 w-full bg-surface-elevated border border-border rounded-xl shadow-xl overflow-hidden">
-              <div className="max-h-72 overflow-y-auto">
-                {sets.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => {
-                      setSelectedSet(s.id);
-                      setDropdownOpen(false);
-                    }}
-                    className={clsx(
-                      "w-full text-left px-4 py-2.5 text-sm hover:bg-surface-hover transition-colors",
-                      s.id === selectedSet ? "text-accent font-medium" : "text-text-primary"
-                    )}
-                  >
-                    {s.name}
-                    {s.releaseDate && (
-                      <span className="text-text-muted ml-2 text-xs">{s.releaseDate.slice(0, 4)}</span>
-                    )}
-                  </button>
-                ))}
+          {dropdownOpen && sets.length > 0 && (() => {
+            const q = setQuery.trim().toLowerCase();
+            const filtered = q
+              ? sets.filter(
+                  (s) => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q)
+                )
+              : sets;
+            return (
+              <div className="absolute z-20 top-full mt-1 w-full bg-surface-elevated border border-border rounded-xl shadow-xl overflow-hidden">
+                <div className="p-2 border-b border-border">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+                    <input
+                      autoFocus
+                      type="text"
+                      value={setQuery}
+                      onChange={(e) => setSetQuery(e.target.value)}
+                      placeholder="Search sets…"
+                      className="w-full bg-surface border border-border focus:border-accent rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+                <div className="max-h-72 overflow-y-auto">
+                  {filtered.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-sm text-text-muted">
+                      No sets match &ldquo;{setQuery}&rdquo;
+                    </div>
+                  ) : (
+                    filtered.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => {
+                          setSelectedSet(s.id);
+                          setDropdownOpen(false);
+                          setSetQuery("");
+                        }}
+                        className={clsx(
+                          "w-full text-left px-4 py-2.5 text-sm hover:bg-surface-hover transition-colors",
+                          s.id === selectedSet ? "text-accent font-medium" : "text-text-primary"
+                        )}
+                      >
+                        {s.name}
+                        {s.releaseDate && (
+                          <span className="text-text-muted ml-2 text-xs">{s.releaseDate.slice(0, 4)}</span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Period toggle */}
@@ -186,7 +215,13 @@ export default function SetTrendsPage() {
 
       {/* Close dropdown on outside click */}
       {dropdownOpen && (
-        <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
+        <div
+          className="fixed inset-0 z-10"
+          onClick={() => {
+            setDropdownOpen(false);
+            setSetQuery("");
+          }}
+        />
       )}
 
       {/* Error state */}
