@@ -28,6 +28,13 @@ export default function SetTrendsPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [setQuery, setSetQuery] = useState("");
 
+  const [selectedRarities, setSelectedRarities] = useState<string[]>([]);
+
+  // Reset rarity filter when set changes — the available rarity list will differ.
+  useEffect(() => {
+    setSelectedRarities([]);
+  }, [selectedSet]);
+
   // Load set list once on mount
   useEffect(() => {
     async function loadSets() {
@@ -67,12 +74,18 @@ export default function SetTrendsPage() {
     loadSets();
   }, []);
 
-  const fetchTrends = useCallback(async (setSlug: string, p: Period) => {
+  const fetchTrends = useCallback(async (setSlug: string, p: Period, rarities: string[]) => {
     if (!setSlug) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/set-trends?set=${encodeURIComponent(setSlug)}&period=${p}&limit=10`);
+      const params = new URLSearchParams({
+        set: setSlug,
+        period: p,
+        limit: "10",
+      });
+      if (rarities.length > 0) params.set("rarities", rarities.join(","));
+      const res = await fetch(`/api/set-trends?${params.toString()}`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? "Failed to load trends");
@@ -80,16 +93,17 @@ export default function SetTrendsPage() {
       const json: SetTrendsResponse = await res.json();
       setData(json);
     } catch (err) {
+      setData(null);
       setError(err instanceof Error ? err.message : "Failed to load trends");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Fetch whenever selected set or period changes
+  // Fetch whenever selected set, period, or rarity filter changes
   useEffect(() => {
-    if (selectedSet) fetchTrends(selectedSet, period);
-  }, [selectedSet, period, fetchTrends]);
+    if (selectedSet) fetchTrends(selectedSet, period, selectedRarities);
+  }, [selectedSet, period, selectedRarities, fetchTrends]);
 
   const selectedSetName = sets.find((s) => s.id === selectedSet)?.name ?? selectedSet;
 
@@ -212,6 +226,45 @@ export default function SetTrendsPage() {
           ))}
         </div>
       </div>
+
+      {/* Rarity filter pills */}
+      {data && data.availableRarities.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-text-muted mr-1">Rarity:</span>
+          <button
+            onClick={() => setSelectedRarities([])}
+            className={clsx(
+              "px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
+              selectedRarities.length === 0
+                ? "bg-accent text-surface border-accent"
+                : "bg-surface text-text-muted border-border hover:border-border-hover hover:text-text-primary"
+            )}
+          >
+            All
+          </button>
+          {data.availableRarities.map((r) => {
+            const active = selectedRarities.includes(r);
+            return (
+              <button
+                key={r}
+                onClick={() => {
+                  setSelectedRarities((prev) =>
+                    prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]
+                  );
+                }}
+                className={clsx(
+                  "px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
+                  active
+                    ? "bg-accent text-surface border-accent"
+                    : "bg-surface text-text-secondary border-border hover:border-border-hover hover:text-text-primary"
+                )}
+              >
+                {r}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Close dropdown on outside click */}
       {dropdownOpen && (

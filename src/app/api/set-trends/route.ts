@@ -28,6 +28,8 @@ export interface SetTrendsResponse {
   period: "1d" | "7d";
   raw: TrendCard[];
   psa10: TrendCard[];
+  availableRarities: string[];
+  appliedRarities: string[];
   fromCache: boolean;
   fetchedAt: string;
 }
@@ -62,15 +64,26 @@ function computeTrendCard(card: PoketraceCard, tier: string, period: "1d" | "7d"
 function topN(cards: TrendCard[], n: number): TrendCard[] {
   return cards
     .sort((a, b) => b.currentPrice - a.currentPrice)
-    .slice(0, n)
-    .map((c, i) => ({ ...c, rank: i + 1 } as TrendCard & { rank: number }));
+    .slice(0, n);
+}
+
+function normaliseRarity(r: string | null | undefined): string | null {
+  if (!r) return null;
+  const trimmed = r.trim();
+  if (!trimmed || trimmed.toLowerCase() === "none") return null;
+  return trimmed;
 }
 
 async function fromCache(
   setSlug: string,
   period: "1d" | "7d",
   limit: number
-): Promise<{ raw: TrendCard[]; psa10: TrendCard[]; setName: string } | null> {
+): Promise<{
+  raw: TrendCard[];
+  psa10: TrendCard[];
+  setName: string;
+  availableRarities: string[];
+} | null> {
   const today = new Date().toISOString().split("T")[0];
 
   const { data, error } = await supabase
@@ -81,7 +94,7 @@ async function fromCache(
     .gte("recorded_at", `${today}T00:00:00.000Z`)
     .order("tier_type")
     .order("rank")
-    .limit(limit * 2 * 2); // raw + psa10, 2× safety margin
+    .limit(limit * 2 * 2);
 
   if (error || !data || data.length === 0) return null;
 
@@ -91,7 +104,7 @@ async function fromCache(
     id: row.card_id as string,
     name: row.card_name as string,
     cardNumber: (row.card_number as string) ?? null,
-    rarity: (row.rarity as string) ?? null,
+    rarity: normaliseRarity(row.rarity as string),
     image: (row.card_image as string) ?? null,
     currentPrice: Number(row.current_price),
     prevPrice: row.prev_price != null ? Number(row.prev_price) : null,
@@ -106,7 +119,11 @@ async function fromCache(
 
   if (raw.length === 0 && psa10.length === 0) return null;
 
-  return { raw, psa10, setName };
+  const availableRarities = Array.from(
+    new Set([...raw, ...psa10].map((c) => c.rarity).filter((r): r is string => !!r))
+  ).sort();
+
+  return { raw, psa10, setName, availableRarities };
 }
 
 export async function GET(request: NextRequest) {
@@ -114,6 +131,13 @@ export async function GET(request: NextRequest) {
   const setSlug = searchParams.get("set");
   const period = (searchParams.get("period") ?? "7d") as "1d" | "7d";
   const limit = Math.min(Number(searchParams.get("limit") ?? "10"), 25);
+  const rarityParam = searchParams.get("rarities") ?? "";
+  const appliedRarities = rarityParam
+    .split(",")
+    .map((r) => r.trim())
+    .filter(Boolean);
+  const hasRarityFilter = appliedRarities.length > 0;
+  const rarityFilterSet = new Set(appliedRarities.map((r) => r.toLowerCase()));
 
   if (!setSlug) {
     return NextResponse.json({ error: "set parameter is required" }, { status: 400 });
@@ -122,21 +146,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "period must be 1d or 7d" }, { status: 400 });
   }
 
-  // Try cache first
-  const cached = await fromCache(setSlug, period, limit);
-  if (cached) {
-    const response: SetTrendsResponse = {
-      set: { slug: setSlug, name: cached.setName },
-      period,
-      raw: cached.raw,
-      psa10: cached.psa10,
-      fromCache: true,
-      fetchedAt: new Date().toISOString(),
-    };
-    return NextResponse.json(response);
+  // Cache only covers the unfiltered ranking. When a rarity filter is applied,
+  // skip cache and fall through to a live fetch so we can rank within the
+  // filtered subset rather than just filtering pre-ranked top-10s.
+  if (!hasRarityFilter) {
+    const cached = await fromCache(setSlug, period, limit);
+    if (cached) {
+      const response: SetTrendsResponse = {
+        set: { slug: setSlug, name: cached.setName },
+        period,
+        raw: cached.raw,
+        psa10: cached.psa10,
+        availableRarities: cached.availableRarities,
+        appliedRarities: [],
+        fromCache: true,
+        fetchedAt: new Date().toISOString(),
+      };
+      return NextResponse.json(response);
+    }
   }
 
-  // Live fetch from Poketrace
   let cards: PoketraceCard[];
   try {
     cards = await fetchPoketraceCardsBySet(setSlug, "US", { pageSize: 100, maxPages: 6 });
@@ -151,15 +180,34 @@ export async function GET(request: NextRequest) {
 
   const setName = cards[0]?.set?.name ?? setSlug;
 
+  // Collect all rarities from the full set so the UI can offer a filter list.
+  const availableRarities = Array.from(
+    new Set(cards.map((c) => normaliseRarity(c.rarity)).filter((r): r is string => !!r))
+  ).sort();
+
+  // Filter cards by rarity (if applied) before ranking.
+  const filteredCards = hasRarityFilter
+    ? cards.filter((c) => {
+        const r = normaliseRarity(c.rarity);
+        return r ? rarityFilterSet.has(r.toLowerCase()) : false;
+      })
+    : cards;
+
   const rawCards: TrendCard[] = [];
   const psa10Cards: TrendCard[] = [];
 
-  for (const card of cards) {
+  for (const card of filteredCards) {
     const rawEntry = computeTrendCard(card, "NEAR_MINT", period);
-    if (rawEntry) rawCards.push(rawEntry);
+    if (rawEntry) {
+      rawEntry.rarity = normaliseRarity(rawEntry.rarity);
+      rawCards.push(rawEntry);
+    }
 
     const psa10Entry = computeTrendCard(card, "PSA_10", period);
-    if (psa10Entry) psa10Cards.push(psa10Entry);
+    if (psa10Entry) {
+      psa10Entry.rarity = normaliseRarity(psa10Entry.rarity);
+      psa10Cards.push(psa10Entry);
+    }
   }
 
   const response: SetTrendsResponse = {
@@ -167,6 +215,8 @@ export async function GET(request: NextRequest) {
     period,
     raw: topN(rawCards, limit),
     psa10: topN(psa10Cards, limit),
+    availableRarities,
+    appliedRarities,
     fromCache: false,
     fetchedAt: new Date().toISOString(),
   };
