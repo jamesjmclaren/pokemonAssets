@@ -8,10 +8,14 @@ import {
 } from "@/lib/poketrace";
 import type { TrendCard } from "@/app/api/set-trends/route";
 
-// Default ceiling on sets per run. Pro plan is 10k req/day; ~150 sets ×
-// ~11 pages ≈ 1,650 requests, well within budget. Override with
-// ?max=N if you need to throttle.
-const DEFAULT_MAX_SETS = 250;
+// Default ceiling on sets per run. Poketrace's /sets endpoint returns
+// many legacy / parent-category slugs that 404 or return 0 cards on
+// /cards — those failures are cheap (1 request each), and we need to
+// process the whole catalogue to find the modern English flagship
+// slugs (which Poketrace prefixes e.g. "sv-scarlet-and-violet-151"
+// rather than just "151"). Pro budget = 10k req/day; an all-sets run
+// on a fresh catalogue is ~2,500 req. Override with ?max=N to throttle.
+const DEFAULT_MAX_SETS = 2000;
 // Top N cards to store per tier per period per set.
 const TOP_N = 10;
 // Minimum cards-with-prices to keep a set's results. Below this we skip
@@ -19,8 +23,10 @@ const TOP_N = 10;
 const MIN_CARDS_FOR_INSERT = 8;
 
 // Set name patterns that almost always indicate junk data (Japanese-only
-// addendums, promo dumps, etc). We skip these regardless of card count.
-const JUNK_NAME_PATTERN = /\b(japanese|additionals?|commemorat|promo card pack|movie commemoration|battle academy)\b/i;
+// addendums, deck kit fragments, promo dumps, etc). We skip these
+// regardless of card count.
+const JUNK_NAME_PATTERN =
+  /\b(japanese|additionals?|commemorat|promo card pack|movie commemoration|battle academy|battle strength deck|battle starter deck|half deck|trainer kit|deck kit|gift box|burger king|theme deck)\b/i;
 
 function computeTrendCard(card: PoketraceCard, tier: string, period: "1d" | "7d"): TrendCard | null {
   const tierData = getPoketraceTier(card, tier);
