@@ -8,7 +8,9 @@ interface TrendBadgeProps {
 }
 
 export default function TrendBadge({ absChange, pctChange, size = "md" }: TrendBadgeProps) {
-  if (absChange == null || pctChange == null) {
+  const isFlat = pctChange != null && Math.abs(pctChange) < 0.05;
+
+  if (absChange == null || pctChange == null || isFlat) {
     return (
       <span className={clsx(
         "inline-flex items-center gap-1 text-text-muted",
@@ -21,19 +23,6 @@ export default function TrendBadge({ absChange, pctChange, size = "md" }: TrendB
   }
 
   const isUp = absChange >= 0;
-  const isFlat = Math.abs(pctChange) < 0.05;
-
-  if (isFlat) {
-    return (
-      <span className={clsx(
-        "inline-flex items-center gap-1 text-text-muted",
-        size === "sm" ? "text-xs" : "text-sm"
-      )}>
-        <Minus className={size === "sm" ? "w-3 h-3" : "w-4 h-4"} />
-        <span>0.0%</span>
-      </span>
-    );
-  }
 
   return (
     <span className={clsx(

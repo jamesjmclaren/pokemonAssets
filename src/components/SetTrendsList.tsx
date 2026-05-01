@@ -96,11 +96,13 @@ export default function SetTrendsList({
                 <p className="text-sm font-medium text-text-primary truncate leading-tight">
                   {card.name}
                 </p>
-                <p className="text-xs text-text-muted mt-0.5">
-                  {[card.cardNumber && `#${card.cardNumber}`, card.rarity]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
+                {(() => {
+                  const rarity = card.rarity && card.rarity !== "None" ? card.rarity : null;
+                  const meta = [card.cardNumber && `#${card.cardNumber}`, rarity].filter(Boolean);
+                  return meta.length > 0 ? (
+                    <p className="text-xs text-text-muted mt-0.5">{meta.join(" · ")}</p>
+                  ) : null;
+                })()}
               </div>
 
               {/* Price + trend */}

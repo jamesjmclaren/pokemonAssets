@@ -36,7 +36,27 @@ export default function SetTrendsPage() {
         const json = await res.json();
         const list: SetOption[] = Array.isArray(json) ? json : json.sets ?? [];
         setSets(list);
-        if (list.length > 0) setSelectedSet(list[0].id);
+
+        // Prefer a recognisable English flagship set as the default landing
+        // experience. Fall back to the first non-promo set, then the first
+        // available set.
+        const PREFERRED_SLUGS = [
+          "prismatic-evolutions",
+          "surging-sparks",
+          "stellar-crown",
+          "twilight-masquerade",
+          "temporal-forces",
+          "paldean-fates",
+          "paradox-rift",
+        ];
+        const preferred = PREFERRED_SLUGS.map((s) => list.find((l) => l.id === s)).find(Boolean);
+        const firstNonPromo = list.find(
+          (l) =>
+            !/promo|commemoration|movie/i.test(l.name) &&
+            !/japanese/i.test(l.name)
+        );
+        const defaultSet = preferred ?? firstNonPromo ?? list[0];
+        if (defaultSet) setSelectedSet(defaultSet.id);
       } catch {
         setSetsLoading(false);
       } finally {
