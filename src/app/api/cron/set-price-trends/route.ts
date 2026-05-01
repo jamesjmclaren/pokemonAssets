@@ -16,7 +16,11 @@ const DEFAULT_MAX_SETS = 250;
 const TOP_N = 10;
 // Minimum cards-with-prices to keep a set's results. Below this we skip
 // the insert entirely so the dropdown stays clean.
-const MIN_CARDS_FOR_INSERT = 3;
+const MIN_CARDS_FOR_INSERT = 8;
+
+// Set name patterns that almost always indicate junk data (Japanese-only
+// addendums, promo dumps, etc). We skip these regardless of card count.
+const JUNK_NAME_PATTERN = /\b(japanese|additionals?|commemorat|promo card pack|movie commemoration|battle academy)\b/i;
 
 function computeTrendCard(card: PoketraceCard, tier: string, period: "1d" | "7d"): TrendCard | null {
   const tierData = getPoketraceTier(card, tier);
@@ -69,6 +73,18 @@ async function processSet(setSlug: string, setName: string): Promise<SetResult> 
     psa10_with_price: 0,
     rows_inserted: 0,
   };
+
+  // Always remove the set's stale rows first. This ensures sets that no
+  // longer pass the threshold (e.g. after raising MIN_CARDS_FOR_INSERT)
+  // disappear from the dropdown immediately.
+  await supabase.from("set_price_trends").delete().eq("set_slug", setSlug);
+
+  // Quick name-based skip for known junk patterns.
+  if (JUNK_NAME_PATTERN.test(setName)) {
+    console.log(`[cron/set-price-trends]   ${setSlug}: skipping (junk name pattern)`);
+    result.status = "below_threshold";
+    return result;
+  }
 
   let cards: PoketraceCard[];
   try {

@@ -86,6 +86,7 @@ export default function SetTrendsPage() {
     if (!setSlug) return;
     setLoading(true);
     setError(null);
+    setData(null); // clear stale data immediately so we never show prior set's results
     try {
       const params = new URLSearchParams({
         set: setSlug,

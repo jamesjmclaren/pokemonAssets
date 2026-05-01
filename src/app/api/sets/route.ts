@@ -18,10 +18,13 @@ export async function GET(request: NextRequest) {
     // Filter to only sets present in set_price_trends — i.e. sets the cron
     // found real card data for. This keeps the dropdown free of niche
     // Japanese promos and other Poketrace-incomplete sets.
+    // Only treat sets as "with data" if they have rows from the last 2 days.
+    // The cron runs nightly and now deletes-then-inserts per set, so anything
+    // older than that means the latest run dropped the set.
     const { data: trendsData, error } = await supabase
       .from("set_price_trends")
       .select("set_slug")
-      .gte("recorded_at", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString());
+      .gte("recorded_at", new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString());
 
     if (error) {
       console.warn("[api/sets] Failed to filter by trends data:", error.message);
