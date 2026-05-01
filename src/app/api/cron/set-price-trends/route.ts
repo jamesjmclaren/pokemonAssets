@@ -49,21 +49,42 @@ function topN(cards: TrendCard[], n: number): TrendCard[] {
   return [...cards].sort((a, b) => b.currentPrice - a.currentPrice).slice(0, n);
 }
 
-async function processSet(
-  setSlug: string,
-  setName: string
-): Promise<{ inserted: number; skipped: number }> {
+type SetResult = {
+  slug: string;
+  name: string;
+  status: "inserted" | "fetch_failed" | "no_cards" | "below_threshold" | "insert_failed";
+  cards_fetched: number;
+  raw_with_price: number;
+  psa10_with_price: number;
+  rows_inserted: number;
+};
+
+async function processSet(setSlug: string, setName: string): Promise<SetResult> {
+  const result: SetResult = {
+    slug: setSlug,
+    name: setName,
+    status: "no_cards",
+    cards_fetched: 0,
+    raw_with_price: 0,
+    psa10_with_price: 0,
+    rows_inserted: 0,
+  };
+
   let cards: PoketraceCard[];
   try {
-    // Poketrace API caps `limit` at 20. Use 20 pages × 20 = 400 cards max.
     cards = await fetchPoketraceCardsBySet(setSlug, "US", { pageSize: 20, maxPages: 20 });
   } catch (err) {
     console.warn(`[cron/set-price-trends] Failed to fetch cards for "${setSlug}":`, err);
-    return { inserted: 0, skipped: 1 };
+    result.status = "fetch_failed";
+    return result;
   }
 
+  result.cards_fetched = cards.length;
   console.log(`[cron/set-price-trends]   ${setSlug}: ${cards.length} cards fetched`);
-  if (cards.length === 0) return { inserted: 0, skipped: 1 };
+  if (cards.length === 0) {
+    result.status = "no_cards";
+    return result;
+  }
 
   const periods: Array<"1d" | "7d"> = ["1d", "7d"];
   const tierDefs: Array<{ key: string; tierType: "raw" | "psa10" }> = [
@@ -73,17 +94,18 @@ async function processSet(
 
   const rows: Record<string, unknown>[] = [];
 
-  // Quick check: if there aren't enough cards with NM or PSA_10 prices,
-  // don't bother inserting — it'll just clutter the dropdown.
   let rawWithPrice = 0;
   let psa10WithPrice = 0;
   for (const card of cards) {
     if (computeTrendCard(card, "NEAR_MINT", "7d")) rawWithPrice++;
     if (computeTrendCard(card, "PSA_10", "7d")) psa10WithPrice++;
   }
+  result.raw_with_price = rawWithPrice;
+  result.psa10_with_price = psa10WithPrice;
   if (rawWithPrice < MIN_CARDS_FOR_INSERT && psa10WithPrice < MIN_CARDS_FOR_INSERT) {
     console.log(`[cron/set-price-trends]   ${setSlug}: skipping (raw=${rawWithPrice}, psa10=${psa10WithPrice} below threshold)`);
-    return { inserted: 0, skipped: 1 };
+    result.status = "below_threshold";
+    return result;
   }
 
   for (const period of periods) {
@@ -118,15 +140,21 @@ async function processSet(
     }
   }
 
-  if (rows.length === 0) return { inserted: 0, skipped: 1 };
+  if (rows.length === 0) {
+    result.status = "below_threshold";
+    return result;
+  }
 
   const { error } = await supabase.from("set_price_trends").insert(rows);
   if (error) {
     console.error(`[cron/set-price-trends] Insert failed for "${setSlug}":`, error.message);
-    return { inserted: 0, skipped: 1 };
+    result.status = "insert_failed";
+    return result;
   }
 
-  return { inserted: rows.length, skipped: 0 };
+  result.status = "inserted";
+  result.rows_inserted = rows.length;
+  return result;
 }
 
 async function processBatch<T, R>(items: T[], batchSize: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -169,27 +197,52 @@ export async function GET(request: NextRequest) {
 
   console.log(`[cron/set-price-trends] Processing ${setsToProcess.length} sets`);
 
-  let totalInserted = 0;
-  let totalSkipped = 0;
-
   // Process 5 sets concurrently to respect the 30 req/10 sec burst limit.
   const results = await processBatch(setsToProcess, 5, async ({ slug, name }) => {
     console.log(`[cron/set-price-trends]   → ${slug}`);
     return processSet(slug, name);
   });
 
-  for (const r of results) {
-    totalInserted += r.inserted;
-    totalSkipped += r.skipped;
-  }
+  const totalInserted = results.reduce((acc, r) => acc + r.rows_inserted, 0);
+  const breakdown = {
+    inserted: results.filter((r) => r.status === "inserted"),
+    below_threshold: results.filter((r) => r.status === "below_threshold"),
+    no_cards: results.filter((r) => r.status === "no_cards"),
+    fetch_failed: results.filter((r) => r.status === "fetch_failed"),
+    insert_failed: results.filter((r) => r.status === "insert_failed"),
+  };
 
-  console.log(`[cron/set-price-trends] ===== Done: ${totalInserted} rows inserted, ${totalSkipped} sets skipped =====`);
+  console.log(
+    `[cron/set-price-trends] ===== Done: ${breakdown.inserted.length} inserted, ${breakdown.below_threshold.length} below threshold, ${breakdown.no_cards.length} empty, ${breakdown.fetch_failed.length} fetch failed =====`
+  );
 
   return NextResponse.json({
     message: "Set price trends recorded",
-    sets_processed: setsToProcess.length - totalSkipped,
-    sets_skipped: totalSkipped,
+    counts: {
+      total: results.length,
+      inserted: breakdown.inserted.length,
+      below_threshold: breakdown.below_threshold.length,
+      no_cards: breakdown.no_cards.length,
+      fetch_failed: breakdown.fetch_failed.length,
+      insert_failed: breakdown.insert_failed.length,
+    },
     rows_inserted: totalInserted,
+    inserted_sets: breakdown.inserted.map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      cards: r.cards_fetched,
+      raw: r.raw_with_price,
+      psa10: r.psa10_with_price,
+    })),
+    below_threshold_sets: breakdown.below_threshold.map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      cards: r.cards_fetched,
+      raw: r.raw_with_price,
+      psa10: r.psa10_with_price,
+    })),
+    no_cards_sets: breakdown.no_cards.map((r) => ({ slug: r.slug, name: r.name })),
+    fetch_failed_sets: breakdown.fetch_failed.map((r) => ({ slug: r.slug, name: r.name })),
     timestamp: new Date().toISOString(),
   });
 }
