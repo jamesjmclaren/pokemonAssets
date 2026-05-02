@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { TrendingUp, ChevronDown, RefreshCw, AlertCircle, Search } from "lucide-react";
 import { clsx } from "clsx";
 import SetTrendsList from "@/components/SetTrendsList";
-import type { SetTrendsResponse } from "@/app/api/set-trends/route";
+import type { SetTrendsResponse, TrendCard } from "@/app/api/set-trends/route";
 
 interface SetOption {
   id: string;
@@ -13,6 +13,25 @@ interface SetOption {
 }
 
 type Period = "1d" | "7d";
+type SortMode = "price" | "gainers" | "losers";
+
+function sortCards(cards: TrendCard[], mode: SortMode): TrendCard[] {
+  const copy = [...cards];
+  if (mode === "price") {
+    copy.sort((a, b) => b.currentPrice - a.currentPrice);
+  } else {
+    // Nulls always sort to the bottom regardless of direction.
+    copy.sort((a, b) => {
+      const av = a.pctChange;
+      const bv = b.pctChange;
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return mode === "gainers" ? bv - av : av - bv;
+    });
+  }
+  return copy;
+}
 
 export default function SetTrendsPage() {
   const [sets, setSets] = useState<SetOption[]>([]);
@@ -20,6 +39,7 @@ export default function SetTrendsPage() {
 
   const [selectedSet, setSelectedSet] = useState<string>("");
   const [period, setPeriod] = useState<Period>("7d");
+  const [sortMode, setSortMode] = useState<SortMode>("gainers");
 
   const [data, setData] = useState<SetTrendsResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -100,7 +120,7 @@ export default function SetTrendsPage() {
       const params = new URLSearchParams({
         set: setSlug,
         period: p,
-        limit: "10",
+        limit: "20",
       });
       if (rarities.length > 0) params.set("rarities", rarities.join(","));
       const res = await fetch(`/api/set-trends?${params.toString()}`);
@@ -254,6 +274,31 @@ export default function SetTrendsPage() {
         </div>
       </div>
 
+      {/* Sort toggle */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-text-muted">Sort:</span>
+        <div className="flex bg-surface border border-border rounded-xl p-1 gap-1">
+          {([
+            { id: "gainers", label: "Top gainers" },
+            { id: "losers", label: "Top losers" },
+            { id: "price", label: "Highest price" },
+          ] as { id: SortMode; label: string }[]).map((opt) => (
+            <button
+              key={opt.id}
+              onClick={() => setSortMode(opt.id)}
+              className={clsx(
+                "px-3 py-1.5 text-xs font-medium rounded-lg transition-colors",
+                sortMode === opt.id
+                  ? "bg-accent text-surface"
+                  : "text-text-muted hover:text-text-primary"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Rarity filter pills */}
       {data && data.availableRarities.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
@@ -322,22 +367,34 @@ export default function SetTrendsPage() {
       )}
 
       {/* Two-column trend lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SetTrendsList
-          title="Raw (Near Mint)"
-          subtitle={`Top 10 by NM price · ${periodLabel}`}
-          cards={data?.raw ?? []}
-          loading={loading}
-          accentColor="gold"
-        />
-        <SetTrendsList
-          title="PSA 10 Graded"
-          subtitle={`Top 10 by PSA 10 price · ${periodLabel}`}
-          cards={data?.psa10 ?? []}
-          loading={loading}
-          accentColor="blue"
-        />
-      </div>
+      {(() => {
+        const sortLabel =
+          sortMode === "gainers"
+            ? "top % gainers"
+            : sortMode === "losers"
+            ? "top % losers"
+            : "highest price";
+        const rawCards = sortCards(data?.raw ?? [], sortMode);
+        const psa10Cards = sortCards(data?.psa10 ?? [], sortMode);
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <SetTrendsList
+              title="Raw (Near Mint)"
+              subtitle={`20 NM cards · ${sortLabel} · ${periodLabel}`}
+              cards={rawCards}
+              loading={loading}
+              accentColor="gold"
+            />
+            <SetTrendsList
+              title="PSA 10 Graded"
+              subtitle={`20 PSA 10 cards · ${sortLabel} · ${periodLabel}`}
+              cards={psa10Cards}
+              loading={loading}
+              accentColor="blue"
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 }
