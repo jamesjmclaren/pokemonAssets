@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
   const slug = request.nextUrl.searchParams.get("slug")?.trim();
   const search = request.nextUrl.searchParams.get("search")?.trim();
-  const market = request.nextUrl.searchParams.get("market")?.trim() || "US";
+  const marketParam = request.nextUrl.searchParams.get("market")?.trim();
 
   if (!slug && !search) {
     return NextResponse.json(
@@ -35,42 +35,49 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const results: Record<string, unknown> = { market };
+  const results: Record<string, unknown> = {};
 
-  // Probe /cards for an exact slug
+  // Probe /cards for an exact slug — try US and EU when no market given.
   if (slug) {
-    const url = new URL("/v1/cards", API_BASE);
-    url.searchParams.set("set", slug);
-    url.searchParams.set("market", market);
-    url.searchParams.set("limit", "3");
-    try {
-      const res = await fetch(url.toString(), {
-        headers: { "X-API-Key": apiKey, "Content-Type": "application/json" },
-        cache: "no-store",
-      });
-      const text = await res.text();
-      let body: unknown = text;
+    const marketsToTry: ("US" | "EU")[] = marketParam === "US" || marketParam === "EU"
+      ? [marketParam as "US" | "EU"]
+      : ["US", "EU"];
+
+    const probeOne = async (market: "US" | "EU") => {
+      const url = new URL("/v1/cards", API_BASE);
+      url.searchParams.set("set", slug);
+      url.searchParams.set("market", market);
+      url.searchParams.set("limit", "3");
       try {
-        body = JSON.parse(text);
-      } catch {
-        /* keep as text */
+        const res = await fetch(url.toString(), {
+          headers: { "X-API-Key": apiKey, "Content-Type": "application/json" },
+          cache: "no-store",
+        });
+        const text = await res.text();
+        let body: unknown = text;
+        try {
+          body = JSON.parse(text);
+        } catch {
+          /* keep as text */
+        }
+        const sample = (body as { data?: unknown[] })?.data;
+        return {
+          market,
+          status: res.status,
+          ok: res.ok,
+          cardCount: Array.isArray(sample) ? sample.length : 0,
+          firstCard: Array.isArray(sample) && sample[0] ? sample[0] : null,
+          body: Array.isArray(sample)
+            ? { hasMore: (body as { hasMore?: boolean }).hasMore }
+            : body,
+        };
+      } catch (err) {
+        return { market, error: err instanceof Error ? err.message : String(err) };
       }
-      const sample = (body as { data?: unknown[] })?.data;
-      results.cards_probe = {
-        slug,
-        url: url.toString().replace(apiKey, "***"),
-        status: res.status,
-        ok: res.ok,
-        cardCount: Array.isArray(sample) ? sample.length : 0,
-        firstCard: Array.isArray(sample) && sample[0] ? sample[0] : null,
-        body: Array.isArray(sample) ? { hasMore: (body as { hasMore?: boolean }).hasMore } : body,
-      };
-    } catch (err) {
-      results.cards_probe = {
-        slug,
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
+    };
+
+    const probes = await Promise.all(marketsToTry.map(probeOne));
+    results.cards_probe = { slug, results: probes };
   }
 
   // Probe /sets searching by keyword (substring match against name + slug)
