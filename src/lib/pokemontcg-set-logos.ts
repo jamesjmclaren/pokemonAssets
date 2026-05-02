@@ -13,6 +13,7 @@
 interface PokemonTcgSet {
   id: string;
   name: string;
+  series?: string;
   releaseDate: string;
   images?: { symbol?: string; logo?: string };
 }
@@ -50,7 +51,7 @@ export async function getPokemonTcgSetLogos(): Promise<Map<string, string>> {
   inflight = (async () => {
     try {
       const res = await fetch(
-        "https://api.pokemontcg.io/v2/sets?select=id,name,releaseDate,images",
+        "https://api.pokemontcg.io/v2/sets?select=id,name,series,releaseDate,images",
         { next: { revalidate: 86400 } }
       );
       if (!res.ok) {
@@ -62,13 +63,22 @@ export async function getPokemonTcgSetLogos(): Promise<Map<string, string>> {
       for (const s of json.data ?? []) {
         const logo = s.images?.logo;
         if (!logo) continue;
-        // Index under both keys so callers can try strict-match first
-        // and fall back to name-only when years don't align.
-        const yearKey = s.releaseDate ? withYear(s.name, s.releaseDate) : null;
-        const nameKey = normaliseName(s.name);
-        if (yearKey && !map.has(yearKey)) map.set(yearKey, logo);
-        // Don't overwrite a year-keyed entry with a less specific one.
-        if (!map.has(nameKey)) map.set(nameKey, logo);
+        // Poketrace tends to ship long-form names ("Scarlet & Violet—151")
+        // while pokemontcg.io uses short-form ("151") plus a `series`
+        // field. Index under several derived keys so callers can match
+        // either shape. First write wins, prefer the most specific.
+        const candidates: string[] = [];
+        if (s.releaseDate) candidates.push(withYear(s.name, s.releaseDate));
+        if (s.series && s.releaseDate) {
+          candidates.push(withYear(`${s.series} ${s.name}`, s.releaseDate));
+        }
+        if (s.series) {
+          candidates.push(normaliseName(`${s.series} ${s.name}`));
+        }
+        candidates.push(normaliseName(s.name));
+        for (const k of candidates) {
+          if (!map.has(k)) map.set(k, logo);
+        }
       }
 
       cache = map;
