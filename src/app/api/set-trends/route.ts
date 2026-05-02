@@ -6,6 +6,7 @@ import {
   getPoketraceTier,
   type PoketraceCard,
 } from "@/lib/poketrace";
+import { getCandidateSlugs } from "@/lib/poketrace-set-aliases";
 
 // Revalidate hourly — Poketrace upstream prices update at most once per day.
 export const revalidate = 3600;
@@ -79,7 +80,8 @@ const PERSISTED_MIN_CARDS = 1;
 async function persistTrendsForSet(
   setSlug: string,
   setName: string,
-  cards: PoketraceCard[]
+  cards: PoketraceCard[],
+  candidateSlugs: string[] = [setSlug]
 ): Promise<void> {
   const periods: Array<"1d" | "7d"> = ["1d", "7d"];
   const tierDefs: Array<{ key: string; tierType: "raw" | "psa10" }> = [
@@ -87,10 +89,13 @@ async function persistTrendsForSet(
     { key: "PSA_10", tierType: "psa10" },
   ];
 
-  // Drop any stale rows for this slug first so rank ordering stays clean
-  // and the rolling-2-day window is reset by today's fetch. Service-role
-  // client because set_price_trends has read-only public RLS.
-  await supabaseAdmin.from("set_price_trends").delete().eq("set_slug", setSlug);
+  // Drop stale rows for any slug variant of this set so rank ordering
+  // stays clean across cron-vs-user inserts. Service-role client because
+  // set_price_trends has read-only public RLS.
+  await supabaseAdmin
+    .from("set_price_trends")
+    .delete()
+    .in("set_slug", candidateSlugs.length ? candidateSlugs : [setSlug]);
 
   // Below-threshold short-circuit — leaves the table clean if the set
   // genuinely has no priced cards.
@@ -209,6 +214,7 @@ async function fromCache(
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const setSlug = searchParams.get("set");
+  const setNameParam = searchParams.get("setName") ?? undefined;
   const period = (searchParams.get("period") ?? "7d") as "1d" | "7d";
   const limit = Math.min(Number(searchParams.get("limit") ?? "10"), 25);
   const rarityParam = searchParams.get("rarities") ?? "";
@@ -246,13 +252,31 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  let cards: PoketraceCard[];
+  // Poketrace's /sets and /cards indexes don't always agree on slug shape
+  // (e.g. /sets surfaces "151", /cards needs "sv-scarlet-and-violet-151").
+  // Try the requested slug first, then known aliases on a zero-card miss.
+  const candidates = getCandidateSlugs(setSlug, setNameParam);
+  let cards: PoketraceCard[] = [];
+  let workingSlug = setSlug;
   try {
-    // Poketrace API caps `limit` at 20 per page. Use 20 explicitly and bump
-    // maxPages so we cover sets with secret rares numbered well above the
-    // printed card count (e.g. #294/217). 20 pages × 20 = 400 cards max.
-    cards = await fetchPoketraceCardsBySet(setSlug, "US", { pageSize: 20, maxPages: 20 });
-    console.log(`[set-trends] Fetched ${cards.length} cards for set "${setSlug}"`);
+    for (const candidate of candidates) {
+      // Poketrace API caps `limit` at 20 per page. 20 pages × 20 = 400 cards max.
+      const batch = await fetchPoketraceCardsBySet(candidate, "US", {
+        pageSize: 20,
+        maxPages: 20,
+      });
+      if (batch.length > 0) {
+        cards = batch;
+        workingSlug = candidate;
+        console.log(
+          `[set-trends] Fetched ${batch.length} cards for "${setSlug}" via candidate "${candidate}"`
+        );
+        break;
+      }
+    }
+    if (cards.length === 0) {
+      console.log(`[set-trends] No candidate returned cards for "${setSlug}" (tried ${candidates.length})`);
+    }
   } catch (err) {
     console.error("[set-trends] fetchPoketraceCardsBySet failed:", err);
     return NextResponse.json({ error: "Failed to fetch set cards" }, { status: 502 });
@@ -305,12 +329,12 @@ export async function GET(request: NextRequest) {
     fetchedAt: new Date().toISOString(),
   };
 
-  // Persist the unfiltered ranking so the set surfaces in the default
-  // dropdown going forward. Skipped when a rarity filter is applied —
-  // that path returns a subset, not the canonical top-10.
+  // Persist the unfiltered ranking under the user-facing slug so the
+  // cache lookup hits next time. Also pass every candidate slug we tried
+  // so the delete-then-insert clears any cron-written aliases.
   if (!hasRarityFilter) {
     try {
-      await persistTrendsForSet(setSlug, setName, cards);
+      await persistTrendsForSet(setSlug, setName, cards, candidates);
     } catch (err) {
       console.warn("[set-trends] persistTrendsForSet threw:", err);
     }

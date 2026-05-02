@@ -22,15 +22,24 @@ let cache: Map<string, string> | null = null;
 let cacheExpiry = 0;
 let inflight: Promise<Map<string, string>> | null = null;
 
-function normaliseKey(name: string, releaseDate: string): string {
-  const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-  // Poketrace dates are YYYY-MM-DD; pokemontcg.io uses YYYY/MM/DD.
-  const year = releaseDate.slice(0, 4);
-  return `${cleanName}|${year}`;
+function normaliseName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-export function makeLogoLookupKey(name: string, releaseDate: string): string {
-  return normaliseKey(name, releaseDate);
+function withYear(name: string, releaseDate: string): string {
+  // Poketrace dates are YYYY-MM-DD; pokemontcg.io uses YYYY/MM/DD.
+  const year = releaseDate.slice(0, 4);
+  return `${normaliseName(name)}|${year}`;
+}
+
+export function makeLogoLookupKeys(name: string, releaseDate: string): string[] {
+  // Try the strict (name + year) key first, then fall back to name-only.
+  // Year matching is fragile because releaseDate is sometimes empty or
+  // formatted differently across the two APIs.
+  const keys: string[] = [];
+  if (releaseDate) keys.push(withYear(name, releaseDate));
+  keys.push(normaliseName(name));
+  return keys;
 }
 
 export async function getPokemonTcgSetLogos(): Promise<Map<string, string>> {
@@ -53,9 +62,13 @@ export async function getPokemonTcgSetLogos(): Promise<Map<string, string>> {
       for (const s of json.data ?? []) {
         const logo = s.images?.logo;
         if (!logo) continue;
-        const key = normaliseKey(s.name, s.releaseDate);
-        // First write wins — keeps a stable mapping if duplicates exist.
-        if (!map.has(key)) map.set(key, logo);
+        // Index under both keys so callers can try strict-match first
+        // and fall back to name-only when years don't align.
+        const yearKey = s.releaseDate ? withYear(s.name, s.releaseDate) : null;
+        const nameKey = normaliseName(s.name);
+        if (yearKey && !map.has(yearKey)) map.set(yearKey, logo);
+        // Don't overwrite a year-keyed entry with a less specific one.
+        if (!map.has(nameKey)) map.set(nameKey, logo);
       }
 
       cache = map;

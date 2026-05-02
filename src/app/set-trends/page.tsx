@@ -123,6 +123,8 @@ export default function SetTrendsPage() {
         period: p,
         limit: "10",
       });
+      const setNameForLookup = sets.find((s) => s.id === setSlug)?.name;
+      if (setNameForLookup) params.set("setName", setNameForLookup);
       if (rarities.length > 0) params.set("rarities", rarities.join(","));
       const res = await fetch(`/api/set-trends?${params.toString()}`);
       if (!res.ok) {
@@ -137,7 +139,7 @@ export default function SetTrendsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sets]);
 
   // Fetch whenever selected set, period, or rarity filter changes
   useEffect(() => {
