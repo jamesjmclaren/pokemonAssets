@@ -63,7 +63,7 @@ export default function SetTrendsPage() {
     async function loadSets() {
       setSetsLoading(true);
       try {
-        const res = await fetch("/api/sets");
+        const res = await fetch("/api/sets", { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to load sets");
         const json = await res.json();
         const list: SetOption[] = Array.isArray(json) ? json : json.sets ?? [];
