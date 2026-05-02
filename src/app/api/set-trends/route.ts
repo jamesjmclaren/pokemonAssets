@@ -67,6 +67,84 @@ function topN(cards: TrendCard[], n: number): TrendCard[] {
     .slice(0, n);
 }
 
+// Persist a successful live fetch to set_price_trends so the set
+// auto-promotes into the default ("with data") dropdown for the next 2
+// days, even when the nightly cron hasn't covered it (e.g. if the cron
+// hit its time budget before reaching this set). Mirrors the cron's row
+// shape exactly so /api/sets?onlyWithData=true picks it up.
+const PERSISTED_TOP_N = 10;
+const PERSISTED_MIN_CARDS = 1;
+
+async function persistTrendsForSet(
+  setSlug: string,
+  setName: string,
+  cards: PoketraceCard[]
+): Promise<void> {
+  const periods: Array<"1d" | "7d"> = ["1d", "7d"];
+  const tierDefs: Array<{ key: string; tierType: "raw" | "psa10" }> = [
+    { key: "NEAR_MINT", tierType: "raw" },
+    { key: "PSA_10", tierType: "psa10" },
+  ];
+
+  // Drop any stale rows for this slug first so rank ordering stays clean
+  // and the rolling-2-day window is reset by today's fetch.
+  await supabase.from("set_price_trends").delete().eq("set_slug", setSlug);
+
+  // Below-threshold short-circuit — leaves the table clean if the set
+  // genuinely has no priced cards.
+  let rawWithPrice = 0;
+  let psa10WithPrice = 0;
+  for (const card of cards) {
+    if (computeTrendCard(card, "NEAR_MINT", "7d")) rawWithPrice++;
+    if (computeTrendCard(card, "PSA_10", "7d")) psa10WithPrice++;
+  }
+  if (rawWithPrice < PERSISTED_MIN_CARDS && psa10WithPrice < PERSISTED_MIN_CARDS) {
+    return;
+  }
+
+  const rows: Record<string, unknown>[] = [];
+  for (const period of periods) {
+    for (const { key, tierType } of tierDefs) {
+      const computed: TrendCard[] = [];
+      for (const card of cards) {
+        const entry = computeTrendCard(card, key, period);
+        if (entry) {
+          entry.rarity = normaliseRarity(entry.rarity);
+          computed.push(entry);
+        }
+      }
+      const top = topN(computed, PERSISTED_TOP_N);
+      for (let i = 0; i < top.length; i++) {
+        const c = top[i];
+        rows.push({
+          set_slug: setSlug,
+          set_name: setName,
+          period,
+          tier_type: tierType,
+          rank: i + 1,
+          card_id: c.id,
+          card_name: c.name,
+          card_number: c.cardNumber,
+          card_image: c.image,
+          rarity: c.rarity,
+          current_price: c.currentPrice,
+          prev_price: c.prevPrice,
+          abs_change: c.absChange,
+          pct_change: c.pctChange,
+          sale_count: c.saleCount,
+          source: c.source,
+        });
+      }
+    }
+  }
+
+  if (rows.length === 0) return;
+  const { error } = await supabase.from("set_price_trends").insert(rows);
+  if (error) {
+    console.warn(`[set-trends] persist failed for "${setSlug}":`, error.message);
+  }
+}
+
 function normaliseRarity(r: string | null | undefined): string | null {
   if (!r) return null;
   const trimmed = r.trim();
@@ -224,6 +302,17 @@ export async function GET(request: NextRequest) {
     fromCache: false,
     fetchedAt: new Date().toISOString(),
   };
+
+  // Persist the unfiltered ranking so the set surfaces in the default
+  // dropdown going forward. Skipped when a rarity filter is applied —
+  // that path returns a subset, not the canonical top-10.
+  if (!hasRarityFilter) {
+    try {
+      await persistTrendsForSet(setSlug, setName, cards);
+    } catch (err) {
+      console.warn("[set-trends] persistTrendsForSet threw:", err);
+    }
+  }
 
   return NextResponse.json(response);
 }
