@@ -10,6 +10,8 @@ interface SetOption {
   id: string;
   name: string;
   releaseDate: string;
+  totalCards?: number;
+  logo?: string | null;
 }
 
 type Period = "1d" | "7d";
@@ -47,7 +49,6 @@ export default function SetTrendsPage() {
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [setQuery, setSetQuery] = useState("");
-  const [showAllSets, setShowAllSets] = useState(false);
 
   const [selectedRarities, setSelectedRarities] = useState<string[]>([]);
 
@@ -56,13 +57,13 @@ export default function SetTrendsPage() {
     setSelectedRarities([]);
   }, [selectedSet]);
 
-  // Load set list whenever the data-only filter toggle changes
+  // Load the full Poketrace catalogue once on mount. Sets without
+  // cached trend data fall through to a live fetch + persist when picked.
   useEffect(() => {
     async function loadSets() {
       setSetsLoading(true);
       try {
-        const url = showAllSets ? "/api/sets" : "/api/sets?onlyWithData=true";
-        const res = await fetch(url);
+        const res = await fetch("/api/sets");
         if (!res.ok) throw new Error("Failed to load sets");
         const json = await res.json();
         const list: SetOption[] = Array.isArray(json) ? json : json.sets ?? [];
@@ -109,7 +110,7 @@ export default function SetTrendsPage() {
       }
     }
     loadSets();
-  }, [showAllSets]);
+  }, []);
 
   const fetchTrends = useCallback(async (setSlug: string, p: Period, rarities: string[]) => {
     if (!setSlug) return;
@@ -201,7 +202,7 @@ export default function SetTrendsPage() {
               : sets;
             return (
               <div className="absolute z-20 top-full mt-1 w-full bg-surface-elevated border border-border rounded-xl shadow-xl overflow-hidden">
-                <div className="p-2 border-b border-border space-y-2">
+                <div className="p-2 border-b border-border">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
                     <input
@@ -213,17 +214,8 @@ export default function SetTrendsPage() {
                       className="w-full bg-surface border border-border focus:border-accent rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors"
                     />
                   </div>
-                  <label className="flex items-center gap-2 px-1 text-xs text-text-muted cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={showAllSets}
-                      onChange={(e) => setShowAllSets(e.target.checked)}
-                      className="w-3.5 h-3.5 accent-accent cursor-pointer"
-                    />
-                    <span>Show all sets (including ones without trend data)</span>
-                  </label>
                 </div>
-                <div className="max-h-72 overflow-y-auto">
+                <div className="max-h-80 overflow-y-auto">
                   {filtered.length === 0 ? (
                     <div className="px-4 py-6 text-center text-sm text-text-muted">
                       No sets match &ldquo;{setQuery}&rdquo;
@@ -238,14 +230,33 @@ export default function SetTrendsPage() {
                           setSetQuery("");
                         }}
                         className={clsx(
-                          "w-full text-left px-4 py-2.5 text-sm hover:bg-surface-hover transition-colors",
+                          "w-full flex items-center gap-3 px-3 py-2 text-sm text-left hover:bg-surface-hover transition-colors",
                           s.id === selectedSet ? "text-accent font-medium" : "text-text-primary"
                         )}
                       >
-                        {s.name}
-                        {s.releaseDate && (
-                          <span className="text-text-muted ml-2 text-xs">{s.releaseDate.slice(0, 4)}</span>
-                        )}
+                        <div className="w-10 h-7 relative shrink-0 flex items-center justify-center bg-surface rounded">
+                          {s.logo ? (
+                            // Set logos vary in aspect — use plain <img> to skip
+                            // next/image's per-domain config requirements.
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={s.logo}
+                              alt=""
+                              className="max-w-full max-h-full object-contain"
+                            />
+                          ) : (
+                            <span className="text-[10px] text-text-muted">—</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate">{s.name}</div>
+                        </div>
+                        <div className="shrink-0 text-xs text-text-muted tabular-nums">
+                          {s.totalCards ? `${s.totalCards} cards` : ""}
+                          {s.releaseDate && (
+                            <span className="ml-2">{s.releaseDate.slice(0, 4)}</span>
+                          )}
+                        </div>
                       </button>
                     ))
                   )}
