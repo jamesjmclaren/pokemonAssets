@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import {
   fetchPoketraceCardsBySet,
   getPoketraceTier,
+  inferAssetType,
   type PoketraceCard,
 } from "@/lib/poketrace";
 
@@ -184,18 +185,21 @@ export async function GET(request: NextRequest) {
 
   const setName = cards[0]?.set?.name ?? setSlug;
 
-  // Collect all rarities from the full set so the UI can offer a filter list.
+  // Drop sealed products — only rank actual cards.
+  const cardsOnly = cards.filter((c) => inferAssetType(c) === "card");
+
+  // Collect all rarities from the card-only set so the UI can offer a filter list.
   const availableRarities = Array.from(
-    new Set(cards.map((c) => normaliseRarity(c.rarity)).filter((r): r is string => !!r))
+    new Set(cardsOnly.map((c) => normaliseRarity(c.rarity)).filter((r): r is string => !!r))
   ).sort();
 
   // Filter cards by rarity (if applied) before ranking.
   const filteredCards = hasRarityFilter
-    ? cards.filter((c) => {
+    ? cardsOnly.filter((c) => {
         const r = normaliseRarity(c.rarity);
         return r ? rarityFilterSet.has(r.toLowerCase()) : false;
       })
-    : cards;
+    : cardsOnly;
 
   const rawCards: TrendCard[] = [];
   const psa10Cards: TrendCard[] = [];

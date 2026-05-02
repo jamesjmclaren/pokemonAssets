@@ -4,6 +4,7 @@ import {
   fetchPoketraceCardsBySet,
   getPoketraceTier,
   getPoketraceSets,
+  inferAssetType,
   type PoketraceCard,
 } from "@/lib/poketrace";
 import type { TrendCard } from "@/app/api/set-trends/route";
@@ -82,8 +83,11 @@ async function processSet(slug: string, setName: string): Promise<SetResult> {
 
   result.cards_fetched = cards.length;
 
+  // Drop sealed products — only rank actual cards.
+  const cardOnly = cards.filter((c) => inferAssetType(c) === "card");
+
   // Check we have enough priced cards to be worth inserting.
-  const pricedCount = cards.filter((c) => computeTrendCard(c, "NEAR_MINT", "7d") !== null).length;
+  const pricedCount = cardOnly.filter((c) => computeTrendCard(c, "NEAR_MINT", "7d") !== null).length;
   if (pricedCount < MIN_CARDS_FOR_INSERT) {
     console.log(`[cron/set-price-trends]   ${slug}: only ${pricedCount} priced cards (below threshold)`);
     result.status = "below_threshold";
@@ -101,7 +105,7 @@ async function processSet(slug: string, setName: string): Promise<SetResult> {
   for (const period of periods) {
     for (const { key, tierType } of tierDefs) {
       const computed: TrendCard[] = [];
-      for (const card of cards) {
+      for (const card of cardOnly) {
         const entry = computeTrendCard(card, key, period);
         if (entry) computed.push(entry);
       }
