@@ -120,7 +120,7 @@ export default function SetTrendsPage() {
       const params = new URLSearchParams({
         set: setSlug,
         period: p,
-        limit: "20",
+        limit: "10",
       });
       if (rarities.length > 0) params.set("rarities", rarities.join(","));
       const res = await fetch(`/api/set-trends?${params.toString()}`);
@@ -380,14 +380,14 @@ export default function SetTrendsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <SetTrendsList
               title="Raw (Near Mint)"
-              subtitle={`20 NM cards · ${sortLabel} · ${periodLabel}`}
+              subtitle={`10 NM cards · ${sortLabel} · ${periodLabel}`}
               cards={rawCards}
               loading={loading}
               accentColor="gold"
             />
             <SetTrendsList
               title="PSA 10 Graded"
-              subtitle={`20 PSA 10 cards · ${sortLabel} · ${periodLabel}`}
+              subtitle={`10 PSA 10 cards · ${sortLabel} · ${periodLabel}`}
               cards={psa10Cards}
               loading={loading}
               accentColor="blue"

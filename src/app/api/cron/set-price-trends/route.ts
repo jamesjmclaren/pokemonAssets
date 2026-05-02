@@ -17,10 +17,11 @@ import type { TrendCard } from "@/app/api/set-trends/route";
 // on a fresh catalogue is ~2,500 req. Override with ?max=N to throttle.
 const DEFAULT_MAX_SETS = 2000;
 // Top N cards to store per tier per period per set.
-const TOP_N = 20;
-// Minimum cards-with-prices to keep a set's results. Below this we skip
-// the insert entirely so the dropdown stays clean.
-const MIN_CARDS_FOR_INSERT = 8;
+const TOP_N = 10;
+// Minimum cards-with-prices to keep a set's results. We only skip when
+// nothing came back at all — any set with at least one card is worth
+// surfacing in the dropdown.
+const MIN_CARDS_FOR_INSERT = 1;
 
 // Set name patterns that almost always indicate junk data (Japanese-only
 // addendums, deck kit fragments, promo dumps, etc). We skip these
