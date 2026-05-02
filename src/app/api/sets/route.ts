@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPoketraceSets } from "@/lib/poketrace";
 import { supabase } from "@/lib/supabase";
 
-// Set catalogue changes only when new products release — cache for 6 hours.
-export const revalidate = 21600;
+// The Poketrace catalogue is cached internally by apiFetch (revalidate:
+// 3600), so this handler runs cheaply per request: one likely-cached
+// Poketrace fetch + one Supabase filter query. Skip route-level caching
+// so the dropdown reflects newly-persisted sets within the same session.
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const onlyWithData = request.nextUrl.searchParams.get("onlyWithData") === "true";
