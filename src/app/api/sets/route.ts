@@ -37,23 +37,8 @@ export async function GET(request: NextRequest) {
       if (!trendsBySlug.has(row.set_slug)) trendsBySlug.set(row.set_slug, row.set_name);
     }
 
-    // Keep catalogue entries that have data, then append any trend slugs that
-    // aren't surfaced by the Poketrace /sets catalogue (e.g. our supplemental
-    // long-form slugs like sv-scarlet-and-violet-ascended-heroes).
     const filtered = sets.filter((s) => trendsBySlug.has(s.id));
-    const cataloguedSlugs = new Set(filtered.map((s) => s.id));
-    const extras = [...trendsBySlug.entries()]
-      .filter(([slug]) => !cataloguedSlugs.has(slug))
-      .map(([slug, name]) => ({
-        id: slug,
-        name,
-        series: "pokemon",
-        releaseDate: "",
-        totalCards: 0,
-      }));
-
-    // Supplemental sets are newest — surface them at the top.
-    return NextResponse.json([...extras, ...filtered]);
+    return NextResponse.json(filtered);
   } catch (err) {
     console.error("[api/sets] Failed to fetch sets:", err);
     return NextResponse.json({ error: "Failed to fetch sets" }, { status: 502 });
