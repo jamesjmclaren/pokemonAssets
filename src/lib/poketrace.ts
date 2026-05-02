@@ -784,7 +784,12 @@ const ENGLISH_SLUG_PREFIXES = [
 ];
 
 function isEnglishSet(slug: string, language?: string): boolean {
-  if (language) return language === "en";
+  // If the API returns a language field, accept "en" or "english" (case-insensitive).
+  if (language) {
+    const lang = language.toLowerCase();
+    return lang === "en" || lang === "english";
+  }
+  // Otherwise fall back to slug-prefix heuristic.
   return ENGLISH_SLUG_PREFIXES.some((p) => slug.startsWith(p));
 }
 
@@ -801,7 +806,8 @@ export async function getPoketraceSets(
   do {
     const params: Record<string, string> = { limit: "100" };
     if (cursor) params.cursor = cursor;
-    if (language) params.language = language;
+    // Note: we intentionally do NOT pass language as an API param since
+    // Poketrace /v1/sets may not support it. Filtering is done client-side.
     const response = await apiFetch("/v1/sets", params);
     const batch: PoketraceSet[] = response?.data || [];
     all.push(...batch);
