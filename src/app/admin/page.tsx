@@ -53,6 +53,13 @@ export default function AdminPage() {
   const [cronResult, setCronResult] = useState<unknown>(null);
   const [cronError, setCronError] = useState<string | null>(null);
 
+  // Poketrace probe — temporary tool for slug discovery.
+  const [probeSlug, setProbeSlug] = useState("");
+  const [probeSearch, setProbeSearch] = useState("");
+  const [probeRunning, setProbeRunning] = useState(false);
+  const [probeResult, setProbeResult] = useState<unknown>(null);
+  const [probeError, setProbeError] = useState<string | null>(null);
+
   useEffect(() => {
     if (isLoaded && user) {
       const userEmail = user.primaryEmailAddress?.emailAddress?.toLowerCase();
@@ -102,6 +109,31 @@ export default function AdminPage() {
       setCronError(err instanceof Error ? err.message : "Cron failed");
     } finally {
       setCronRunning(false);
+    }
+  };
+
+  const runProbe = async () => {
+    const slug = probeSlug.trim();
+    const search = probeSearch.trim();
+    if (!slug && !search) {
+      setProbeError("Provide a slug or search term");
+      return;
+    }
+    setProbeRunning(true);
+    setProbeResult(null);
+    setProbeError(null);
+    try {
+      const params = new URLSearchParams();
+      if (slug) params.set("slug", slug);
+      if (search) params.set("search", search);
+      const res = await fetch(`/api/admin/probe-poketrace?${params.toString()}`);
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Probe failed");
+      setProbeResult(body);
+    } catch (err) {
+      setProbeError(err instanceof Error ? err.message : "Probe failed");
+    } finally {
+      setProbeRunning(false);
     }
   };
 
@@ -236,6 +268,61 @@ export default function AdminPage() {
         {cronResult != null && (
           <pre className="mt-2 max-h-96 overflow-auto bg-background border border-border rounded-lg p-3 text-xs text-text-secondary font-mono whitespace-pre-wrap">
             {JSON.stringify(cronResult, null, 2)}
+          </pre>
+        )}
+      </div>
+
+      {/* TEMPORARY — Poketrace slug probe. Remove with cron card once dialed in. */}
+      <div className="bg-surface border border-border rounded-xl p-6 mb-8">
+        <div className="mb-4">
+          <h2 className="text-text-primary font-medium mb-1">Poketrace Probe (temporary)</h2>
+          <p className="text-text-muted text-xs">
+            Hits Poketrace directly with your API key. Use <code className="text-text-secondary">slug</code> to test
+            an exact set slug against /cards. Use <code className="text-text-secondary">search</code> to grep
+            /sets for a keyword.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block text-xs text-text-muted mb-1">Exact slug → /cards</label>
+            <input
+              type="text"
+              value={probeSlug}
+              onChange={(e) => setProbeSlug(e.target.value)}
+              placeholder="swsh07-evolving-skies"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-text-muted mb-1">Keyword → /sets search</label>
+            <input
+              type="text"
+              value={probeSearch}
+              onChange={(e) => setProbeSearch(e.target.value)}
+              placeholder="evolving skies"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+        <button
+          onClick={runProbe}
+          disabled={probeRunning || (!probeSlug.trim() && !probeSearch.trim())}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-accent text-background text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {probeRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          {probeRunning ? "Probing…" : "Probe"}
+        </button>
+
+        {probeError && (
+          <div className="mt-3 flex items-center gap-2 text-sm text-danger bg-danger-muted border border-danger/30 rounded-lg px-3 py-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {probeError}
+          </div>
+        )}
+
+        {probeResult != null && (
+          <pre className="mt-3 max-h-96 overflow-auto bg-background border border-border rounded-lg p-3 text-xs text-text-secondary font-mono whitespace-pre-wrap">
+            {JSON.stringify(probeResult, null, 2)}
           </pre>
         )}
       </div>
