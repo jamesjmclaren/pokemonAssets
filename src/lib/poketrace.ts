@@ -815,9 +815,16 @@ export async function getPoketraceSets(
     pages += 1;
   } while (cursor && pages < maxPages);
 
+  if (all.length > 0) {
+    const sample = all.slice(0, 3).map((s) => `${s.slug}(lang=${s.language ?? "none"})`).join(", ");
+    console.log(`[poketrace/sets] fetched ${all.length} sets total. Sample: ${sample}`);
+  }
+
   const filtered = language
     ? all.filter((s) => isEnglishSet(s.slug, s.language))
     : all;
+
+  console.log(`[poketrace/sets] after English filter: ${filtered.length} sets`);
 
   const normalized = filtered.map((s) => ({
     id: s.slug,

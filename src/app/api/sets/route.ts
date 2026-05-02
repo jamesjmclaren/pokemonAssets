@@ -1,14 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getPoketraceSets } from "@/lib/poketrace";
 
-// Set catalogue changes only when new products release — cache for 6 hours.
-export const revalidate = 21600;
+export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(_request: NextRequest) {
   try {
     const sets = await getPoketraceSets("releaseDate", "desc", "en");
-    // Only include sets that have a release date so the dropdown is clean.
-    return NextResponse.json(sets.filter((s) => !!s.releaseDate));
+    const withDate = sets.filter((s) => !!s.releaseDate);
+
+    console.log(
+      `[api/sets] total=${sets.length} withDate=${withDate.length}` +
+      (sets.length > 0 ? ` sample slug="${sets[0].id}" lang="${sets[0].language}"` : " (empty)")
+    );
+
+    return NextResponse.json(withDate);
   } catch (err) {
     console.error("[api/sets] Failed to fetch sets:", err);
     return NextResponse.json({ error: "Failed to fetch sets" }, { status: 502 });
