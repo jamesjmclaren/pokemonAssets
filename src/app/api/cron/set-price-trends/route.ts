@@ -42,7 +42,15 @@ function computeTrendCard(card: PoketraceCard, tier: string, period: "1d" | "7d"
 }
 
 function topN(cards: TrendCard[], n: number): TrendCard[] {
-  return [...cards].sort((a, b) => b.currentPrice - a.currentPrice).slice(0, n);
+  // Rank by percentage gain descending; cards with no prior price data sort last.
+  return [...cards]
+    .sort((a, b) => {
+      if (a.pctChange == null && b.pctChange == null) return 0;
+      if (a.pctChange == null) return 1;
+      if (b.pctChange == null) return -1;
+      return b.pctChange - a.pctChange;
+    })
+    .slice(0, n);
 }
 
 type SetResult = {
