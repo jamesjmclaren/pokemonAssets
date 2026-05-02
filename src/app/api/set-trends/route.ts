@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   fetchPoketraceCardsBySet,
   getPoketraceTier,
@@ -87,8 +88,9 @@ async function persistTrendsForSet(
   ];
 
   // Drop any stale rows for this slug first so rank ordering stays clean
-  // and the rolling-2-day window is reset by today's fetch.
-  await supabase.from("set_price_trends").delete().eq("set_slug", setSlug);
+  // and the rolling-2-day window is reset by today's fetch. Service-role
+  // client because set_price_trends has read-only public RLS.
+  await supabaseAdmin.from("set_price_trends").delete().eq("set_slug", setSlug);
 
   // Below-threshold short-circuit — leaves the table clean if the set
   // genuinely has no priced cards.
@@ -139,7 +141,7 @@ async function persistTrendsForSet(
   }
 
   if (rows.length === 0) return;
-  const { error } = await supabase.from("set_price_trends").insert(rows);
+  const { error } = await supabaseAdmin.from("set_price_trends").insert(rows);
   if (error) {
     console.warn(`[set-trends] persist failed for "${setSlug}":`, error.message);
   }
