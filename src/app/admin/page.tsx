@@ -14,6 +14,7 @@ import {
   Link as LinkIcon,
   Store,
   BadgeCheck,
+  RefreshCw,
 } from "lucide-react";
 import type { Vendor } from "@/types";
 
@@ -46,6 +47,11 @@ export default function AdminPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorsLoading, setVendorsLoading] = useState(false);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
+
+  // Set-trends cron — temporary tool while debugging slug coverage.
+  const [cronRunning, setCronRunning] = useState(false);
+  const [cronResult, setCronResult] = useState<unknown>(null);
+  const [cronError, setCronError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoaded && user) {
@@ -82,6 +88,22 @@ export default function AdminPage() {
       </div>
     );
   }
+
+  const runSetTrendsCron = async () => {
+    setCronRunning(true);
+    setCronResult(null);
+    setCronError(null);
+    try {
+      const res = await fetch("/api/admin/run-set-trends-cron", { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Cron failed");
+      setCronResult(body);
+    } catch (err) {
+      setCronError(err instanceof Error ? err.message : "Cron failed");
+    } finally {
+      setCronRunning(false);
+    }
+  };
 
   const copyToClipboard = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
@@ -178,6 +200,44 @@ export default function AdminPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-text-primary mb-1">Admin</h1>
         <p className="text-text-secondary text-sm">Manage members and marketplace vendors.</p>
+      </div>
+
+      {/* TEMPORARY — set-trends cron trigger. Remove once slug coverage is dialed in. */}
+      <div className="bg-surface border border-border rounded-xl p-6 mb-8">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-text-primary font-medium mb-1">Set Trends Cron (temporary)</h2>
+            <p className="text-text-muted text-xs">
+              Runs the full /api/cron/set-price-trends sweep. Takes a few minutes;
+              keep this tab open. Inserts/updates rows in set_price_trends.
+            </p>
+          </div>
+          <button
+            onClick={runSetTrendsCron}
+            disabled={cronRunning}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent text-background text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            {cronRunning ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            {cronRunning ? "Running…" : "Run Cron"}
+          </button>
+        </div>
+
+        {cronError && (
+          <div className="flex items-center gap-2 text-sm text-danger bg-danger-muted border border-danger/30 rounded-lg px-3 py-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {cronError}
+          </div>
+        )}
+
+        {cronResult != null && (
+          <pre className="mt-2 max-h-96 overflow-auto bg-background border border-border rounded-lg p-3 text-xs text-text-secondary font-mono whitespace-pre-wrap">
+            {JSON.stringify(cronResult, null, 2)}
+          </pre>
+        )}
       </div>
 
       {/* Tabs */}
