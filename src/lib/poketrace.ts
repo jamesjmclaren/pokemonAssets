@@ -99,6 +99,7 @@ export interface PoketraceSet {
   releaseDate?: string;
   cardCount?: number;
   series?: string;
+  language?: string;
 }
 
 /**
@@ -760,18 +761,47 @@ export async function getPoketracePriceHistory(
 /**
  * Get all Pokemon sets from Poketrace.
  */
+// Slug prefixes that identify English TCG sets in the Poketrace catalogue.
+// Used as a fallback when the API doesn't return a language field.
+const ENGLISH_SLUG_PREFIXES = [
+  "me-",    // 2026 Mega Evolution era
+  "sv-",    // Scarlet & Violet
+  "swsh-",  // Sword & Shield
+  "sm-",    // Sun & Moon
+  "xy-",    // XY
+  "bw-",    // Black & White
+  "dp-",    // Diamond & Pearl
+  "pl-",    // Platinum
+  "hgss-",  // HeartGold & SoulSilver
+  "col-",   // Call of Legends
+  "ex-",    // EX era
+  "neo-",   // Neo era
+  "gym-",   // Gym Heroes/Challenge
+  // Bare-slug English sets (no era prefix)
+  "base-set", "base-set-2", "jungle", "fossil", "team-rocket",
+  "hidden-fates", "detective-pikachu", "celebrations", "shining-fates",
+  "expedition", "aquapolis", "skyridge", "legendary-collection",
+];
+
+function isEnglishSet(slug: string, language?: string): boolean {
+  if (language) return language === "en";
+  return ENGLISH_SLUG_PREFIXES.some((p) => slug.startsWith(p));
+}
+
 export async function getPoketraceSets(
   sortBy = "releaseDate",
-  sortOrder = "desc"
-): Promise<{ id: string; name: string; series: string; releaseDate: string; totalCards: number }[]> {
+  sortOrder = "desc",
+  language?: string
+): Promise<{ id: string; name: string; series: string; releaseDate: string; totalCards: number; language: string }[]> {
   const all: PoketraceSet[] = [];
   let cursor: string | null | undefined;
   let pages = 0;
-  const maxPages = 20; // 2000 sets is well above Poketrace's actual catalogue size
+  const maxPages = 20;
 
   do {
     const params: Record<string, string> = { limit: "100" };
     if (cursor) params.cursor = cursor;
+    if (language) params.language = language;
     const response = await apiFetch("/v1/sets", params);
     const batch: PoketraceSet[] = response?.data || [];
     all.push(...batch);
@@ -779,12 +809,17 @@ export async function getPoketraceSets(
     pages += 1;
   } while (cursor && pages < maxPages);
 
-  const normalized = all.map((s) => ({
+  const filtered = language
+    ? all.filter((s) => isEnglishSet(s.slug, s.language))
+    : all;
+
+  const normalized = filtered.map((s) => ({
     id: s.slug,
     name: s.name,
     series: s.series || "pokemon",
     releaseDate: s.releaseDate || "",
     totalCards: s.cardCount || 0,
+    language: s.language || (isEnglishSet(s.slug) ? "en" : "other"),
   }));
 
   const sortKey = sortBy === "releaseDate" ? "releaseDate" : "name";

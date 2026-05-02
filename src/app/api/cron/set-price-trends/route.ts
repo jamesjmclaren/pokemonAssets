@@ -182,7 +182,7 @@ export async function GET(request: NextRequest) {
     // and take the most recent SETS_TO_PROCESS sets.
     let allSets: Awaited<ReturnType<typeof getPoketraceSets>>;
     try {
-      allSets = await getPoketraceSets("releaseDate", "desc");
+      allSets = await getPoketraceSets("releaseDate", "desc", "en");
     } catch (err) {
       console.error("[cron/set-price-trends] Failed to fetch set catalogue:", err);
       return NextResponse.json({ error: "Failed to fetch sets" }, { status: 502 });

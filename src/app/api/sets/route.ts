@@ -1,44 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getPoketraceSets } from "@/lib/poketrace";
-import { supabase } from "@/lib/supabase";
 
 // Set catalogue changes only when new products release — cache for 6 hours.
 export const revalidate = 21600;
 
-export async function GET(request: NextRequest) {
-  const onlyWithData = request.nextUrl.searchParams.get("onlyWithData") === "true";
-
+export async function GET() {
   try {
-    const sets = await getPoketraceSets("releaseDate", "desc");
-
-    if (!onlyWithData) {
-      return NextResponse.json(sets);
-    }
-
-    // Filter to only sets present in set_price_trends — i.e. sets the cron
-    // found real card data for. This keeps the dropdown free of niche
-    // Japanese promos and other Poketrace-incomplete sets.
-    // Only treat sets as "with data" if they have rows from the last 2 days.
-    // The cron runs nightly and now deletes-then-inserts per set, so anything
-    // older than that means the latest run dropped the set.
-    const { data: trendsData, error } = await supabase
-      .from("set_price_trends")
-      .select("set_slug, set_name")
-      .gte("recorded_at", new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString());
-
-    if (error) {
-      console.warn("[api/sets] Failed to filter by trends data:", error.message);
-      return NextResponse.json(sets);
-    }
-
-    // Build a slug→name map of every set with recent trend data.
-    const trendsBySlug = new Map<string, string>();
-    for (const row of (trendsData ?? []) as { set_slug: string; set_name: string }[]) {
-      if (!trendsBySlug.has(row.set_slug)) trendsBySlug.set(row.set_slug, row.set_name);
-    }
-
-    const filtered = sets.filter((s) => trendsBySlug.has(s.id));
-    return NextResponse.json(filtered);
+    const sets = await getPoketraceSets("releaseDate", "desc", "en");
+    // Only include sets that have a release date so the dropdown is clean.
+    return NextResponse.json(sets.filter((s) => !!s.releaseDate));
   } catch (err) {
     console.error("[api/sets] Failed to fetch sets:", err);
     return NextResponse.json({ error: "Failed to fetch sets" }, { status: 502 });
