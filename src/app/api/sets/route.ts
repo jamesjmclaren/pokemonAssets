@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     // older than that means the latest run dropped the set.
     const { data: trendsData, error } = await supabase
       .from("set_price_trends")
-      .select("set_slug")
+      .select("set_slug, set_name")
       .gte("recorded_at", new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString());
 
     if (error) {
@@ -31,12 +31,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(sets);
     }
 
-    const validSlugs = new Set(
-      (trendsData ?? []).map((r: { set_slug: string }) => r.set_slug)
-    );
-    const filtered = sets.filter((s) => validSlugs.has(s.id));
+    // Build a slug→name map of every set with recent trend data.
+    const trendsBySlug = new Map<string, string>();
+    for (const row of (trendsData ?? []) as { set_slug: string; set_name: string }[]) {
+      if (!trendsBySlug.has(row.set_slug)) trendsBySlug.set(row.set_slug, row.set_name);
+    }
 
-    return NextResponse.json(filtered);
+    // Keep catalogue entries that have data, then append any trend slugs that
+    // aren't surfaced by the Poketrace /sets catalogue (e.g. our supplemental
+    // long-form slugs like sv-scarlet-and-violet-ascended-heroes).
+    const filtered = sets.filter((s) => trendsBySlug.has(s.id));
+    const cataloguedSlugs = new Set(filtered.map((s) => s.id));
+    const extras = [...trendsBySlug.entries()]
+      .filter(([slug]) => !cataloguedSlugs.has(slug))
+      .map(([slug, name]) => ({
+        id: slug,
+        name,
+        series: "pokemon",
+        releaseDate: "",
+        totalCards: 0,
+      }));
+
+    // Supplemental sets are newest — surface them at the top.
+    return NextResponse.json([...extras, ...filtered]);
   } catch (err) {
     console.error("[api/sets] Failed to fetch sets:", err);
     return NextResponse.json({ error: "Failed to fetch sets" }, { status: 502 });
