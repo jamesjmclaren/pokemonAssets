@@ -137,9 +137,75 @@ export default function SearchAssetPage() {
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
+  const [deepLinkLoading, setDeepLinkLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addFormRef = useRef<HTMLDivElement>(null);
+
+  // Deep-link support: if the URL carries ?cardId=<poketraceId>, resolve it
+  // via /api/card-detail and drop straight into the card-detail view.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const cardId = params.get("cardId");
+    if (!cardId) return;
+
+    let cancelled = false;
+    setDeepLinkLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(`/api/card-detail?poketraceId=${encodeURIComponent(cardId)}`);
+        if (!res.ok) throw new Error("Card not found");
+        type CardDetail = {
+          id: string;
+          name: string;
+          setName: string;
+          cardNumber: string | null;
+          rarity: string | null;
+          image: string | null;
+          type: "card" | "sealed";
+          rawPrices: Record<string, { avg: number }>;
+          gradedPrices: { tier: string; avg: number }[];
+        };
+        const card: CardDetail = await res.json();
+        if (cancelled) return;
+
+        const rawAvg =
+          card.rawPrices?.NEAR_MINT?.avg ??
+          card.rawPrices?.["Near Mint"]?.avg ??
+          null;
+        const psa10Avg = card.gradedPrices?.find((g) => g.tier === "PSA_10")?.avg ?? null;
+        const psa9Avg = card.gradedPrices?.find((g) => g.tier === "PSA_9")?.avg ?? null;
+
+        setSelectedResult({
+          id: card.id,
+          name: card.name,
+          setName: card.setName,
+          number: card.cardNumber ?? undefined,
+          rarity: card.rarity ?? undefined,
+          imageUrl: card.image ?? undefined,
+          type: card.type,
+          marketPrice: rawAvg,
+          prices: {
+            raw: rawAvg ?? undefined,
+            psa10: psa10Avg ?? undefined,
+            psa9: psa9Avg ?? undefined,
+          },
+          poketraceId: card.id,
+        });
+      } catch {
+        // Bad / stale cardId — drop the param and fall back to search UI.
+        if (!cancelled) {
+          window.history.replaceState({}, "", "/dashboard/add");
+        }
+      } finally {
+        if (!cancelled) setDeepLinkLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Debounced search
   const doSearch = useCallback(async (q: string) => {
@@ -171,6 +237,9 @@ export default function SearchAssetPage() {
     setShowAddForm(false);
     setQuery("");
     setSearchResults([]);
+    if (typeof window !== "undefined" && window.location.search.includes("cardId")) {
+      window.history.replaceState({}, "", "/dashboard/add");
+    }
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
@@ -192,6 +261,18 @@ export default function SearchAssetPage() {
         marketPrice: selectedResult.marketPrice ?? undefined,
       } as SelectedCard)
     : undefined;
+
+  // ---------------------------------------------------------------------------
+  // Render — deep-link loading
+  // ---------------------------------------------------------------------------
+  if (deepLinkLoading) {
+    return (
+      <div className="max-w-5xl mx-auto py-20 flex flex-col items-center justify-center gap-3 text-text-muted">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <p className="text-sm">Loading card…</p>
+      </div>
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // Render — search state

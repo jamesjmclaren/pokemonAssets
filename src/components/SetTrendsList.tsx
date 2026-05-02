@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { clsx } from "clsx";
 import TrendBadge from "@/components/TrendBadge";
 import type { TrendCard } from "@/app/api/set-trends/route";
@@ -64,9 +65,10 @@ export default function SetTrendsList({
           <EmptyState label={title.toLowerCase()} />
         ) : (
           cards.map((card, i) => (
-            <div
+            <Link
               key={card.id}
-              className="flex items-center gap-3 py-3 border-b border-border last:border-0 hover:bg-surface-hover transition-colors rounded"
+              href={`/dashboard/add?cardId=${encodeURIComponent(card.id)}`}
+              className="flex items-center gap-3 py-3 border-b border-border last:border-0 hover:bg-surface-hover transition-colors rounded -mx-2 px-2"
             >
               {/* Rank */}
               <div className={clsx("w-6 text-center text-xs font-bold shrink-0", i < 3 ? textAccent : "text-text-muted")}>
@@ -118,7 +120,7 @@ export default function SetTrendsList({
                   />
                 </div>
               </div>
-            </div>
+            </Link>
           ))
         )}
       </div>
