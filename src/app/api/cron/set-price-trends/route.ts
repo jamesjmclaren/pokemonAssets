@@ -31,12 +31,22 @@ const JUNK_NAME_PATTERN =
   /\b(japanese|additionals?|commemorat|promo card pack|movie commemoration|battle academy|battle strength deck|battle starter deck|half deck|trainer kit|deck kit|gift box|burger king|theme deck)\b/i;
 
 
+// See /api/set-trends/route.ts for the rationale — we keep the threshold
+// in sync between the live route and the cron so cached rows agree.
+const MIN_SALES_FOR_TREND = 5;
+
 function computeTrendCard(card: PoketraceCard, tier: string, period: "1d" | "7d"): TrendCard | null {
   const tierData = getPoketraceTier(card, tier);
   if (!tierData) return null;
 
   const currentPrice = tierData.avg;
-  const prevPrice = period === "1d" ? tierData.avg1d : tierData.avg7d;
+  const reliable =
+    tierData.saleCount == null || tierData.saleCount >= MIN_SALES_FOR_TREND;
+  const prevPrice = reliable
+    ? period === "1d"
+      ? tierData.avg1d
+      : tierData.avg7d
+    : null;
   const absChange = prevPrice != null ? currentPrice - prevPrice : null;
   const pctChange =
     absChange != null && prevPrice != null && prevPrice > 0

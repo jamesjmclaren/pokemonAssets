@@ -37,12 +37,26 @@ export interface SetTrendsResponse {
   fetchedAt: string;
 }
 
+// A trend % derived from a tier with too few historical sales is noise
+// (e.g. an ETB whose Poketrace NEAR_MINT row is a single eBay sale —
+// the avg1d will swing wildly off that one data point). Above this
+// threshold we trust the avg1d / avg7d values; below it we still surface
+// the card with its current price but null out the % change so the
+// "no sales data" badge renders instead of a misleading number.
+const MIN_SALES_FOR_TREND = 5;
+
 function computeTrendCard(card: PoketraceCard, tier: string, period: "1d" | "7d"): TrendCard | null {
   const tierData = getPoketraceTier(card, tier);
   if (!tierData) return null;
 
   const currentPrice = tierData.avg;
-  const prevPrice = period === "1d" ? tierData.avg1d : tierData.avg7d;
+  const reliable =
+    tierData.saleCount == null || tierData.saleCount >= MIN_SALES_FOR_TREND;
+  const prevPrice = reliable
+    ? period === "1d"
+      ? tierData.avg1d
+      : tierData.avg7d
+    : null;
   const absChange = prevPrice != null ? currentPrice - prevPrice : null;
   const pctChange =
     absChange != null && prevPrice != null && prevPrice > 0
