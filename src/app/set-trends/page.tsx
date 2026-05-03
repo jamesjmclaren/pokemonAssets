@@ -11,7 +11,6 @@ interface SetOption {
   name: string;
   releaseDate: string;
   totalCards?: number;
-  logo?: string | null;
 }
 
 type Period = "1d" | "7d";
@@ -232,27 +231,11 @@ export default function SetTrendsPage() {
                           setSetQuery("");
                         }}
                         className={clsx(
-                          "w-full flex items-center gap-3 px-3 py-2 text-sm text-left hover:bg-surface-hover transition-colors",
+                          "w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-surface-hover transition-colors",
                           s.id === selectedSet ? "text-accent font-medium" : "text-text-primary"
                         )}
                       >
-                        <div className="w-10 h-7 relative shrink-0 flex items-center justify-center bg-surface rounded">
-                          {s.logo ? (
-                            // Set logos vary in aspect — use plain <img> to skip
-                            // next/image's per-domain config requirements.
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={s.logo}
-                              alt=""
-                              className="max-w-full max-h-full object-contain"
-                            />
-                          ) : (
-                            <span className="text-[10px] text-text-muted">—</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="truncate">{s.name}</div>
-                        </div>
+                        <div className="flex-1 min-w-0 truncate">{s.name}</div>
                         <div className="shrink-0 text-xs text-text-muted tabular-nums">
                           {s.totalCards ? `${s.totalCards} cards` : ""}
                           {s.releaseDate && (

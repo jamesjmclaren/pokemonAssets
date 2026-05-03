@@ -807,7 +807,7 @@ export async function getPoketracePriceHistory(
 export async function getPoketraceSets(
   sortBy = "releaseDate",
   sortOrder = "desc"
-): Promise<{ id: string; name: string; series: string; releaseDate: string; totalCards: number; logo: string | null }[]> {
+): Promise<{ id: string; name: string; series: string; releaseDate: string; totalCards: number }[]> {
   const all: PoketraceSet[] = [];
   let cursor: string | null | undefined;
   let pages = 0;
@@ -829,7 +829,6 @@ export async function getPoketraceSets(
     series: s.series || "pokemon",
     releaseDate: s.releaseDate || "",
     totalCards: s.cardCount || 0,
-    logo: s.logo || null,
   }));
 
   const sortKey = sortBy === "releaseDate" ? "releaseDate" : "name";
