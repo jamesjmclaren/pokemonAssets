@@ -845,6 +845,31 @@ export async function getPoketraceSets(
 }
 
 /**
+ * Search Poketrace's set catalogue by free-text name. Used to discover
+ * the actual slug Poketrace's /cards index uses for a given set when
+ * our hardcoded alias list comes up empty (e.g. brand-new sets we
+ * haven't catalogued yet). Returns up to `limit` matches.
+ */
+export async function searchPoketraceSetsByName(
+  query: string,
+  limit = 20
+): Promise<{ slug: string; name: string }[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  try {
+    const response = await apiFetch("/v1/sets", {
+      search: trimmed,
+      limit: String(limit),
+    });
+    const batch: PoketraceSet[] = response?.data || [];
+    return batch.map((s) => ({ slug: s.slug, name: s.name }));
+  } catch (err) {
+    console.warn(`[poketrace] searchPoketraceSetsByName("${trimmed}") failed:`, err);
+    return [];
+  }
+}
+
+/**
  * Fetch the current price for a Poketrace-linked asset.
  * Handles graded assets by looking up the grade-specific price tier.
  * Returns { price, currency, isConverted, rate } or null.

@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   fetchPoketraceCardsBySet,
   getPoketraceTier,
+  searchPoketraceSetsByName,
   type PoketraceCard,
 } from "@/lib/poketrace";
 import { getCandidateSlugs } from "@/lib/poketrace-set-aliases";
@@ -254,28 +255,51 @@ export async function GET(request: NextRequest) {
 
   // Poketrace's /sets and /cards indexes don't always agree on slug shape
   // (e.g. /sets surfaces "151", /cards needs "sv-scarlet-and-violet-151").
-  // Try the requested slug first, then known aliases on a zero-card miss.
+  // Try the requested slug, then known aliases, then — if still empty —
+  // ask Poketrace's /sets search endpoint for any slug matching the
+  // display name and try those (catches brand-new sets we haven't yet
+  // catalogued in poketrace-set-aliases.ts).
   const candidates = getCandidateSlugs(setSlug, setNameParam);
+  const tried = new Set<string>();
   let cards: PoketraceCard[] = [];
   let workingSlug = setSlug;
+
+  async function tryCandidate(slug: string): Promise<boolean> {
+    if (!slug || tried.has(slug)) return false;
+    tried.add(slug);
+    const batch = await fetchPoketraceCardsBySet(slug, "US", {
+      pageSize: 20,
+      maxPages: 20,
+    });
+    if (batch.length > 0) {
+      cards = batch;
+      workingSlug = slug;
+      console.log(
+        `[set-trends] Fetched ${batch.length} cards for "${setSlug}" via candidate "${slug}"`
+      );
+      return true;
+    }
+    return false;
+  }
+
   try {
     for (const candidate of candidates) {
-      // Poketrace API caps `limit` at 20 per page. 20 pages × 20 = 400 cards max.
-      const batch = await fetchPoketraceCardsBySet(candidate, "US", {
-        pageSize: 20,
-        maxPages: 20,
-      });
-      if (batch.length > 0) {
-        cards = batch;
-        workingSlug = candidate;
-        console.log(
-          `[set-trends] Fetched ${batch.length} cards for "${setSlug}" via candidate "${candidate}"`
-        );
-        break;
+      if (await tryCandidate(candidate)) break;
+    }
+
+    // Search-by-name fallback when aliases are exhausted.
+    if (cards.length === 0 && setNameParam) {
+      const matches = await searchPoketraceSetsByName(setNameParam, 12);
+      console.log(
+        `[set-trends] alias miss for "${setSlug}" — search "${setNameParam}" returned ${matches.length} candidate(s)`
+      );
+      for (const m of matches) {
+        if (await tryCandidate(m.slug)) break;
       }
     }
+
     if (cards.length === 0) {
-      console.log(`[set-trends] No candidate returned cards for "${setSlug}" (tried ${candidates.length})`);
+      console.log(`[set-trends] No slug returned cards for "${setSlug}" (tried ${tried.size})`);
     }
   } catch (err) {
     console.error("[set-trends] fetchPoketraceCardsBySet failed:", err);
@@ -334,7 +358,7 @@ export async function GET(request: NextRequest) {
   // so the delete-then-insert clears any cron-written aliases.
   if (!hasRarityFilter) {
     try {
-      await persistTrendsForSet(setSlug, setName, cards, candidates);
+      await persistTrendsForSet(setSlug, setName, cards, [...tried]);
     } catch (err) {
       console.warn("[set-trends] persistTrendsForSet threw:", err);
     }
