@@ -202,6 +202,22 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[cron] Step 2 complete: ${snapshotsRecorded} snapshots recorded`);
+
+    // Step 3: Trigger set price trends cron (fire-and-forget, non-blocking)
+    console.log("[cron] Step 3: Triggering set-price-trends cron...");
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000";
+      const trendsRes = await fetch(`${baseUrl}/api/cron/set-price-trends`, {
+        headers: { authorization: `Bearer ${process.env.CRON_SECRET ?? ""}` },
+      });
+      const trendsJson = await trendsRes.json().catch(() => ({}));
+      console.log(`[cron] Step 3 complete: set-price-trends → ${trendsJson.rows_inserted ?? "?"} rows inserted`);
+    } catch (e) {
+      console.warn("[cron] Step 3: set-price-trends trigger failed (non-fatal):", e instanceof Error ? e.message : e);
+    }
+
     console.log(`[cron] ===== Daily price recording finished =====`);
     console.log(`[cron] Summary: ${assets.length} total | ${apiUpdated} refreshed (${poketraceUpdated} via ID) | ${snapshotsRecorded} snapshots`);
 

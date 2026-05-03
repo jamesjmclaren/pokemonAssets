@@ -26,6 +26,32 @@ function getApiKey(): string {
   return key;
 }
 
+// Poketrace enforces a burst rate limit; on 429 the body contains
+// `{ retryAfter: <seconds> }` and the response also carries a Retry-After
+// header. Sleep that long, then retry with exponential backoff + jitter.
+const MAX_RETRIES = 5;
+const BASE_BACKOFF_MS = 500;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRetryAfterMs(headerValue: string | null, body: string): number | null {
+  if (headerValue) {
+    const seconds = Number(headerValue);
+    if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  }
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.retryAfter === "number") {
+      return parsed.retryAfter * 1000;
+    }
+  } catch {
+    // body wasn't JSON — fall through
+  }
+  return null;
+}
+
 async function apiFetch(path: string, params?: Record<string, string>) {
   const url = new URL(path, API_BASE);
   if (params) {
@@ -33,21 +59,39 @@ async function apiFetch(path: string, params?: Record<string, string>) {
       if (value) url.searchParams.set(key, value);
     });
   }
+  const target = url.toString();
 
-  const res = await fetch(url.toString(), {
-    headers: {
-      "X-API-Key": getApiKey(),
-      "Content-Type": "application/json",
-    },
-    next: { revalidate: 3600 },
-  });
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(target, {
+      headers: {
+        "X-API-Key": getApiKey(),
+        "Content-Type": "application/json",
+      },
+      next: { revalidate: 3600 },
+    });
 
-  if (!res.ok) {
+    if (res.ok) {
+      return res.json();
+    }
+
     const text = await res.text();
+
+    // Retry on 429 (burst rate limit) and 5xx (transient upstream issues).
+    const retriable = res.status === 429 || (res.status >= 500 && res.status < 600);
+    if (retriable && attempt < MAX_RETRIES) {
+      const retryAfterMs = parseRetryAfterMs(res.headers.get("retry-after"), text);
+      const backoff = retryAfterMs ?? BASE_BACKOFF_MS * 2 ** attempt;
+      const jitter = Math.floor(Math.random() * 250);
+      await sleep(backoff + jitter);
+      lastError = new Error(`Poketrace API error ${res.status}: ${text}`);
+      continue;
+    }
+
     throw new Error(`Poketrace API error ${res.status}: ${text}`);
   }
 
-  return res.json();
+  throw lastError ?? new Error("Poketrace API: exhausted retries");
 }
 
 // ---------------------------------------------------------------------------
@@ -124,10 +168,15 @@ export async function fetchPoketraceCardsBySet(
     };
     if (cursor) params.cursor = cursor;
     if (opts.variant) params.variant = opts.variant;
-    const response: PoketraceSearchResponse = await apiFetch("/v1/cards", params);
-    const batch = response?.data || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response: any = await apiFetch("/v1/cards", params);
+    const batch: PoketraceCard[] = response?.data || [];
     all.push(...batch);
-    cursor = response?.hasMore ? response?.nextCursor : null;
+    // Poketrace nests pagination under `pagination` for both /sets and /cards
+    // — fall back to the top-level fields just in case.
+    const hasMore = response?.pagination?.hasMore ?? response?.hasMore;
+    const nextCursor = response?.pagination?.nextCursor ?? response?.nextCursor;
+    cursor = hasMore ? nextCursor : null;
     pages += 1;
   } while (cursor && pages < maxPages);
 
@@ -792,6 +841,31 @@ export async function getPoketraceSets(
   });
 
   return normalized;
+}
+
+/**
+ * Search Poketrace's set catalogue by free-text name. Used to discover
+ * the actual slug Poketrace's /cards index uses for a given set when
+ * our hardcoded alias list comes up empty (e.g. brand-new sets we
+ * haven't catalogued yet). Returns up to `limit` matches.
+ */
+export async function searchPoketraceSetsByName(
+  query: string,
+  limit = 20
+): Promise<{ slug: string; name: string }[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  try {
+    const response = await apiFetch("/v1/sets", {
+      search: trimmed,
+      limit: String(limit),
+    });
+    const batch: PoketraceSet[] = response?.data || [];
+    return batch.map((s) => ({ slug: s.slug, name: s.name }));
+  } catch (err) {
+    console.warn(`[poketrace] searchPoketraceSetsByName("${trimmed}") failed:`, err);
+    return [];
+  }
 }
 
 /**
