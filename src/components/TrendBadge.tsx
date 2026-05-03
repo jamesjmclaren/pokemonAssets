@@ -8,16 +8,32 @@ interface TrendBadgeProps {
 }
 
 export default function TrendBadge({ absChange, pctChange, size = "md" }: TrendBadgeProps) {
-  const isFlat = pctChange != null && Math.abs(pctChange) < 0.05;
+  // Three empty-state cases worth distinguishing:
+  //  - null: Poketrace had no comparable prior price → "no data"
+  //  - flat: a real reading that happens to be ~0% → "0%"
+  if (absChange == null || pctChange == null) {
+    return (
+      <span
+        className={clsx(
+          "inline-flex items-center gap-1 italic text-text-muted",
+          size === "sm" ? "text-[11px]" : "text-xs"
+        )}
+        title="Poketrace has no recent sales for this card"
+      >
+        no sales data
+      </span>
+    );
+  }
 
-  if (absChange == null || pctChange == null || isFlat) {
+  const isFlat = Math.abs(pctChange) < 0.05;
+  if (isFlat) {
     return (
       <span className={clsx(
         "inline-flex items-center gap-1 text-text-muted",
         size === "sm" ? "text-xs" : "text-sm"
       )}>
         <Minus className={size === "sm" ? "w-3 h-3" : "w-4 h-4"} />
-        <span>—</span>
+        <span>0%</span>
       </span>
     );
   }
