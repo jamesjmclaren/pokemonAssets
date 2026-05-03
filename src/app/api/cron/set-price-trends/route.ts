@@ -47,11 +47,10 @@ function computeTrendCard(card: PoketraceCard, tier: string, period: "1d" | "7d"
       ? tierData.avg1d
       : tierData.avg7d
     : null;
-  const absChange = prevPrice != null ? currentPrice - prevPrice : null;
-  const pctChange =
-    absChange != null && prevPrice != null && prevPrice > 0
-      ? (absChange / prevPrice) * 100
-      : null;
+  // No reliable prior price for the requested period — drop the card.
+  if (prevPrice == null) return null;
+  const absChange = currentPrice - prevPrice;
+  const pctChange = prevPrice > 0 ? (absChange / prevPrice) * 100 : null;
 
   return {
     id: card.id,
@@ -214,14 +213,26 @@ async function processSet(slugCandidates: string[], setName: string): Promise<Se
   return result;
 }
 
-async function processBatch<T, R>(items: T[], batchSize: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+async function processBatch<T, R>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T) => Promise<R>,
+  budgetMs?: number
+): Promise<{ results: R[]; processed: number; abandonedAfter: number | null }> {
+  const start = Date.now();
+  const deadline = budgetMs == null ? null : start + budgetMs;
   const results: R[] = [];
+  let processed = 0;
   for (let i = 0; i < items.length; i += batchSize) {
+    if (deadline != null && Date.now() >= deadline) {
+      return { results, processed, abandonedAfter: items.length - processed };
+    }
     const batch = items.slice(i, i + batchSize);
     const out = await Promise.all(batch.map(fn));
     results.push(...out);
+    processed += batch.length;
   }
-  return results;
+  return { results, processed, abandonedAfter: null };
 }
 
 export async function GET(request: NextRequest) {
@@ -269,11 +280,26 @@ export async function GET(request: NextRequest) {
 
   console.log(`[cron/set-price-trends] Processing ${setsToProcess.length} sets (${SUPPLEMENTAL_SETS.length} supplemental + catalogue)`);
 
+  // Vercel kills the function at 300s — leave a 30s margin so we have time
+  // to compute the summary and serialise JSON instead of returning HTML.
+  const WALL_CLOCK_BUDGET_MS = 270 * 1000;
+
   // Process 5 sets concurrently to respect the 30 req/10 sec burst limit.
-  const results = await processBatch(setsToProcess, 5, async ({ slugs, name }) => {
-    console.log(`[cron/set-price-trends]   → ${name} (${slugs.length} candidate(s))`);
-    return processSet(slugs, name);
-  });
+  const { results, processed, abandonedAfter } = await processBatch(
+    setsToProcess,
+    5,
+    async ({ slugs, name }) => {
+      console.log(`[cron/set-price-trends]   → ${name} (${slugs.length} candidate(s))`);
+      return processSet(slugs, name);
+    },
+    WALL_CLOCK_BUDGET_MS
+  );
+
+  if (abandonedAfter != null) {
+    console.warn(
+      `[cron/set-price-trends] Wall-clock budget hit — processed ${processed} of ${setsToProcess.length} sets, ${abandonedAfter} skipped`
+    );
+  }
 
   const totalInserted = results.reduce((acc, r) => acc + r.rows_inserted, 0);
   const breakdown = {
@@ -289,7 +315,11 @@ export async function GET(request: NextRequest) {
   );
 
   return NextResponse.json({
-    message: "Set price trends recorded",
+    message: abandonedAfter != null
+      ? `Set price trends recorded (partial — ${abandonedAfter} sets skipped due to time budget)`
+      : "Set price trends recorded",
+    partial: abandonedAfter != null,
+    skipped: abandonedAfter ?? 0,
     counts: {
       total: results.length,
       inserted: breakdown.inserted.length,

@@ -57,11 +57,12 @@ function computeTrendCard(card: PoketraceCard, tier: string, period: "1d" | "7d"
       ? tierData.avg1d
       : tierData.avg7d
     : null;
-  const absChange = prevPrice != null ? currentPrice - prevPrice : null;
-  const pctChange =
-    absChange != null && prevPrice != null && prevPrice > 0
-      ? (absChange / prevPrice) * 100
-      : null;
+  // No reliable prior price for the requested period (low-sample tier
+  // or upstream avg1d/avg7d missing) — drop the card entirely so it
+  // can't pollute either the rankings or the list itself.
+  if (prevPrice == null) return null;
+  const absChange = currentPrice - prevPrice;
+  const pctChange = prevPrice > 0 ? (absChange / prevPrice) * 100 : null;
 
   return {
     id: card.id,
@@ -214,8 +215,21 @@ async function fromCache(
     source: (row.source as string) ?? "",
   });
 
-  const raw = data.filter((r: Record<string, unknown>) => r.tier_type === "raw").slice(0, limit).map(toTrendCard);
-  const psa10 = data.filter((r: Record<string, unknown>) => r.tier_type === "psa10").slice(0, limit).map(toTrendCard);
+  // Hide rows the old cron persisted before we started filtering on
+  // sale-count — they've still got a numeric prev_price written from
+  // a low-sample tier. Once today's cache is rewritten by a newer cron
+  // these shouldn't appear, but the filter keeps the UI clean either way.
+  const isReliableRow = (r: Record<string, unknown>): boolean =>
+    r.prev_price != null && r.pct_change != null;
+
+  const raw = data
+    .filter((r: Record<string, unknown>) => r.tier_type === "raw" && isReliableRow(r))
+    .slice(0, limit)
+    .map(toTrendCard);
+  const psa10 = data
+    .filter((r: Record<string, unknown>) => r.tier_type === "psa10" && isReliableRow(r))
+    .slice(0, limit)
+    .map(toTrendCard);
 
   if (raw.length === 0 && psa10.length === 0) return null;
 
