@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, UserPlus, Trash2, Copy, Check, Shield, Eye } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Copy, Check, Shield, Eye, Globe, Link2 } from "lucide-react";
 import Link from "next/link";
 
 const SUPER_ADMIN_EMAILS = [
@@ -41,6 +41,10 @@ export default function PortfolioSettingsPage() {
   const [inviteRole, setInviteRole] = useState<"admin" | "read_only">("read_only");
   const [inviting, setInviting] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(false);
+  const [publicToken, setPublicToken] = useState<string | null>(null);
+  const [publicToggling, setPublicToggling] = useState(false);
+  const [copiedPublicLink, setCopiedPublicLink] = useState(false);
 
   const isOwner = user?.id === ownerId;
   const isSuperAdmin = user?.emailAddresses
@@ -54,9 +58,10 @@ export default function PortfolioSettingsPage() {
 
   async function fetchData() {
     try {
-      const [membersRes, invitationsRes] = await Promise.all([
+      const [membersRes, invitationsRes, portfolioRes] = await Promise.all([
         fetch(`/api/portfolios/${portfolioId}/members`),
         fetch(`/api/portfolios/${portfolioId}/invitations`),
+        fetch(`/api/portfolios/${portfolioId}`),
       ]);
 
       if (membersRes.ok) {
@@ -69,11 +74,44 @@ export default function PortfolioSettingsPage() {
         const data = await invitationsRes.json();
         setInvitations(data);
       }
+
+      if (portfolioRes.ok) {
+        const data = await portfolioRes.json();
+        setIsPublic(data.is_public ?? false);
+        setPublicToken(data.public_token ?? null);
+      }
     } catch (error) {
       console.error("Failed to fetch data:", error);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function togglePublicLink(enable: boolean) {
+    setPublicToggling(true);
+    try {
+      const res = await fetch(`/api/portfolios/${portfolioId}/public`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_public: enable }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsPublic(data.is_public);
+        setPublicToken(data.public_token);
+      }
+    } catch (error) {
+      console.error("Failed to toggle public link:", error);
+    } finally {
+      setPublicToggling(false);
+    }
+  }
+
+  function copyPublicLink() {
+    if (!publicToken) return;
+    navigator.clipboard.writeText(`${window.location.origin}/p/${publicToken}`);
+    setCopiedPublicLink(true);
+    setTimeout(() => setCopiedPublicLink(false), 2000);
   }
 
   async function sendInvitation(e: React.FormEvent) {
@@ -145,6 +183,58 @@ export default function PortfolioSettingsPage() {
       </Link>
 
       <h1 className="text-2xl font-bold text-white mb-8">Portfolio Settings</h1>
+
+      {/* Public Sharing */}
+      {isOwner && (
+        <section className="bg-zinc-800 border border-zinc-700 rounded-xl p-6 mb-6">
+          <h2 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+            <Globe className="w-5 h-5" />
+            Public Sharing
+          </h2>
+          <p className="text-sm text-zinc-400 mb-4">
+            Share a read-only view of your collection showing market prices. Purchase prices and personal info are never shown.
+          </p>
+
+          <div className="flex items-center justify-between">
+            <span className="text-white font-medium">Public link</span>
+            <button
+              onClick={() => togglePublicLink(!isPublic)}
+              disabled={publicToggling}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                isPublic ? "bg-accent" : "bg-zinc-600"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  isPublic ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          {isPublic && publicToken && (
+            <div className="mt-4 p-3 bg-zinc-900 rounded-lg flex items-center gap-3">
+              <Link2 className="w-4 h-4 text-zinc-400 shrink-0" />
+              <span className="text-sm text-zinc-300 flex-1 truncate">
+                {typeof window !== "undefined"
+                  ? `${window.location.origin}/p/${publicToken}`
+                  : `/p/${publicToken}`}
+              </span>
+              <button
+                onClick={copyPublicLink}
+                className="p-1.5 hover:bg-zinc-700 rounded-lg transition-colors shrink-0"
+                title="Copy link"
+              >
+                {copiedPublicLink ? (
+                  <Check className="w-4 h-4 text-green-400" />
+                ) : (
+                  <Copy className="w-4 h-4 text-zinc-400" />
+                )}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Invite Form */}
       <section className="bg-zinc-800 border border-zinc-700 rounded-xl p-6 mb-6">
