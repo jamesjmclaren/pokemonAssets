@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { TrendingUp, TrendingDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { fixStorageUrl } from "@/lib/format";
 
@@ -20,8 +19,6 @@ type PublicAsset = {
   asset_type: string | null;
   quantity: number | null;
   language: string | null;
-  change7d: number | null;
-  change7dPct: number | null;
 };
 
 function formatPrice(value: number | null, currency = "USD"): string {
@@ -68,37 +65,7 @@ async function getPublicPortfolio(token: string) {
     .or("status.is.null,status.eq.ACTIVE")
     .order("current_price", { ascending: false });
 
-  const assetIds = (assets ?? []).map((a) => a.id);
-  const baseline: Record<string, number> = {};
-
-  if (assetIds.length > 0) {
-    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: snapshots } = await supabase
-      .from("price_snapshots")
-      .select("asset_id, price")
-      .in("asset_id", assetIds)
-      .lte("recorded_at", cutoff)
-      .order("recorded_at", { ascending: false });
-
-    for (const snap of snapshots ?? []) {
-      if (!(snap.asset_id in baseline)) {
-        baseline[snap.asset_id] = snap.price;
-      }
-    }
-  }
-
-  const publicAssets: PublicAsset[] = (assets ?? []).map((asset) => {
-    const base = baseline[asset.id] ?? null;
-    const current = asset.current_price ?? null;
-    const change7d = base !== null && current !== null ? current - base : null;
-    const change7dPct =
-      base !== null && base !== 0 && current !== null
-        ? ((current - base) / base) * 100
-        : null;
-    return { ...asset, change7d, change7dPct };
-  });
-
-  return { portfolio, assets: publicAssets };
+  return { portfolio, assets: (assets ?? []) as PublicAsset[] };
 }
 
 export default async function PublicPortfolioPage({
@@ -112,7 +79,6 @@ export default async function PublicPortfolioPage({
   if (!data) return notFound();
 
   const { portfolio, assets } = data;
-  const activeAssets = assets.filter((a) => a.current_price != null || a.name);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -121,27 +87,23 @@ export default async function PublicPortfolioPage({
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-0.5">Portfolio</p>
-            <h1 className="text-xl font-bold">
-              <span className="text-accent">{portfolio.name}</span>
-            </h1>
+            <h1 className="text-xl font-bold text-accent">{portfolio.name}</h1>
           </div>
           <div className="text-right">
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-0.5">Total Value</p>
-            <p className="text-xl font-bold text-white">{formatTotalValue(activeAssets)}</p>
+            <p className="text-xl font-bold text-white">{formatTotalValue(assets)}</p>
           </div>
         </div>
       </div>
 
       {/* Cards Grid */}
       <div className="max-w-4xl mx-auto px-4 py-6">
-        {activeAssets.length === 0 ? (
+        {assets.length === 0 ? (
           <div className="text-center py-20 text-zinc-500">No cards in this portfolio yet.</div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
-            {activeAssets.map((asset) => {
+            {assets.map((asset) => {
               const imageUrl = fixStorageUrl(asset.custom_image_url) ?? asset.image_url;
-              const isGain = asset.change7d != null && asset.change7d > 0;
-              const isLoss = asset.change7d != null && asset.change7d < 0;
               const currency = asset.price_currency || "USD";
               const label = asset.psa_grade
                 ? `PSA ${asset.psa_grade}`
@@ -158,7 +120,6 @@ export default async function PublicPortfolioPage({
                   key={asset.id}
                   className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden flex flex-col"
                 >
-                  {/* Card Image */}
                   <div className="relative aspect-[3/4] bg-zinc-800">
                     {imageUrl ? (
                       <Image
@@ -181,7 +142,6 @@ export default async function PublicPortfolioPage({
                     )}
                   </div>
 
-                  {/* Card Details */}
                   <div className="p-3 flex flex-col gap-1 flex-1">
                     <p className="font-semibold text-white text-sm leading-tight">
                       {asset.name}
@@ -196,40 +156,11 @@ export default async function PublicPortfolioPage({
                       <p className="text-xs text-zinc-500">{cardRef}</p>
                     )}
 
-                    {/* Price */}
-                    <div className="mt-auto pt-2">
-                      <div className="flex items-center gap-1">
-                        {isGain && <TrendingUp className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                        {isLoss && <TrendingDown className="w-3.5 h-3.5 text-red-400 shrink-0" />}
-                        <span
-                          className={`text-base font-bold ${
-                            isGain
-                              ? "text-emerald-400"
-                              : isLoss
-                              ? "text-red-400"
-                              : "text-white"
-                          }`}
-                        >
-                          {formatPrice(asset.current_price, currency)}
-                        </span>
-                      </div>
-
-                      {asset.change7d != null && asset.change7dPct != null && (
-                        <p
-                          className={`text-xs mt-0.5 ${
-                            isGain ? "text-emerald-500" : "text-red-500"
-                          }`}
-                        >
-                          {isGain ? "+" : ""}
-                          {formatPrice(asset.change7d, currency)} (
-                          {isGain ? "+" : ""}
-                          {asset.change7dPct.toFixed(2)}%)
-                        </p>
-                      )}
-
-                      <p className="text-xs text-zinc-500 mt-1">
-                        Qty: {asset.quantity ?? 1}
-                      </p>
+                    <div className="mt-auto pt-2 flex items-center justify-between">
+                      <span className="text-base font-bold text-white">
+                        {formatPrice(asset.current_price, currency)}
+                      </span>
+                      <span className="text-xs text-zinc-500">Qty: {asset.quantity ?? 1}</span>
                     </div>
                   </div>
                 </div>
@@ -239,15 +170,11 @@ export default async function PublicPortfolioPage({
         )}
       </div>
 
-      {/* Footer */}
       <div className="border-t border-zinc-800 mt-8">
         <div className="max-w-4xl mx-auto px-4 py-6 text-center">
           <p className="text-zinc-500 text-sm">
             Powered by{" "}
-            <Link
-              href="/"
-              className="text-accent hover:text-accent-hover transition-colors font-medium"
-            >
+            <Link href="/" className="text-accent hover:text-accent-hover transition-colors font-medium">
               West Investments
             </Link>{" "}
             — Track your Pokémon card collection for free

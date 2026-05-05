@@ -13,7 +13,7 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
-  const { is_public } = body;
+  const { is_public, regenerate } = body;
 
   if (typeof is_public !== "boolean") {
     return NextResponse.json({ error: "is_public must be a boolean" }, { status: 400 });
@@ -35,7 +35,7 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = { is_public };
 
-  if (is_public && !portfolio.public_token) {
+  if (is_public && (!portfolio.public_token || regenerate === true)) {
     updates.public_token = crypto.randomUUID();
   }
 

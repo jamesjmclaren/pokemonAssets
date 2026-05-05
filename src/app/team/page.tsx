@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePortfolio } from "@/lib/portfolio-context";
 import { useUser } from "@clerk/nextjs";
-import { UserPlus, Trash2, Copy, Check, Shield, Eye, Users, Crown, X, Globe, Link as LinkIcon } from "lucide-react";
+import { UserPlus, Trash2, Copy, Check, Shield, Eye, Users, Crown, X } from "lucide-react";
 
 const SUPER_ADMIN_EMAILS = [
   "jamesjmclaren@gmail.com",
@@ -41,10 +41,6 @@ export default function TeamPage() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [isPublic, setIsPublic] = useState(false);
-  const [publicToken, setPublicToken] = useState<string | null>(null);
-  const [publicToggling, setPublicToggling] = useState(false);
-  const [copiedPublicLink, setCopiedPublicLink] = useState(false);
 
   const isOwner = currentPortfolio?.role === "owner";
   const canInvite = isOwner || currentPortfolio?.role === "admin";
@@ -59,10 +55,9 @@ export default function TeamPage() {
     if (!currentPortfolio) return;
     setLoading(true);
     try {
-      const [membersRes, invitationsRes, portfolioRes] = await Promise.all([
+      const [membersRes, invitationsRes] = await Promise.all([
         fetch(`/api/portfolios/${currentPortfolio.id}/members`),
         fetch(`/api/portfolios/${currentPortfolio.id}/invitations`),
-        fetch(`/api/portfolios/${currentPortfolio.id}`),
       ]);
 
       if (membersRes.ok) {
@@ -75,45 +70,11 @@ export default function TeamPage() {
         const data = await invitationsRes.json();
         setInvitations(Array.isArray(data) ? data : []);
       }
-
-      if (portfolioRes.ok) {
-        const data = await portfolioRes.json();
-        setIsPublic(data.is_public ?? false);
-        setPublicToken(data.public_token ?? null);
-      }
     } catch (err) {
       console.error("Failed to fetch team data:", err);
     } finally {
       setLoading(false);
     }
-  }
-
-  async function togglePublicLink(enable: boolean) {
-    if (!currentPortfolio) return;
-    setPublicToggling(true);
-    try {
-      const res = await fetch(`/api/portfolios/${currentPortfolio.id}/public`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_public: enable }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setIsPublic(data.is_public);
-        setPublicToken(data.public_token);
-      }
-    } catch (err) {
-      console.error("Failed to toggle public link:", err);
-    } finally {
-      setPublicToggling(false);
-    }
-  }
-
-  function copyPublicLink() {
-    if (!publicToken) return;
-    navigator.clipboard.writeText(`${window.location.origin}/p/${publicToken}`);
-    setCopiedPublicLink(true);
-    setTimeout(() => setCopiedPublicLink(false), 2000);
   }
 
   async function sendInvitation(e: React.FormEvent) {
@@ -222,60 +183,6 @@ export default function TeamPage() {
           Manage who has access to {currentPortfolio.name}
         </p>
       </div>
-
-      {/* Public Sharing */}
-      {isOwner && (
-        <section className="bg-surface border border-border rounded-2xl p-6">
-          <h2 className="text-lg font-semibold text-text-primary mb-1 flex items-center gap-2">
-            <Globe className="w-5 h-5" />
-            Public Link
-          </h2>
-          <p className="text-sm text-text-muted mb-4">
-            Share a read-only view of your collection showing market prices. Purchase prices and personal info are never shown.
-          </p>
-
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-text-primary">
-              {isPublic ? "Public link is on" : "Public link is off"}
-            </span>
-            <button
-              onClick={() => togglePublicLink(!isPublic)}
-              disabled={publicToggling}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
-                isPublic ? "bg-accent" : "bg-border"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  isPublic ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
-          </div>
-
-          {isPublic && publicToken && (
-            <div className="flex items-center gap-2 p-3 bg-background rounded-xl">
-              <LinkIcon className="w-4 h-4 text-text-muted shrink-0" />
-              <span className="text-sm text-text-muted truncate flex-1">
-                {typeof window !== "undefined"
-                  ? `${window.location.origin}/p/${publicToken}`
-                  : `/p/${publicToken}`}
-              </span>
-              <button
-                onClick={copyPublicLink}
-                className="p-1.5 hover:bg-surface rounded-lg transition-colors shrink-0"
-                title="Copy link"
-              >
-                {copiedPublicLink ? (
-                  <Check className="w-4 h-4 text-green-400" />
-                ) : (
-                  <Copy className="w-4 h-4 text-text-muted" />
-                )}
-              </button>
-            </div>
-          )}
-        </section>
-      )}
 
       {/* Invite Form */}
       {canInvite && (
