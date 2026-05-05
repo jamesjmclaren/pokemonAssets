@@ -29,6 +29,7 @@ export default function DashboardPage() {
   const [assets, setAssets] = useState<PortfolioAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -40,7 +41,14 @@ export default function DashboardPage() {
         const assetsRes = await fetch(`/api/assets?portfolioId=${currentPortfolio.id}`);
         if (!assetsRes.ok) throw new Error("Failed to fetch assets");
         const data = await assetsRes.json();
-        setAssets(Array.isArray(data) ? data : []);
+        const list: PortfolioAsset[] = Array.isArray(data) ? data : [];
+        setAssets(list);
+        const latest = list.reduce<Date | null>((max, a) => {
+          if (!a.price_updated_at) return max;
+          const d = new Date(a.price_updated_at);
+          return max === null || d > max ? d : max;
+        }, null);
+        if (latest) setLastRefreshed(latest);
       } catch (error) {
         console.error("Error fetching data:", error);
         setAssets([]);
@@ -66,6 +74,7 @@ export default function DashboardPage() {
         const refreshed = await fetch(`/api/assets?portfolioId=${currentPortfolio?.id}`);
         if (refreshed.ok) setAssets(await refreshed.json());
       }
+      setLastRefreshed(new Date());
     } catch {
       // silent
     } finally {
@@ -227,9 +236,22 @@ export default function DashboardPage() {
       </div>
 
       {/* Market disclaimer footnote */}
-      <p className="text-[11px] text-text-muted -mt-1">
-        Valuations based on US market pricing (TCGPlayer + eBay, USD). European-market assets are converted from EUR at today&apos;s rate.
-      </p>
+      <div className="-mt-1 space-y-0.5">
+        <p className="text-[11px] text-text-muted">
+          Valuations based on US market pricing (TCGPlayer + eBay, USD). European-market assets are converted from EUR at today&apos;s rate.
+        </p>
+        {lastRefreshed && (
+          <p className="text-[11px] text-text-muted">
+            Prices last updated:{" "}
+            <span className="text-text-secondary">
+              {lastRefreshed.toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </span>
+          </p>
+        )}
+      </div>
 
       {/* Summary bar */}
       {assets.length > 0 && (
