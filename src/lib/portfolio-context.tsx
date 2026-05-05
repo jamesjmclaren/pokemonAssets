@@ -23,7 +23,7 @@ interface PortfolioContextType {
 
 const PortfolioContext = createContext<PortfolioContextType | null>(null);
 
-const PUBLIC_ROUTES = ["/", "/sign-in", "/sign-up", "/invite", "/onboarding"];
+const PUBLIC_ROUTES = ["/", "/sign-in", "/sign-up", "/invite", "/onboarding", "/p/"];
 
 export function PortfolioProvider({ children }: { children: ReactNode }) {
   const { isSignedIn, isLoaded } = useUser();

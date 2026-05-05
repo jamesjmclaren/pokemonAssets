@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Settings, KeyRound, FileCode } from "lucide-react";
+import { Settings, KeyRound, FileCode, Globe } from "lucide-react";
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,6 +10,13 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       </div>
 
       <nav className="flex gap-2 border-b border-border">
+        <Link
+          href="/settings/sharing"
+          className="flex items-center gap-2 px-4 py-2 text-sm text-text-secondary hover:text-text-primary border-b-2 border-transparent hover:border-accent/40"
+        >
+          <Globe className="w-4 h-4" />
+          Sharing
+        </Link>
         <Link
           href="/settings/api-keys"
           className="flex items-center gap-2 px-4 py-2 text-sm text-text-secondary hover:text-text-primary border-b-2 border-transparent hover:border-accent/40"
