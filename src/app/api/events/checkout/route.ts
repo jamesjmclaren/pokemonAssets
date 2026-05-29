@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cardTypesStr = card_types.join(",");
-    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+    const lineItems: Stripe.Checkout.SessionCreateParams["line_items"] = [];
 
     if (satCount > 0) {
       lineItems.push({
