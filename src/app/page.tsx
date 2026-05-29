@@ -74,6 +74,9 @@ export default function LandingPage() {
             <Link href="/community" className="text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
               Community
             </Link>
+            <Link href="/event" className="text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+              Event
+            </Link>
             <button
               onClick={() => router.push("/sign-in")}
               className="text-xs tracking-widest uppercase border border-accent/40 text-accent px-6 py-2.5 hover:bg-accent hover:text-background transition-all cursor-pointer"
@@ -107,6 +110,9 @@ export default function LandingPage() {
             </a>
             <Link href="/community" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
               Community
+            </Link>
+            <Link href="/event" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-accent hover:text-accent-hover transition-colors" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.12em", fontSize: "11px", textTransform: "uppercase" }}>
+              Event
             </Link>
             <button
               onClick={() => { setMobileMenuOpen(false); router.push("/sign-in"); }}
