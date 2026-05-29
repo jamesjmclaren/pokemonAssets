@@ -203,6 +203,22 @@ async function handleEventTableBooking(
     }
   }
 
+  // Fetch remaining availability after booking
+  const totalTables = parseInt(process.env.EVENT_TOTAL_TABLES || "176", 10);
+  let satRemaining: number | null = null;
+  let sunRemaining: number | null = null;
+  try {
+    const { data: allBookings } = await supabase
+      .from("event_bookings")
+      .select("tables_count, event_day")
+      .eq("payment_status", "paid");
+    const rows = allBookings || [];
+    const satBooked = rows.filter((r) => r.event_day === "Saturday").reduce((s, r) => s + r.tables_count, 0);
+    const sunBooked = rows.filter((r) => r.event_day === "Sunday").reduce((s, r) => s + r.tables_count, 0);
+    satRemaining = Math.max(0, totalTables - satBooked);
+    sunRemaining = Math.max(0, totalTables - sunBooked);
+  } catch {}
+
   const amountFormatted = `£${(amountPaidPence / 100).toFixed(2)}`;
   const mailerooKey = process.env.MAILEROO_API_KEY!;
   const domain = process.env.MAILEROO_DOMAIN || "west.investments";
@@ -232,6 +248,10 @@ async function handleEventTableBooking(
           <p><strong>Payment Status:</strong> ${session.payment_status}</p>
           <p><strong>Stripe Session ID:</strong> ${session.id}</p>
           <p><strong>Booked At:</strong> ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</p>
+          <hr />
+          <h3>Tables Remaining</h3>
+          <p><strong>Saturday 4th June:</strong> ${satRemaining !== null ? `${satRemaining} of ${totalTables}` : "—"}</p>
+          <p><strong>Sunday 5th June:</strong> ${sunRemaining !== null ? `${sunRemaining} of ${totalTables}` : "—"}</p>
         `,
       }),
     });
