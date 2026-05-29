@@ -160,19 +160,32 @@ async function handleEventTableBooking(
   const instagramHandle = metadata.instagram_handle || "";
   const email = metadata.email || "";
   const phone = metadata.phone || "Not provided";
-  const cardType = metadata.card_type || "Not provided";
-  const tablesCount = parseInt(metadata.tables_count || "1", 10);
-  const eventDay = metadata.event_day || "Saturday";
+  const cardTypes = metadata.card_types || "Not provided";
+  const satCount = parseInt(metadata.saturday_tables || "0", 10);
+  const sunCount = parseInt(metadata.sunday_tables || "0", 10);
   const amountPaidPence = session.amount_total || 0;
   const vendorName = `${firstName} ${lastName}`.trim() || businessName;
-  const dayLabel = DAY_LABELS[eventDay] || eventDay;
 
-  // Insert booking record
-  try {
-    await getSupabaseAdmin()
-      .from("event_bookings")
-      .insert({
-        stripe_session_id: session.id,
+  // Build day summary for emails
+  const dayLines: string[] = [];
+  if (satCount > 0) dayLines.push(`${satCount} table${satCount > 1 ? "s" : ""} — ${DAY_LABELS.Saturday}`);
+  if (sunCount > 0) dayLines.push(`${sunCount} table${sunCount > 1 ? "s" : ""} — ${DAY_LABELS.Sunday}`);
+  const daySummary = dayLines.join(", ");
+  const subjectDays = [satCount > 0 ? DAY_LABELS.Saturday : null, sunCount > 0 ? DAY_LABELS.Sunday : null]
+    .filter(Boolean).join(" & ");
+
+  // Insert one row per booked day so per-day counter stays accurate
+  const supabase = getSupabaseAdmin();
+  const dayInserts = [
+    satCount > 0 ? { event_day: "Saturday", tables_count: satCount } : null,
+    sunCount > 0 ? { event_day: "Sunday", tables_count: sunCount } : null,
+  ].filter(Boolean) as { event_day: string; tables_count: number }[];
+
+  for (const [i, day] of dayInserts.entries()) {
+    try {
+      await supabase.from("event_bookings").insert({
+        // Suffix session ID so uniqueness constraint holds for two-day bookings
+        stripe_session_id: dayInserts.length > 1 ? `${session.id}_${i}` : session.id,
         payment_status: "paid",
         first_name: firstName,
         last_name: lastName,
@@ -180,13 +193,14 @@ async function handleEventTableBooking(
         instagram_handle: instagramHandle || null,
         email,
         phone,
-        card_type: cardType,
-        tables_count: tablesCount,
-        event_day: eventDay,
-        amount_paid_pence: amountPaidPence,
+        card_type: cardTypes,
+        tables_count: day.tables_count,
+        event_day: day.event_day,
+        amount_paid_pence: Math.round((amountPaidPence * day.tables_count) / (satCount + sunCount)),
       });
-  } catch (dbError) {
-    console.error("Failed to insert event booking:", dbError);
+    } catch (dbError) {
+      console.error(`Failed to insert event booking row for ${day.event_day}:`, dbError);
+    }
   }
 
   const amountFormatted = `£${(amountPaidPence / 100).toFixed(2)}`;
@@ -201,7 +215,7 @@ async function handleEventTableBooking(
       body: JSON.stringify({
         from: { address: `noreply@${domain}`, display_name: "West Investments" },
         to: { address: "info@west.investments", display_name: "West Investments" },
-        subject: `New Table Booking: ${businessName} — ${dayLabel} (${tablesCount} table${tablesCount > 1 ? "s" : ""})`,
+        subject: `New Table Booking: ${businessName} — ${subjectDays}`,
         html: `
           <h2>New Event Table Booking</h2>
           <p>A vendor has completed payment for table(s) at the TCG Card Show.</p>
@@ -211,11 +225,10 @@ async function handleEventTableBooking(
           ${instagramHandle ? `<p><strong>Instagram:</strong> @${instagramHandle}</p>` : ""}
           <p><strong>Email:</strong> ${email}</p>
           <p><strong>Phone:</strong> ${phone}</p>
-          <p><strong>Card Type:</strong> ${cardType}</p>
-          <p><strong>Event Day:</strong> ${dayLabel}</p>
-          <p><strong>Tables Booked:</strong> ${tablesCount}</p>
+          <p><strong>Card Types:</strong> ${cardTypes}</p>
+          <p><strong>Tables Booked:</strong> ${daySummary}</p>
           <hr />
-          <p><strong>Amount Paid:</strong> ${amountFormatted}</p>
+          <p><strong>Total Paid:</strong> ${amountFormatted}</p>
           <p><strong>Payment Status:</strong> ${session.payment_status}</p>
           <p><strong>Stripe Session ID:</strong> ${session.id}</p>
           <p><strong>Booked At:</strong> ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</p>
@@ -235,22 +248,21 @@ async function handleEventTableBooking(
         body: JSON.stringify({
           from: { address: `noreply@${domain}`, display_name: "West Investments" },
           to: { address: email, display_name: vendorName },
-          subject: `Booking Confirmed — TCG Card Show (${dayLabel})`,
+          subject: `Booking Confirmed — TCG Card Show (${subjectDays})`,
           html: `
             <h2>Booking Confirmed</h2>
             <p>Hi ${vendorName},</p>
-            <p>Thank you for booking your table${tablesCount > 1 ? "s" : ""} at the West Investments TCG Card Show. Your payment of <strong>${amountFormatted}</strong> has been received.</p>
+            <p>Thank you for booking at the West Investments TCG Card Show. Your payment of <strong>${amountFormatted}</strong> has been received.</p>
             <h3>Booking Summary</h3>
             <p><strong>Name:</strong> ${vendorName}</p>
             <p><strong>Business Name:</strong> ${businessName}</p>
-            <p><strong>Card Type:</strong> ${cardType}</p>
-            <p><strong>Event Day:</strong> ${dayLabel}</p>
-            <p><strong>Tables Booked:</strong> ${tablesCount}</p>
-            <p><strong>Amount Paid:</strong> ${amountFormatted}</p>
+            <p><strong>Card Types:</strong> ${cardTypes}</p>
+            <p><strong>Tables Booked:</strong> ${daySummary}</p>
+            <p><strong>Total Paid:</strong> ${amountFormatted}</p>
             <p><strong>Booking Reference:</strong> ${session.id}</p>
             <hr />
             <p><strong>Please note:</strong> This booking does not include internet or power. These can be purchased at a later date from ExCeL London.</p>
-            <p>Table and booth positions will be allocated randomly within rows. Display cases can be booked at a later date.</p>
+            <p>Table and booth positions will be allocated randomly. Display cases can be booked at a later date.</p>
             <br />
             <p>We will be in touch with further details about the event, including setup times.</p>
             <p>If you have any questions, please contact us at <a href="mailto:info@west.investments">info@west.investments</a>.</p>

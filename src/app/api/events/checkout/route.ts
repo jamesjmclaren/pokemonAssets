@@ -16,8 +16,7 @@ function getSupabaseAdmin() {
 }
 
 const TOTAL_TABLES = parseInt(process.env.EVENT_TOTAL_TABLES || "176", 10);
-const CARD_TYPES = ["TCG", "Sports", "Collectibles", "Other"] as const;
-const EVENT_DAYS = ["Saturday", "Sunday"] as const;
+const VALID_CARD_TYPES = ["TCG", "Sports", "Collectibles", "Other"];
 
 const DAY_LABELS: Record<string, string> = {
   Saturday: "Saturday 4th June",
@@ -33,9 +32,9 @@ export async function POST(req: NextRequest) {
       instagram_handle,
       email,
       phone,
-      card_type,
-      tables_count,
-      event_day,
+      card_types,
+      saturday_tables,
+      sunday_tables,
     } = await req.json();
 
     if (!first_name?.trim() || !last_name?.trim() || !business_name?.trim() || !email?.trim() || !phone?.trim()) {
@@ -45,17 +44,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!CARD_TYPES.includes(card_type)) {
-      return NextResponse.json({ error: "Invalid card type." }, { status: 400 });
+    if (!Array.isArray(card_types) || card_types.length === 0 || !card_types.every((t: string) => VALID_CARD_TYPES.includes(t))) {
+      return NextResponse.json({ error: "Please select at least one card type." }, { status: 400 });
     }
 
-    const count = Number(tables_count);
-    if (![1, 2, 3].includes(count)) {
-      return NextResponse.json({ error: "Tables must be 1, 2, or 3." }, { status: 400 });
+    const satCount = Number(saturday_tables ?? 0);
+    const sunCount = Number(sunday_tables ?? 0);
+
+    if (![0, 1, 2, 3].includes(satCount) || ![0, 1, 2, 3].includes(sunCount)) {
+      return NextResponse.json({ error: "Table count must be 0–3 per day." }, { status: 400 });
     }
 
-    if (!EVENT_DAYS.includes(event_day)) {
-      return NextResponse.json({ error: "Please select a valid event day." }, { status: 400 });
+    if (satCount === 0 && sunCount === 0) {
+      return NextResponse.json({ error: "Please select tables for at least one day." }, { status: 400 });
     }
 
     const pricePerTablePence = parseInt(process.env.EVENT_TABLE_PRICE_PENCE || "0", 10);
@@ -66,49 +67,69 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Server-side availability check per day to prevent overbooking
+    // Server-side availability check per day
     const supabase = getSupabaseAdmin();
     const { data: bookings, error: dbError } = await supabase
       .from("event_bookings")
-      .select("tables_count")
-      .eq("payment_status", "paid")
-      .eq("event_day", event_day);
+      .select("tables_count, event_day")
+      .eq("payment_status", "paid");
 
     if (dbError) throw dbError;
 
-    const booked = (bookings || []).reduce((sum, row) => sum + row.tables_count, 0);
-    const available = Math.max(0, TOTAL_TABLES - booked);
+    const rows = bookings || [];
+    const satBooked = rows.filter((r) => r.event_day === "Saturday").reduce((s, r) => s + r.tables_count, 0);
+    const sunBooked = rows.filter((r) => r.event_day === "Sunday").reduce((s, r) => s + r.tables_count, 0);
+    const satAvailable = Math.max(0, TOTAL_TABLES - satBooked);
+    const sunAvailable = Math.max(0, TOTAL_TABLES - sunBooked);
 
-    if (count > available) {
+    if (satCount > satAvailable) {
       return NextResponse.json(
-        {
-          error:
-            available === 0
-              ? `Sorry, all tables for ${DAY_LABELS[event_day]} have been sold.`
-              : `Only ${available} table${available === 1 ? "" : "s"} remaining for ${DAY_LABELS[event_day]}.`,
-        },
+        { error: satAvailable === 0 ? "Saturday is sold out." : `Only ${satAvailable} Saturday table${satAvailable === 1 ? "" : "s"} remaining.` },
+        { status: 409 }
+      );
+    }
+    if (sunCount > sunAvailable) {
+      return NextResponse.json(
+        { error: sunAvailable === 0 ? "Sunday is sold out." : `Only ${sunAvailable} Sunday table${sunAvailable === 1 ? "" : "s"} remaining.` },
         { status: 409 }
       );
     }
 
-    const vendorName = `${first_name.trim()} ${last_name.trim()}`;
+    const cardTypesStr = card_types.join(",");
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+
+    if (satCount > 0) {
+      lineItems.push({
+        price_data: {
+          currency: "gbp",
+          unit_amount: pricePerTablePence,
+          product_data: {
+            name: `TCG Card Show — ${DAY_LABELS.Saturday}`,
+            description: `${satCount} vendor table${satCount > 1 ? "s" : ""} — ${DAY_LABELS.Saturday}`,
+          },
+        },
+        quantity: satCount,
+      });
+    }
+
+    if (sunCount > 0) {
+      lineItems.push({
+        price_data: {
+          currency: "gbp",
+          unit_amount: pricePerTablePence,
+          product_data: {
+            name: `TCG Card Show — ${DAY_LABELS.Sunday}`,
+            description: `${sunCount} vendor table${sunCount > 1 ? "s" : ""} — ${DAY_LABELS.Sunday}`,
+          },
+        },
+        quantity: sunCount,
+      });
+    }
 
     const session = await getStripe().checkout.sessions.create({
       payment_method_types: ["card"],
       customer_email: email.trim(),
-      line_items: [
-        {
-          price_data: {
-            currency: "gbp",
-            unit_amount: pricePerTablePence,
-            product_data: {
-              name: `TCG Card Show — Table${count > 1 ? "s" : ""} (${DAY_LABELS[event_day]})`,
-              description: `${count} vendor table${count > 1 ? "s" : ""} at the West Investments TCG Card Show — ${DAY_LABELS[event_day]}`,
-            },
-          },
-          quantity: count,
-        },
-      ],
+      line_items: lineItems,
       mode: "payment",
       success_url: `${req.nextUrl.origin}/event/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.nextUrl.origin}/event`,
@@ -120,9 +141,9 @@ export async function POST(req: NextRequest) {
         instagram_handle: (instagram_handle || "").trim(),
         email: email.trim(),
         phone: phone.trim(),
-        card_type,
-        tables_count: String(count),
-        event_day,
+        card_types: cardTypesStr,
+        saturday_tables: String(satCount),
+        sunday_tables: String(sunCount),
       },
     });
 
