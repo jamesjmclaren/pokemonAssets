@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import { searchCards, searchSealedProducts, fetchPoketracePrice } from "@/lib/pokemon-api";
 import type { PoketraceSource } from "@/lib/poketrace";
 import { extractCardPrice } from "@/lib/format";

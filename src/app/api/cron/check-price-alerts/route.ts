@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clerkClient } from "@clerk/nextjs/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import { getRawPoketraceCard, extractSourcePrices } from "@/lib/poketrace";
 import type { PriceAlert } from "@/types";
 
