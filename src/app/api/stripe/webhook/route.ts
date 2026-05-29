@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { escapeHtml } from "@/lib/escape-html";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -51,12 +52,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    const name = metadata.name || "Unknown";
-    const whatsapp = metadata.whatsapp || "Not provided";
-    const dob = metadata.dob || "Not provided";
-    const profile = metadata.profile || "Not provided";
-    const interests = metadata.interests || "Not provided";
-    const referral = metadata.referral || "None";
+    const name = escapeHtml(metadata.name || "Unknown");
+    const whatsapp = escapeHtml(metadata.whatsapp || "Not provided");
+    const dob = escapeHtml(metadata.dob || "Not provided");
+    const profile = escapeHtml(metadata.profile || "Not provided");
+    const interests = escapeHtml(metadata.interests || "Not provided");
+    const referral = escapeHtml(metadata.referral || "None");
 
     // Send notification email to admin
     try {
@@ -174,6 +175,14 @@ async function handleEventTableBooking(
   const subjectDays = [satCount > 0 ? DAY_LABELS.Saturday : null, sunCount > 0 ? DAY_LABELS.Sunday : null]
     .filter(Boolean).join(" & ");
 
+  // Escaped copies for safe interpolation into email HTML (DB insert uses raw values)
+  const eVendorName = escapeHtml(vendorName);
+  const eBusinessName = escapeHtml(businessName);
+  const eInstagramHandle = escapeHtml(instagramHandle);
+  const eEmail = escapeHtml(email);
+  const ePhone = escapeHtml(phone);
+  const eCardTypes = escapeHtml(cardTypes);
+
   // Insert one row per booked day so per-day counter stays accurate
   const supabase = getSupabaseAdmin();
   const dayInserts = [
@@ -236,12 +245,12 @@ async function handleEventTableBooking(
           <h2>New Event Table Booking</h2>
           <p>A vendor has completed payment for table(s) at the TCG Card Show.</p>
           <hr />
-          <p><strong>Name:</strong> ${vendorName}</p>
-          <p><strong>Business Name:</strong> ${businessName}</p>
-          ${instagramHandle ? `<p><strong>Instagram:</strong> @${instagramHandle}</p>` : ""}
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Phone:</strong> ${phone}</p>
-          <p><strong>Card Types:</strong> ${cardTypes}</p>
+          <p><strong>Name:</strong> ${eVendorName}</p>
+          <p><strong>Business Name:</strong> ${eBusinessName}</p>
+          ${instagramHandle ? `<p><strong>Instagram:</strong> @${eInstagramHandle}</p>` : ""}
+          <p><strong>Email:</strong> ${eEmail}</p>
+          <p><strong>Phone:</strong> ${ePhone}</p>
+          <p><strong>Card Types:</strong> ${eCardTypes}</p>
           <p><strong>Tables Booked:</strong> ${daySummary}</p>
           <hr />
           <p><strong>Total Paid:</strong> ${amountFormatted}</p>
@@ -271,12 +280,12 @@ async function handleEventTableBooking(
           subject: `Booking Confirmed — TCG Card Show (${subjectDays})`,
           html: `
             <h2>Booking Confirmed</h2>
-            <p>Hi ${vendorName},</p>
+            <p>Hi ${eVendorName},</p>
             <p>Thank you for booking at the West Investments TCG Card Show. Your payment of <strong>${amountFormatted}</strong> has been received.</p>
             <h3>Booking Summary</h3>
-            <p><strong>Name:</strong> ${vendorName}</p>
-            <p><strong>Business Name:</strong> ${businessName}</p>
-            <p><strong>Card Types:</strong> ${cardTypes}</p>
+            <p><strong>Name:</strong> ${eVendorName}</p>
+            <p><strong>Business Name:</strong> ${eBusinessName}</p>
+            <p><strong>Card Types:</strong> ${eCardTypes}</p>
             <p><strong>Tables Booked:</strong> ${daySummary}</p>
             <p><strong>Total Paid:</strong> ${amountFormatted}</p>
             <p><strong>Booking Reference:</strong> ${session.id}</p>

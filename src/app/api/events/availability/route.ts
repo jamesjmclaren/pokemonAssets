@@ -28,11 +28,18 @@ export async function GET() {
       .filter((r) => r.event_day === "Sunday")
       .reduce((sum, r) => sum + r.tables_count, 0);
 
-    return NextResponse.json({
-      total: TOTAL_TABLES,
-      Saturday: { booked: satBooked, available: Math.max(0, TOTAL_TABLES - satBooked) },
-      Sunday: { booked: sunBooked, available: Math.max(0, TOTAL_TABLES - sunBooked) },
-    });
+    return NextResponse.json(
+      {
+        total: TOTAL_TABLES,
+        Saturday: { booked: satBooked, available: Math.max(0, TOTAL_TABLES - satBooked) },
+        Sunday: { booked: sunBooked, available: Math.max(0, TOTAL_TABLES - sunBooked) },
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+        },
+      }
+    );
   } catch (error) {
     console.error("Availability check error:", error);
     return NextResponse.json({ error: "Failed to check availability" }, { status: 500 });

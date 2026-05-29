@@ -18,11 +18,6 @@ import {
 } from "lucide-react";
 import type { Vendor } from "@/types";
 
-const ADMIN_EMAILS = [
-  "jamesjmclaren@gmail.com",
-  "k1west.cityboy@gmail.com",
-];
-
 interface Invitation {
   name: string;
   email: string;
@@ -41,6 +36,7 @@ export default function AdminPage() {
   const [sending, setSending] = useState(false);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminChecked, setAdminChecked] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
   // Vendors tab state
@@ -62,8 +58,13 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (isLoaded && user) {
-      const userEmail = user.primaryEmailAddress?.emailAddress?.toLowerCase();
-      setIsAdmin(ADMIN_EMAILS.some((e) => e.toLowerCase() === userEmail));
+      fetch("/api/admin/check")
+        .then((r) => r.json())
+        .then((d) => setIsAdmin(Boolean(d?.isAdmin)))
+        .catch(() => setIsAdmin(false))
+        .finally(() => setAdminChecked(true));
+    } else if (isLoaded && !user) {
+      setAdminChecked(true);
     }
   }, [isLoaded, user]);
 
@@ -78,7 +79,7 @@ export default function AdminPage() {
     }
   }, [tab, isAdmin]);
 
-  if (!isLoaded) {
+  if (!isLoaded || !adminChecked) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-text-muted" />

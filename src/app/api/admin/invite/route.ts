@@ -1,10 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-
-const ADMIN_EMAILS = [
-  "jamesjmclaren@gmail.com",
-  "k1west.cityboy@gmail.com",
-];
+import { isAdminEmail } from "@/lib/admin";
+import { escapeHtml } from "@/lib/escape-html";
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -15,7 +12,7 @@ export async function POST(request: Request) {
   }
 
   const userEmail = user.primaryEmailAddress?.emailAddress?.toLowerCase();
-  if (!userEmail || !ADMIN_EMAILS.some((e) => e.toLowerCase() === userEmail)) {
+  if (!isAdminEmail(userEmail)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -59,7 +56,7 @@ export async function POST(request: Request) {
           subject: "You're Invited to West Investments",
           html: `
             <h2>You're Invited</h2>
-            <p>Hi ${name},</p>
+            <p>Hi ${escapeHtml(name)},</p>
             <p>You've been invited to join the West Investments platform — a private community for serious collectibles investors, traders, and collectors.</p>
             <p>Click the link below to create your account. You can sign up using your email, Google, or any available method:</p>
             <p style="margin: 24px 0;">

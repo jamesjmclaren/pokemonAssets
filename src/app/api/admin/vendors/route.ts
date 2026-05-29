@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
-
-const ADMIN_EMAILS = [
-  "jamesjmclaren@gmail.com",
-  "k1west.cityboy@gmail.com",
-];
-
-async function assertAdmin(): Promise<boolean> {
-  const user = await currentUser();
-  if (!user) return false;
-  const email = user.primaryEmailAddress?.emailAddress?.toLowerCase();
-  return ADMIN_EMAILS.some((e) => e.toLowerCase() === email);
-}
+import { isCurrentUserAdmin as assertAdmin } from "@/lib/admin";
 
 export async function GET() {
   if (!(await assertAdmin())) {

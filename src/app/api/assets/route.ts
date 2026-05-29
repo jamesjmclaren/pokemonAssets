@@ -412,6 +412,11 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
@@ -420,6 +425,37 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
+    // Verify the asset exists and the user has write access to its portfolio
+    const { data: asset } = await supabase
+      .from("assets")
+      .select("portfolio_id")
+      .eq("id", id)
+      .single();
+
+    if (!asset) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+
+    const { data: portfolio } = await supabase
+      .from("portfolios")
+      .select("owner_id")
+      .eq("id", asset.portfolio_id)
+      .single();
+
+    const isOwner = portfolio?.owner_id === userId;
+    if (!isOwner) {
+      const { data: member } = await supabase
+        .from("portfolio_members")
+        .select("role")
+        .eq("portfolio_id", asset.portfolio_id)
+        .eq("user_id", userId)
+        .single();
+
+      if (member?.role !== "admin") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     const { error } = await supabase.from("assets").delete().eq("id", id);
     if (error) throw error;
     return NextResponse.json({ success: true });

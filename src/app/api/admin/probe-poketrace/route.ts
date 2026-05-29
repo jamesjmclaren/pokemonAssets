@@ -1,10 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-
-const ADMIN_EMAILS = [
-  "jamesjmclaren@gmail.com",
-  "k1west.cityboy@gmail.com",
-];
+import { isAdminEmail } from "@/lib/admin";
 
 const API_BASE = "https://api.poketrace.com/v1";
 
@@ -15,7 +11,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userEmail = user.primaryEmailAddress?.emailAddress?.toLowerCase();
-  if (!userEmail || !ADMIN_EMAILS.some((e) => e.toLowerCase() === userEmail)) {
+  if (!isAdminEmail(userEmail)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

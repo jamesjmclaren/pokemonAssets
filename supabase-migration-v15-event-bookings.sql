@@ -32,3 +32,13 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER event_bookings_updated_at
   BEFORE UPDATE ON event_bookings
   FOR EACH ROW EXECUTE FUNCTION update_event_bookings_updated_at();
+
+-- Security: enable RLS with NO public policy. The anon/authenticated roles are
+-- then denied all access, so customer PII (email, phone) can never be read via
+-- the public REST API + anon key. The service_role key used by our API routes
+-- and the Stripe webhook BYPASSES RLS, so server-side access still works.
+--
+-- IMPORTANT: do NOT add a `FOR ALL USING (true)` policy here — without a `TO`
+-- clause it defaults to `TO public`, which would re-grant the anon key full
+-- access and defeat the purpose.
+ALTER TABLE event_bookings ENABLE ROW LEVEL SECURITY;

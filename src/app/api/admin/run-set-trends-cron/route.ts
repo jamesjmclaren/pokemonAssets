@@ -1,10 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-
-const ADMIN_EMAILS = [
-  "jamesjmclaren@gmail.com",
-  "k1west.cityboy@gmail.com",
-];
+import { isAdminEmail } from "@/lib/admin";
 
 // Long-running set-trends cron sweep. Vercel will allow up to 5 min.
 export const maxDuration = 300;
@@ -17,7 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userEmail = user.primaryEmailAddress?.emailAddress?.toLowerCase();
-  if (!userEmail || !ADMIN_EMAILS.some((e) => e.toLowerCase() === userEmail)) {
+  if (!isAdminEmail(userEmail)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
