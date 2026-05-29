@@ -35,8 +35,8 @@ function tierLabel(tier: string): string {
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    console.warn("[price-alert-cron] Unauthorized request");
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    console.warn("[price-alert-cron] Unauthorized request — CRON_SECRET missing or invalid");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { searchCards, searchSealedProducts, fetchPoketracePrice } from "@/lib/pokemon-api";
 import type { PoketraceSource } from "@/lib/poketrace";
@@ -13,6 +14,11 @@ function coerceSource(value: unknown): PoketraceSource | undefined {
 const STALE_HOURS = 24;
 
 export async function POST() {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   console.log("[refresh-prices] ===== Manual price refresh started =====");
 
   try {

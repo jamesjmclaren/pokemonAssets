@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { escapeHtml } from "@/lib/escape-html";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,6 +11,13 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    const safeName = escapeHtml(name);
+    const safeWhatsapp = escapeHtml(whatsapp);
+    const safeDob = escapeHtml(dob);
+    const safeProfile = escapeHtml(profile || "Not provided");
+    const safeInterests = escapeHtml(interests || "Not provided");
+    const safeReferral = escapeHtml(referral || "None");
 
     const res = await fetch("https://smtp.maileroo.com/api/v2/emails", {
       method: "POST",
@@ -26,15 +34,15 @@ export async function POST(req: NextRequest) {
           address: "info@west.investments",
           display_name: "West Investments",
         },
-        subject: `New Subscription: ${name}`,
+        subject: `New Subscription: ${safeName}`,
         html: `
           <h2>New Subscription</h2>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Number:</strong> ${whatsapp}</p>
-          <p><strong>Date of Birth:</strong> ${dob}</p>
-          <p><strong>Profile:</strong> ${profile || "Not provided"}</p>
-          <p><strong>Interests:</strong> ${interests || "Not provided"}</p>
-          <p><strong>Referral:</strong> ${referral || "None"}</p>
+          <p><strong>Name:</strong> ${safeName}</p>
+          <p><strong>Number:</strong> ${safeWhatsapp}</p>
+          <p><strong>Date of Birth:</strong> ${safeDob}</p>
+          <p><strong>Profile:</strong> ${safeProfile}</p>
+          <p><strong>Interests:</strong> ${safeInterests}</p>
+          <p><strong>Referral:</strong> ${safeReferral}</p>
           <p><strong>Submitted:</strong> ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</p>
         `,
       }),

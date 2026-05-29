@@ -44,7 +44,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!Array.isArray(card_types) || card_types.length === 0 || !card_types.every((t: string) => VALID_CARD_TYPES.includes(t))) {
+    // Reject oversized inputs (also keeps Stripe metadata within its 500-char/value limit)
+    const tooLong = [first_name, last_name, business_name, email, phone, instagram_handle]
+      .some((v) => typeof v === "string" && v.length > 200);
+    if (tooLong) {
+      return NextResponse.json({ error: "One or more fields exceed the maximum length." }, { status: 400 });
+    }
+
+    if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
+    }
+
+    // Validate and normalise card types against the allowed set (dedup, bounded)
+    const validatedCardTypes = Array.isArray(card_types)
+      ? [...new Set(card_types)].filter((t: unknown): t is string => typeof t === "string" && VALID_CARD_TYPES.includes(t))
+      : [];
+    if (validatedCardTypes.length === 0) {
       return NextResponse.json({ error: "Please select at least one card type." }, { status: 400 });
     }
 
@@ -95,7 +110,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const cardTypesStr = card_types.join(",");
+    const cardTypesStr = validatedCardTypes.join(",");
     const lineItems: Stripe.Checkout.SessionCreateParams["line_items"] = [];
 
     if (satCount > 0) {
