@@ -214,7 +214,7 @@ async function handleEventTableBooking(
       headers: { "X-Api-Key": mailerooKey, "Content-Type": "application/json" },
       body: JSON.stringify({
         from: { address: `noreply@${domain}`, display_name: "West Investments" },
-        to: { address: "info@west.investments", display_name: "West Investments" },
+        to: { address: process.env.EVENT_NOTIFICATION_EMAIL || "info@west.investments", display_name: "West Investments" },
         subject: `New Table Booking: ${businessName} — ${subjectDays}`,
         html: `
           <h2>New Event Table Booking</h2>
