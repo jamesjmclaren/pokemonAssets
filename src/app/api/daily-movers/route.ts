@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import { getPoketracePriceHistory } from "@/lib/poketrace";
 
 // Cache aggressively — asset-level price history is updated at most once

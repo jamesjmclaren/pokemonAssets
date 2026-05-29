@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   fetchPoketraceCardsBySet,
@@ -187,7 +186,7 @@ async function fromCache(
 } | null> {
   const today = new Date().toISOString().split("T")[0];
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("set_price_trends")
     .select("*")
     .eq("set_slug", setSlug)

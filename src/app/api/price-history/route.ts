@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPriceHistoryByType, getPriceHistory } from "@/lib/pokemon-api";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
