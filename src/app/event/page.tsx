@@ -79,6 +79,7 @@ export default function EventPage() {
 
   const satAvailable = availability?.Saturday.available ?? null;
   const sunAvailable = availability?.Sunday.available ?? null;
+  const bothSoldOut = satAvailable === 0 && sunAvailable === 0;
   const noDaysSelected = saturdayTables === 0 && sundayTables === 0;
   const satExceeds = satAvailable !== null && saturdayTables > satAvailable;
   const sunExceeds = sunAvailable !== null && sundayTables > sunAvailable;
@@ -152,6 +153,23 @@ export default function EventPage() {
     availableCount: number | null;
   }) => {
     const soldOut = availableCount !== null && availableCount === 0;
+    if (soldOut) {
+      return (
+        <div className="relative border border-danger/40 rounded-xl overflow-hidden">
+          <div className="absolute inset-0 bg-danger/5" />
+          <div className="relative flex items-center justify-between px-5 py-4">
+            <div>
+              <p className="text-text-primary text-sm font-medium" style={{ fontFamily: "Inter, sans-serif" }}>{label}</p>
+              <p className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>{sublabel}</p>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-1.5 bg-danger text-white rounded-full">
+              <span className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.2em" }}>Sold Out</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className={`border rounded-xl p-4 transition-colors ${value > 0 ? "border-accent/40 bg-accent/5" : "border-border"}`}>
         <div className="flex items-center justify-between mb-3">
@@ -160,9 +178,7 @@ export default function EventPage() {
             <p className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
               {sublabel}
               {availableCount !== null && (
-                <span className={`ml-2 ${soldOut ? "text-danger" : "text-accent/70"}`}>
-                  {soldOut ? "· Sold out" : `· ${availableCount} left`}
-                </span>
+                <span className="ml-2 text-accent/70">{`· ${availableCount} left`}</span>
               )}
             </p>
           </div>
@@ -174,18 +190,17 @@ export default function EventPage() {
         </div>
         <div className="grid grid-cols-4 gap-2">
           {TABLE_COUNTS.map((n) => {
-            const disabled = soldOut && n > 0;
             const exceeds = availableCount !== null && n > availableCount;
             return (
               <button
                 key={n}
                 type="button"
-                onClick={() => !disabled && !exceeds && onChange(n as TableCount)}
-                disabled={disabled || exceeds}
+                onClick={() => !exceeds && onChange(n as TableCount)}
+                disabled={exceeds}
                 className={`py-2 text-sm border rounded-lg transition-all ${
                   value === n
                     ? "border-accent bg-accent text-background cursor-pointer"
-                    : disabled || exceeds
+                    : exceeds
                     ? "border-border text-text-muted/30 cursor-not-allowed opacity-40"
                     : "border-border text-text-muted hover:border-accent/40 hover:text-text-secondary cursor-pointer"
                 }`}
@@ -265,17 +280,38 @@ export default function EventPage() {
       <section id="stats" ref={setRef("stats")} className="border-y border-border/30 py-0" style={{ opacity: isVisible("stats") ? 1 : 0, transform: isVisible("stats") ? "none" : "translateY(20px)", transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)" }}>
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 divide-x divide-border/30">
           {[
-            { value: availability ? `${availability.Saturday.available}` : "—", label: "Saturday Tables Left", sub: "4th June" },
-            { value: availability ? `${availability.Sunday.available}` : "—", label: "Sunday Tables Left", sub: "5th June" },
-            { value: "TBD", label: "Price Per Table", sub: "one-time payment" },
-            { value: "3", label: "Max Per Vendor Per Day", sub: "to ensure fair access" },
-          ].map((stat) => (
-            <div key={stat.label} className="px-6 py-10 md:py-12 text-center">
-              <p className="text-3xl md:text-5xl font-light text-accent mb-2">{stat.value}</p>
-              <p className="text-text-primary tracking-widest uppercase mb-1" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em", fontSize: "9px" }}>{stat.label}</p>
-              <p className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>{stat.sub}</p>
-            </div>
-          ))}
+            { value: availability?.Saturday.available ?? null, label: "Saturday Tables Left", sub: "4th June" },
+            { value: availability?.Sunday.available ?? null, label: "Sunday Tables Left", sub: "5th June" },
+          ].map((stat) => {
+            const isSoldOut = stat.value === 0;
+            return (
+              <div key={stat.label} className={`px-6 py-10 md:py-12 text-center relative ${isSoldOut ? "bg-danger/5" : ""}`}>
+                {isSoldOut ? (
+                  <>
+                    <p className="text-3xl md:text-5xl font-bold text-danger mb-2 uppercase tracking-widest" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em" }}>SOLD OUT</p>
+                    <p className="text-danger/70 tracking-widest uppercase mb-1" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.2em", fontSize: "9px" }}>{stat.label}</p>
+                    <p className="text-danger/50 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>{stat.sub}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-3xl md:text-5xl font-light text-accent mb-2">{stat.value ?? "—"}</p>
+                    <p className="text-text-primary tracking-widest uppercase mb-1" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em", fontSize: "9px" }}>{stat.label}</p>
+                    <p className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>{stat.sub}</p>
+                  </>
+                )}
+              </div>
+            );
+          })}
+          <div className="px-6 py-10 md:py-12 text-center">
+            <p className="text-3xl md:text-5xl font-light text-accent mb-2">TBD</p>
+            <p className="text-text-primary tracking-widest uppercase mb-1" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em", fontSize: "9px" }}>Price Per Table</p>
+            <p className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>one-time payment</p>
+          </div>
+          <div className="px-6 py-10 md:py-12 text-center">
+            <p className="text-3xl md:text-5xl font-light text-accent mb-2">3</p>
+            <p className="text-text-primary tracking-widest uppercase mb-1" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em", fontSize: "9px" }}>Max Per Vendor Per Day</p>
+            <p className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>to ensure fair access</p>
+          </div>
         </div>
       </section>
 
@@ -338,6 +374,26 @@ export default function EventPage() {
             {/* Right — form */}
             <div>
               <div className="bg-background border border-accent/15 rounded-2xl p-8 md:p-10">
+                {bothSoldOut ? (
+                  <div className="text-center py-12">
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-danger/10 border border-danger/30 mb-6">
+                      <X className="w-10 h-10 text-danger" />
+                    </div>
+                    <p className="text-danger text-xs uppercase tracking-[0.3em] mb-3" style={{ fontFamily: "Inter, sans-serif" }}>Both Days</p>
+                    <h4 className="text-4xl font-bold text-danger uppercase tracking-widest mb-4" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.2em" }}>SOLD OUT</h4>
+                    <div className="w-16 h-px bg-danger/30 mx-auto mb-6" />
+                    <p className="text-text-secondary text-sm leading-relaxed max-w-xs mx-auto mb-8" style={{ fontFamily: "Inter, sans-serif", fontWeight: 300 }}>
+                      All tables for both days have been sold. Contact us to be added to the waiting list.
+                    </p>
+                    <a
+                      href="mailto:info@west.investments"
+                      className="inline-flex items-center gap-2 px-6 py-3 border border-accent/40 text-accent text-xs tracking-widest uppercase hover:bg-accent hover:text-background transition-all"
+                      style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em" }}
+                    >
+                      Join Waiting List
+                    </a>
+                  </div>
+                ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="text-center mb-8">
                     <h3 className="text-2xl font-light text-text-primary mb-2">Book Your Stall</h3>
@@ -482,6 +538,7 @@ export default function EventPage() {
                     <Link href="/privacy" className="underline hover:text-text-secondary">Privacy Policy</Link>.
                   </p>
                 </form>
+                )}
               </div>
             </div>
           </div>
