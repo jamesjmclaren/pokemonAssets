@@ -55,99 +55,83 @@ interface AvailabilityData {
 }
 
 // ─── Floor plan layout ────────────────────────────────────────────────────────
-// Schematic based on described counts (120 standard / 12 corner / 16 premier corner).
-// Update the coordinates once the actual PDF floor plan is reviewed.
-// SVG viewBox: "0 0 960 600"
+// Matches the real floor plan: 7 column-group pairs (14 strips total) with
+// premier-corner or corner end tables at the top and bottom of each strip,
+// and standard tables filling the middle. A sponsor zone sits in the centre.
+//
+// Groups (left→right): PC · C · PC · [SPONSOR] · C · PC · C · PC
+//   PC groups (0,2,4,6): 2 strips × 9 std + blue PC ends  → 16 PC units total
+//   Corner groups (1,3,5): 2 strips × 8 std + green ends  → 12 corner units total
+//   Standard total: (4×2×9) + (3×2×8) = 72 + 48 = 120 ✓
+//
+// SVG viewBox: "0 0 852 380"
 
 function generateTableLayout(): TableCell[] {
   const cells: TableCell[] = [];
 
-  // Premier corner (16 units) — 2×2 group in each of the 4 hall corners
-  const pcW = 70, pcH = 42, pcGap = 8;
-  const pcGroups = [
-    { baseX: 22, baseY: 22 },    // top-left
-    { baseX: 790, baseY: 22 },   // top-right
-    { baseX: 22, baseY: 486 },   // bottom-left
-    { baseX: 790, baseY: 486 },  // bottom-right
-  ];
-  let pcIdx = 1;
-  for (const g of pcGroups) {
-    for (let row = 0; row < 2; row++) {
-      for (let col = 0; col < 2; col++) {
-        cells.push({
-          id: `PC-${String(pcIdx).padStart(2, "0")}`,
-          type: "premier_corner",
-          x: g.baseX + col * (pcW + pcGap),
-          y: g.baseY + row * (pcH + pcGap),
-          w: pcW,
-          h: pcH,
-        });
-        pcIdx++;
+  // Dimensions
+  const STRIP_W = 32;
+  const INNER_GAP = 6;           // gap between the 2 strips of a group
+  const AISLE = 32;              // gap between groups
+  const GROUP_W = STRIP_W + INNER_GAP + STRIP_W; // 70px
+  const GROUP_STEP = GROUP_W + AISLE;             // 102px
+  const SPONSOR_W = 110;         // sponsor zone width (replaces one aisle worth of space)
+  const START_X = 18;
+  const START_Y = 28;
+
+  const PC_END_H = 46;
+  const C_END_H  = 36;
+  const STD_H    = 15;
+  const STD_GAP  = 5;
+  const END_TO_STD_GAP = 10;
+
+  // Groups 0,2,4,6 = premier_corner type; 1,3,5 = corner type
+  const PC_GROUPS = new Set([0, 2, 4, 6]);
+
+  let pcCount = 1, cCount = 1, sCount = 1;
+
+  for (let g = 0; g < 7; g++) {
+    const isPC = PC_GROUPS.has(g);
+    const endH = isPC ? PC_END_H : C_END_H;
+    const stdPerStrip = isPC ? 9 : 8;
+
+    // Shift right by SPONSOR_W for groups after the sponsor zone (g >= 3)
+    const sponsorShift = g >= 3 ? SPONSOR_W : 0;
+    const groupX = START_X + g * GROUP_STEP + sponsorShift;
+
+    const topEndY   = START_Y;
+    const stdStartY = topEndY + endH + END_TO_STD_GAP;
+    const stdH_total = stdPerStrip * STD_H + (stdPerStrip - 1) * STD_GAP;
+    const botEndY   = stdStartY + stdH_total + END_TO_STD_GAP;
+
+    for (let s = 0; s < 2; s++) {
+      const sx = groupX + s * (STRIP_W + INNER_GAP);
+
+      // Top end table
+      if (isPC) {
+        cells.push({ id: `PC-${String(pcCount++).padStart(2, "0")}`, type: "premier_corner", x: sx, y: topEndY,  w: STRIP_W, h: PC_END_H });
+      } else {
+        cells.push({ id: `C-${String(cCount++).padStart(2, "0")}`,   type: "corner",         x: sx, y: topEndY,  w: STRIP_W, h: C_END_H });
       }
-    }
-  }
 
-  // Corner tables (12) — 3 per side, placed between premier corner groups
-  const cW = 58, cH = 40;
+      // Standard tables
+      for (let i = 0; i < stdPerStrip; i++) {
+        cells.push({
+          id: `S-${String(sCount++).padStart(3, "0")}`,
+          type: "standard",
+          x: sx,
+          y: stdStartY + i * (STD_H + STD_GAP),
+          w: STRIP_W,
+          h: STD_H,
+        });
+      }
 
-  // Top 3: horizontally centered between the two top PC groups, vertically centred in PC zone
-  for (let i = 0; i < 3; i++) {
-    cells.push({
-      id: `C-${String(i + 1).padStart(2, "0")}`,
-      type: "corner",
-      x: 373 + i * (cW + 20),
-      y: 48,
-      w: cW,
-      h: cH,
-    });
-  }
-  // Bottom 3
-  for (let i = 0; i < 3; i++) {
-    cells.push({
-      id: `C-${String(i + 4).padStart(2, "0")}`,
-      type: "corner",
-      x: 373 + i * (cW + 20),
-      y: 512,
-      w: cW,
-      h: cH,
-    });
-  }
-  // Left 3: vertically distributed between top-left and bottom-left PC zones
-  for (let i = 0; i < 3; i++) {
-    cells.push({
-      id: `C-${String(i + 7).padStart(2, "0")}`,
-      type: "corner",
-      x: 67,
-      y: 220 + i * (cH + 20),
-      w: cW,
-      h: cH,
-    });
-  }
-  // Right 3
-  for (let i = 0; i < 3; i++) {
-    cells.push({
-      id: `C-${String(i + 10).padStart(2, "0")}`,
-      type: "corner",
-      x: 835,
-      y: 220 + i * (cH + 20),
-      w: cW,
-      h: cH,
-    });
-  }
-
-  // Standard tables (120) — 12 columns × 10 rows in the central area
-  const sW = 32, sH = 22, stepX = 43, stepY = 31;
-  const gridX = 203, gridY = 154;
-  for (let row = 0; row < 10; row++) {
-    for (let col = 0; col < 12; col++) {
-      cells.push({
-        id: `S-${String(row * 12 + col + 1).padStart(3, "0")}`,
-        type: "standard",
-        x: gridX + col * stepX,
-        y: gridY + row * stepY,
-        w: sW,
-        h: sH,
-      });
+      // Bottom end table
+      if (isPC) {
+        cells.push({ id: `PC-${String(pcCount++).padStart(2, "0")}`, type: "premier_corner", x: sx, y: botEndY, w: STRIP_W, h: PC_END_H });
+      } else {
+        cells.push({ id: `C-${String(cCount++).padStart(2, "0")}`,   type: "corner",         x: sx, y: botEndY, w: STRIP_W, h: C_END_H });
+      }
     }
   }
 
@@ -714,20 +698,27 @@ export default function EventPage() {
               {/* SVG floor plan */}
               <div className="border border-border/40 rounded-xl overflow-hidden bg-[#111] p-2">
                 <svg
-                  viewBox="0 0 960 600"
+                  viewBox="0 0 852 380"
                   style={{ width: "100%", height: "auto", display: "block" }}
                   role="img"
                   aria-label="Interactive floor plan — click tables to select them"
                 >
                   {/* Hall outline */}
-                  <rect x="12" y="12" width="936" height="576" rx="6"
+                  <rect x="10" y="10" width="832" height="360" rx="6"
                     fill="none" stroke="#2a2a2a" strokeWidth="2" />
 
-                  {/* Aisle labels */}
-                  <text x="480" y="140" textAnchor="middle" fill="#374151" fontSize="11"
-                    fontFamily="Inter, sans-serif" fontWeight="400" letterSpacing="3">
-                    MAIN FLOOR
-                  </text>
+                  {/* Sponsor zone — sits between column groups 2 and 3 */}
+                  {/* groupX for g=2 ends at 18+2×102+70=308; g=3 starts at 18+3×102+110=448 */}
+                  <rect x="312" y="20" width="108" height="340" rx="4"
+                    fill="#161616" stroke="#2a2a2a" strokeWidth="1.5" strokeDasharray="5 3" />
+                  <text x="366" y="182" textAnchor="middle" fill="#374151" fontSize="9"
+                    fontFamily="Inter, sans-serif" letterSpacing="2">SPONSOR</text>
+                  <text x="366" y="196" textAnchor="middle" fill="#374151" fontSize="9"
+                    fontFamily="Inter, sans-serif" letterSpacing="2">ZONE</text>
+
+                  {/* Aisle direction hints */}
+                  <text x="366" y="370" textAnchor="middle" fill="#1f2937" fontSize="8"
+                    fontFamily="Inter, sans-serif" letterSpacing="3">▲ ENTRANCE ▲</text>
 
                   {/* Tables */}
                   {TABLE_LAYOUT.map((cell) => {
