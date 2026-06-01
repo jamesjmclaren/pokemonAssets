@@ -52,6 +52,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
+    if (metadata.booking_type === "event_table_v2") {
+      await handleEventTableV2Booking(session, metadata);
+      return NextResponse.json({ received: true });
+    }
+
     const name = escapeHtml(metadata.name || "Unknown");
     const whatsapp = escapeHtml(metadata.whatsapp || "Not provided");
     const dob = escapeHtml(metadata.dob || "Not provided");
@@ -303,6 +308,185 @@ async function handleEventTableBooking(
       });
     } catch (emailError) {
       console.error("Failed to send vendor confirmation email:", emailError);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v2 handler — generalised multi-type table bookings (event_bookings_v2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleEventTableV2Booking(
+  session: Stripe.Checkout.Session,
+  metadata: Record<string, string>
+) {
+  const firstName = metadata.first_name || "";
+  const lastName = metadata.last_name || "";
+  const businessName = metadata.business_name || "Unknown";
+  const instagramHandle = metadata.instagram_handle || "";
+  const email = metadata.email || "";
+  const phone = metadata.phone || "Not provided";
+  const cardTypes = metadata.card_types || "Not provided";
+  const eventSlug = metadata.event_slug || "unknown";
+  const amountPaidPence = session.amount_total || 0;
+  const vendorName = `${firstName} ${lastName}`.trim() || businessName;
+
+  // Parse compact items array: [{tk, d, q}, ...]
+  let items: { tk: string; d: string; q: number }[] = [];
+  try {
+    items = JSON.parse(metadata.items || "[]");
+  } catch {
+    console.error("handleEventTableV2Booking: failed to parse items metadata");
+    return;
+  }
+
+  if (items.length === 0) {
+    console.error("handleEventTableV2Booking: no items in metadata");
+    return;
+  }
+
+  // Look up event and table types
+  const supabase = getSupabaseAdmin();
+
+  const { data: event } = await supabase
+    .from("events")
+    .select("id, name, venue")
+    .eq("slug", eventSlug)
+    .single();
+
+  if (!event) {
+    console.error(`handleEventTableV2Booking: event not found for slug "${eventSlug}"`);
+    return;
+  }
+
+  const { data: tableTypes } = await supabase
+    .from("event_table_types")
+    .select("type_key, label, price_pence")
+    .eq("event_id", event.id);
+
+  const typeMap = Object.fromEntries(
+    (tableTypes || []).map((t) => [t.type_key, t])
+  ) as Record<string, { type_key: string; label: string; price_pence: number }>;
+
+  // Insert one event_bookings_v2 row per line item
+  for (const [idx, item] of items.entries()) {
+    const itemAmountPence = (typeMap[item.tk]?.price_pence ?? 0) * item.q;
+    try {
+      await supabase.from("event_bookings_v2").insert({
+        stripe_session_id: items.length > 1 ? `${session.id}_${idx}` : session.id,
+        payment_status: "paid",
+        event_id: event.id,
+        event_day: item.d,
+        table_type_key: item.tk,
+        quantity: item.q,
+        first_name: firstName,
+        last_name: lastName,
+        business_name: businessName,
+        instagram_handle: instagramHandle || null,
+        email,
+        phone,
+        card_types: cardTypes,
+        amount_paid_pence: itemAmountPence,
+      });
+    } catch (dbError) {
+      console.error(`handleEventTableV2Booking: insert failed for item ${idx}:`, dbError);
+    }
+  }
+
+  // Build readable booking summary lines for emails
+  const itemLines = items.map((item) => {
+    const label = typeMap[item.tk]?.label ?? item.tk;
+    const linePence = (typeMap[item.tk]?.price_pence ?? 0) * item.q;
+    return `${label} × ${item.q} — ${item.d}: £${(linePence / 100).toFixed(2)}`;
+  });
+
+  const amountFormatted = `£${(amountPaidPence / 100).toFixed(2)}`;
+  const eVendorName = escapeHtml(vendorName);
+  const eBusinessName = escapeHtml(businessName);
+  const eEmail = escapeHtml(email);
+  const ePhone = escapeHtml(phone);
+  const eCardTypes = escapeHtml(cardTypes);
+  const eInstagram = escapeHtml(instagramHandle);
+  const eEventName = escapeHtml(event.name);
+  const eVenue = escapeHtml(event.venue);
+  const mailerooKey = process.env.MAILEROO_API_KEY!;
+  const domain = process.env.MAILEROO_DOMAIN || "west.investments";
+  const ref = session.id.slice(-8).toUpperCase();
+
+  // Admin notification
+  try {
+    await fetch("https://smtp.maileroo.com/api/v2/emails", {
+      method: "POST",
+      headers: { "X-Api-Key": mailerooKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: { address: `noreply@${domain}`, display_name: "West Investments" },
+        to: {
+          address: process.env.EVENT_NOTIFICATION_EMAIL || "info@west.investments",
+          display_name: "West Investments",
+        },
+        subject: `New Table Booking: ${businessName} — ${eEventName}`,
+        html: `
+          <h2>New Table Booking — ${eEventName}</h2>
+          <p>A vendor has completed payment at ${eVenue}.</p>
+          <hr />
+          <p><strong>Name:</strong> ${eVendorName}</p>
+          <p><strong>Business:</strong> ${eBusinessName}</p>
+          ${instagramHandle ? `<p><strong>Instagram:</strong> @${eInstagram}</p>` : ""}
+          <p><strong>Email:</strong> ${eEmail}</p>
+          <p><strong>Phone:</strong> ${ePhone}</p>
+          <p><strong>Card Types:</strong> ${eCardTypes}</p>
+          <hr />
+          <h3>Tables Booked</h3>
+          ${itemLines.map((l) => `<p>${escapeHtml(l)}</p>`).join("")}
+          <p><strong>Total Paid:</strong> ${amountFormatted}</p>
+          <hr />
+          <p><strong>Stripe Session:</strong> ${session.id}</p>
+          <p><strong>Reference:</strong> ${ref}</p>
+          <p><strong>Booked At:</strong> ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</p>
+        `,
+      }),
+    });
+  } catch (e) {
+    console.error("handleEventTableV2Booking: failed to send admin email:", e);
+  }
+
+  // Vendor confirmation
+  if (email) {
+    try {
+      await fetch("https://smtp.maileroo.com/api/v2/emails", {
+        method: "POST",
+        headers: { "X-Api-Key": mailerooKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: { address: `noreply@${domain}`, display_name: "West Investments" },
+          to: { address: email, display_name: vendorName },
+          subject: `Booking Confirmed — ${event.name}`,
+          html: `
+            <h2>Booking Confirmed</h2>
+            <p>Hi ${eVendorName},</p>
+            <p>Thank you for booking at <strong>${eEventName}</strong> at ${eVenue}.
+            Your payment of <strong>${amountFormatted}</strong> has been received.</p>
+            <h3>Booking Summary</h3>
+            <p><strong>Business:</strong> ${eBusinessName}</p>
+            <p><strong>Card Types:</strong> ${eCardTypes}</p>
+            <h3>Tables</h3>
+            ${itemLines.map((l) => `<p>${escapeHtml(l)}</p>`).join("")}
+            <p><strong>Total Paid:</strong> ${amountFormatted}</p>
+            <p><strong>Booking Reference:</strong> ${ref}</p>
+            <hr />
+            <p><em>This booking does not include internet or power — these can be purchased
+            at a later date from the venue.</em></p>
+            <p><em>Table positions will be communicated closer to the event.
+            Display cases can be booked at a later date.</em></p>
+            <br />
+            <p>If you have any questions please contact us at
+            <a href="mailto:info@west.investments">info@west.investments</a>.</p>
+            <br />
+            <p>Best regards,<br /><strong>West Investments</strong></p>
+          `,
+        }),
+      });
+    } catch (e) {
+      console.error("handleEventTableV2Booking: failed to send vendor email:", e);
     }
   }
 }
