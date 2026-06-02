@@ -165,6 +165,14 @@ const TYPE_COLORS: Record<TableTypeKey, { fill: string; selected: string; sold: 
   premier_corner: { fill: "#ef4444", selected: "#fca5a5", sold: "#374151", label: "Premier Corner" },
 };
 
+// Fallback pricing/inventory so the floor plan and cart work even before the
+// availability API (database) is populated. Mirrors the migration v18 seed.
+const TYPE_META: Record<TableTypeKey, { label: string; price_pence: number; total_available: number }> = {
+  standard:       { label: "Standard Table", price_pence: 10000, total_available: 120 },
+  corner:         { label: "End Corner",     price_pence: 20000, total_available: 24 },
+  premier_corner: { label: "Premier Corner", price_pence: 27500, total_available: 32 },
+};
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function EventPage() {
@@ -237,6 +245,19 @@ export default function EventPage() {
     [availability]
   );
 
+  // Type label/price/total with fallback to local constants when the API has no data yet.
+  const getTypeMeta = useCallback(
+    (typeKey: TableTypeKey) => {
+      const td = getTypeData(typeKey);
+      return {
+        label: td?.label ?? TYPE_META[typeKey].label,
+        price_pence: td?.price_pence ?? TYPE_META[typeKey].price_pence,
+        total_available: td?.total_available ?? TYPE_META[typeKey].total_available,
+      };
+    },
+    [getTypeData]
+  );
+
   const selectedCountForType = useCallback(
     (typeKey: TableTypeKey, day: DayKey): number =>
       [...selectedCells[day]].filter(
@@ -248,8 +269,8 @@ export default function EventPage() {
   const isCellSold = useCallback(
     (cell: TableUnit, day: DayKey): boolean => {
       const td = getTypeData(cell.type);
-      if (!td) return false;
-      return td[day].available <= selectedCountForType(cell.type, day);
+      const available = td ? td[day].available : TYPE_META[cell.type].total_available;
+      return available <= selectedCountForType(cell.type, day);
     },
     [getTypeData, selectedCountForType]
   );
@@ -290,14 +311,14 @@ export default function EventPage() {
       if (cell) typeGroups[cell.type] = (typeGroups[cell.type] ?? 0) + 1;
     }
     for (const [typeKey, qty] of Object.entries(typeGroups) as [TableTypeKey, number][]) {
-      const td = getTypeData(typeKey);
-      if (td && qty > 0) {
+      if (qty > 0) {
+        const meta = getTypeMeta(typeKey);
         cartItems.push({
           typeKey,
-          label: td.label,
+          label: meta.label,
           day,
           quantity: qty,
-          unitPricePence: td.price_pence,
+          unitPricePence: meta.price_pence,
         });
       }
     }
@@ -720,6 +741,12 @@ export default function EventPage() {
                   role="img"
                   aria-label="Interactive floor plan — click tables to select them"
                 >
+                  <defs>
+                    <filter id="tableGlow" x="-60%" y="-60%" width="220%" height="220%">
+                      <feDropShadow dx="0" dy="0" stdDeviation="3.5" floodColor="#D4AF37" floodOpacity="0.95" />
+                    </filter>
+                  </defs>
+
                   {/* Hall outline */}
                   <rect x="4" y="4" width="766" height="494" rx="6"
                     fill="none" stroke="#2a2a2a" strokeWidth="2" />
@@ -734,13 +761,17 @@ export default function EventPage() {
                     const isSelected = selectedCells[activeDay].has(unit.id);
                     const sold = !loadingAvail && isCellSold(unit, activeDay) && !isSelected;
                     const colors = TYPE_COLORS[unit.type];
-                    const fill = sold ? colors.sold : isSelected ? colors.selected : colors.fill;
+                    const fill = sold ? colors.sold : colors.fill;
                     const opacity = sold ? 0.35 : 1;
+                    // Centroid of the unit, for the selected check badge
+                    const cx = unit.rects.reduce((s, r) => s + r.x + r.w / 2, 0) / unit.rects.length;
+                    const cy = unit.rects.reduce((s, r) => s + r.y + r.h / 2, 0) / unit.rects.length;
                     return (
                       <g
                         key={unit.id}
                         className={`table-cell ${sold ? "sold" : ""}`}
                         onClick={() => !sold && handleCellClick(unit)}
+                        filter={isSelected ? "url(#tableGlow)" : undefined}
                       >
                         {unit.rects.map((rc, i) => (
                           <rect
@@ -750,12 +781,25 @@ export default function EventPage() {
                             width={rc.w}
                             height={rc.h}
                             rx={2}
-                            fill={fill}
+                            fill={isSelected ? "#D4AF37" : fill}
                             opacity={opacity}
-                            stroke={isSelected ? "#D4AF37" : "rgba(0,0,0,0.25)"}
+                            stroke={isSelected ? "#fffbe6" : "rgba(0,0,0,0.25)"}
                             strokeWidth={isSelected ? 2 : 0.5}
                           />
                         ))}
+                        {isSelected && (
+                          <g pointerEvents="none">
+                            <circle cx={cx} cy={cy} r={6.5} fill="#1a1a1a" stroke="#fffbe6" strokeWidth={1} />
+                            <path
+                              d={`M ${cx - 3} ${cy} L ${cx - 0.8} ${cy + 2.4} L ${cx + 3.3} ${cy - 2.8}`}
+                              fill="none"
+                              stroke="#D4AF37"
+                              strokeWidth={1.8}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </g>
+                        )}
                       </g>
                     );
                   })}
@@ -765,7 +809,7 @@ export default function EventPage() {
               {/* Legend */}
               <div className="flex flex-wrap gap-4 mt-4">
                 {(["standard", "corner", "premier_corner"] as TableTypeKey[]).map((type) => {
-                  const td = getTypeData(type);
+                  const meta = getTypeMeta(type);
                   const colors = TYPE_COLORS[type];
                   return (
                     <div key={type} className="flex items-center gap-2">
@@ -775,7 +819,7 @@ export default function EventPage() {
                       />
                       <span className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
                         {colors.label}
-                        {td ? ` — £${(td.price_pence / 100).toFixed(0)}` : ""}
+                        {` — £${(meta.price_pence / 100).toFixed(0)}`}
                       </span>
                     </div>
                   );
@@ -798,8 +842,13 @@ export default function EventPage() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <ShoppingCart className="w-4 h-4 text-accent" />
-                    <h3 className="text-sm font-medium text-text-primary" style={{ fontFamily: "Inter, sans-serif" }}>
+                    <h3 className="text-sm font-medium text-text-primary flex items-center" style={{ fontFamily: "Inter, sans-serif" }}>
                       Your Selection
+                      {!cartIsEmpty && (
+                        <span className="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-accent text-background text-[10px] font-semibold">
+                          {cartItems.reduce((s, i) => s + i.quantity, 0)}
+                        </span>
+                      )}
                     </h3>
                   </div>
                   {!cartIsEmpty && (
