@@ -60,7 +60,7 @@ interface AvailabilityData {
 //   . = empty (aisle / booth interior)
 // Tables form hollow rectangular booth islands — a top block and a bottom block
 // split by a centre aisle — exactly as laid out in the spreadsheet.
-// Units: 120 standard singles · 12 end corner · 16 premier corner.
+// Units: 120 standard singles · 24 end corner (L-pairs) · 32 premier corner (L-pairs).
 //
 // SVG viewBox: "0 0 774 510"
 const FLOOR_GRID = [
@@ -115,46 +115,38 @@ function generateTableLayout(): TableUnit[] {
     }
   }
 
-  // Grouped units — each connected cluster of "1" (green) / "3" (red), split
-  // into chunks of 4 cells, is one sellable unit (£200 / £275).
+  // Grouped units — green ("1") and red ("3") cells pair up into L-shaped units
+  // (two tables at a right angle), each sold as one item (£200 / £275).
   const groups: { value: string; type: TableTypeKey; prefix: string }[] = [
     { value: "1", type: "corner", prefix: "C" },
     { value: "3", type: "premier_corner", prefix: "PC" },
   ];
+  // Partner search: diagonals first (these form the right-angle L), then orthogonals.
+  const NEIGHBOURS = [
+    [-1, -1], [-1, 1], [1, -1], [1, 1], // diagonal
+    [-1, 0], [1, 0], [0, -1], [0, 1],   // orthogonal
+  ];
   for (const { value, type, prefix } of groups) {
-    const seen = FLOOR_GRID.map((row) => Array(row.length).fill(false));
+    const used = FLOOR_GRID.map((row) => Array(row.length).fill(false));
     let uIdx = 1;
     for (let r = 0; r < R; r++) {
       for (let c = 0; c < FLOOR_GRID[r].length; c++) {
-        if (val(r, c) !== value || seen[r][c]) continue;
-        // Flood fill (8-connected) to gather the whole cluster
-        const comp: [number, number][] = [];
-        const stack: [number, number][] = [[r, c]];
-        seen[r][c] = true;
-        while (stack.length) {
-          const [y, x] = stack.pop()!;
-          comp.push([y, x]);
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-              if (!dy && !dx) continue;
-              const ny = y + dy;
-              const nx = x + dx;
-              if (val(ny, nx) === value && seen[ny] && !seen[ny][nx]) {
-                seen[ny][nx] = true;
-                stack.push([ny, nx]);
-              }
-            }
+        if (val(r, c) !== value || used[r][c]) continue;
+        used[r][c] = true;
+        // Find one partner cell to form a 2-table (L-shaped) unit
+        let partner: [number, number] | null = null;
+        for (const [dy, dx] of NEIGHBOURS) {
+          const ny = r + dy;
+          const nx = c + dx;
+          if (val(ny, nx) === value && used[ny] && !used[ny][nx]) {
+            used[ny][nx] = true;
+            partner = [ny, nx];
+            break;
           }
         }
-        // Split the cluster into 4-cell units (reading order)
-        comp.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-        for (let i = 0; i < comp.length; i += 4) {
-          units.push({
-            id: `${prefix}-${uIdx++}`,
-            type,
-            rects: comp.slice(i, i + 4).map(([yy, xx]) => cellRect(yy, xx)),
-          });
-        }
+        const rects = [cellRect(r, c)];
+        if (partner) rects.push(cellRect(partner[0], partner[1]));
+        units.push({ id: `${prefix}-${uIdx++}`, type, rects });
       }
     }
   }

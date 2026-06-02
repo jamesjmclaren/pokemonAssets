@@ -123,10 +123,10 @@ FROM ins, (VALUES
   ('corner',
    'End Corner',
    'End-of-row corner — two tables at a right angle, sold as one unit.',
-   20000, 12, '#22c55e', 2),
+   20000, 24, '#22c55e', 2),
 
   ('premier_corner',
    'Premier Corner',
    'Premium corner — two tables at a right angle, prime position, sold as one unit.',
-   27500, 16, '#ef4444', 3)
+   27500, 32, '#ef4444', 3)
 ) AS v(type_key, label, description, price_pence, total_available, display_color, sort_order);
