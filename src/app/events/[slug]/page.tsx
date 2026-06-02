@@ -23,14 +23,11 @@ type DayKey = "Saturday" | "Sunday";
 type TableTypeKey = "standard" | "corner" | "premier_corner";
 type CardType = "TCG" | "Sports" | "Collectibles" | "Memorabilia" | "Other";
 
-interface TableCell {
+interface TableUnit {
   id: string;
   type: TableTypeKey;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  flip?: boolean; // mirror the L-shape horizontally (right-hand strip)
+  // A unit is one or more grid cells drawn together and sold as a single item.
+  rects: { x: number; y: number; w: number; h: number }[];
 }
 
 interface AvailabilityTypeData {
@@ -56,12 +53,14 @@ interface AvailabilityData {
 }
 
 // ─── Floor plan layout ────────────────────────────────────────────────────────
-// Exact mirror of the vendor spreadsheet. Each character is one table cell:
-//   1 = standard (green) · 2 = end corner (blue) · 3 = premier corner (red)
+// Exact mirror of the vendor spreadsheet. Each character is one grid cell:
+//   2 (blue)  = a single standard table, sold individually (£100)
+//   1 (green) = end corner — a cell cluster sold as one unit (£200)
+//   3 (red)   = premier corner — a cell cluster sold as one unit (£275)
 //   . = empty (aisle / booth interior)
 // Tables form hollow rectangular booth islands — a top block and a bottom block
 // split by a centre aisle — exactly as laid out in the spreadsheet.
-// Counts: 48 standard · 120 end corner · 64 premier corner.
+// Units: 120 standard singles · 12 end corner · 16 premier corner.
 //
 // SVG viewBox: "0 0 774 510"
 const FLOOR_GRID = [
@@ -93,29 +92,74 @@ const STEP = 22;   // grid pitch
 const ORIGIN_X = 12;
 const ORIGIN_Y = 12;
 
-const VALUE_TYPE: Record<string, TableTypeKey> = {
-  "1": "standard",
-  "2": "corner",
-  "3": "premier_corner",
-};
+function cellRect(r: number, c: number) {
+  return { x: ORIGIN_X + c * STEP, y: ORIGIN_Y + r * STEP, w: CELL, h: CELL };
+}
 
-function generateTableLayout(): TableCell[] {
-  const cells: TableCell[] = [];
-  FLOOR_GRID.forEach((row, r) => {
-    for (let c = 0; c < row.length; c++) {
-      const type = VALUE_TYPE[row[c]];
-      if (!type) continue;
-      cells.push({
-        id: `${row[c]}-r${r}c${c}`,
-        type,
-        x: ORIGIN_X + c * STEP,
-        y: ORIGIN_Y + r * STEP,
-        w: CELL,
-        h: CELL,
-      });
+function generateTableLayout(): TableUnit[] {
+  const units: TableUnit[] = [];
+  const R = FLOOR_GRID.length;
+  const val = (r: number, c: number): string => {
+    if (r < 0 || r >= R) return ".";
+    const row = FLOOR_GRID[r];
+    return c < 0 || c >= row.length ? "." : row[c] || ".";
+  };
+
+  // Standard singles — every blue "2" cell is its own table (£100).
+  let sIdx = 1;
+  for (let r = 0; r < R; r++) {
+    for (let c = 0; c < FLOOR_GRID[r].length; c++) {
+      if (val(r, c) === "2") {
+        units.push({ id: `S-${sIdx++}`, type: "standard", rects: [cellRect(r, c)] });
+      }
     }
-  });
-  return cells;
+  }
+
+  // Grouped units — each connected cluster of "1" (green) / "3" (red), split
+  // into chunks of 4 cells, is one sellable unit (£200 / £275).
+  const groups: { value: string; type: TableTypeKey; prefix: string }[] = [
+    { value: "1", type: "corner", prefix: "C" },
+    { value: "3", type: "premier_corner", prefix: "PC" },
+  ];
+  for (const { value, type, prefix } of groups) {
+    const seen = FLOOR_GRID.map((row) => Array(row.length).fill(false));
+    let uIdx = 1;
+    for (let r = 0; r < R; r++) {
+      for (let c = 0; c < FLOOR_GRID[r].length; c++) {
+        if (val(r, c) !== value || seen[r][c]) continue;
+        // Flood fill (8-connected) to gather the whole cluster
+        const comp: [number, number][] = [];
+        const stack: [number, number][] = [[r, c]];
+        seen[r][c] = true;
+        while (stack.length) {
+          const [y, x] = stack.pop()!;
+          comp.push([y, x]);
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (!dy && !dx) continue;
+              const ny = y + dy;
+              const nx = x + dx;
+              if (val(ny, nx) === value && seen[ny] && !seen[ny][nx]) {
+                seen[ny][nx] = true;
+                stack.push([ny, nx]);
+              }
+            }
+          }
+        }
+        // Split the cluster into 4-cell units (reading order)
+        comp.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+        for (let i = 0; i < comp.length; i += 4) {
+          units.push({
+            id: `${prefix}-${uIdx++}`,
+            type,
+            rects: comp.slice(i, i + 4).map(([yy, xx]) => cellRect(yy, xx)),
+          });
+        }
+      }
+    }
+  }
+
+  return units;
 }
 
 const TABLE_LAYOUT = generateTableLayout();
@@ -124,8 +168,8 @@ const CARD_TYPES: CardType[] = ["TCG", "Sports", "Collectibles", "Memorabilia", 
 
 // Colours mirror the spreadsheet: standard = green, end corner = blue, premier = red.
 const TYPE_COLORS: Record<TableTypeKey, { fill: string; selected: string; sold: string; label: string }> = {
-  standard:       { fill: "#22c55e", selected: "#86efac", sold: "#374151", label: "Standard" },
-  corner:         { fill: "#3b82f6", selected: "#93c5fd", sold: "#374151", label: "End Corner" },
+  standard:       { fill: "#3b82f6", selected: "#93c5fd", sold: "#374151", label: "Standard" },
+  corner:         { fill: "#22c55e", selected: "#86efac", sold: "#374151", label: "End Corner" },
   premier_corner: { fill: "#ef4444", selected: "#fca5a5", sold: "#374151", label: "Premier Corner" },
 };
 
@@ -210,7 +254,7 @@ export default function EventPage() {
   );
 
   const isCellSold = useCallback(
-    (cell: TableCell, day: DayKey): boolean => {
+    (cell: TableUnit, day: DayKey): boolean => {
       const td = getTypeData(cell.type);
       if (!td) return false;
       return td[day].available <= selectedCountForType(cell.type, day);
@@ -219,7 +263,7 @@ export default function EventPage() {
   );
 
   const handleCellClick = useCallback(
-    (cell: TableCell) => {
+    (cell: TableUnit) => {
       const isSelected = selectedCells[activeDay].has(cell.id);
       if (isSelected) {
         setSelectedCells((prev) => ({
@@ -693,28 +737,34 @@ export default function EventPage() {
                   <text x="387" y="251" textAnchor="middle" fill="#374151" fontSize="9"
                     fontFamily="Inter, sans-serif" letterSpacing="3">CENTRE AISLE</text>
 
-                  {/* Tables — one rect per spreadsheet cell */}
-                  {TABLE_LAYOUT.map((cell) => {
-                    const isSelected = selectedCells[activeDay].has(cell.id);
-                    const sold = !loadingAvail && isCellSold(cell, activeDay) && !isSelected;
-                    const colors = TYPE_COLORS[cell.type];
+                  {/* Tables — one group per sellable unit (blue = single table; green/red clusters sold as one) */}
+                  {TABLE_LAYOUT.map((unit) => {
+                    const isSelected = selectedCells[activeDay].has(unit.id);
+                    const sold = !loadingAvail && isCellSold(unit, activeDay) && !isSelected;
+                    const colors = TYPE_COLORS[unit.type];
                     const fill = sold ? colors.sold : isSelected ? colors.selected : colors.fill;
                     const opacity = sold ? 0.35 : 1;
                     return (
-                      <rect
-                        key={cell.id}
-                        x={cell.x}
-                        y={cell.y}
-                        width={cell.w}
-                        height={cell.h}
-                        rx={2}
-                        fill={fill}
-                        opacity={opacity}
-                        stroke={isSelected ? "#D4AF37" : "rgba(0,0,0,0.25)"}
-                        strokeWidth={isSelected ? 2 : 0.5}
+                      <g
+                        key={unit.id}
                         className={`table-cell ${sold ? "sold" : ""}`}
-                        onClick={() => !sold && handleCellClick(cell)}
-                      />
+                        onClick={() => !sold && handleCellClick(unit)}
+                      >
+                        {unit.rects.map((rc, i) => (
+                          <rect
+                            key={i}
+                            x={rc.x}
+                            y={rc.y}
+                            width={rc.w}
+                            height={rc.h}
+                            rx={2}
+                            fill={fill}
+                            opacity={opacity}
+                            stroke={isSelected ? "#D4AF37" : "rgba(0,0,0,0.25)"}
+                            strokeWidth={isSelected ? 2 : 0.5}
+                          />
+                        ))}
+                      </g>
                     );
                   })}
                 </svg>
