@@ -117,16 +117,16 @@ SELECT
 FROM ins, (VALUES
   ('standard',
    'Standard Table',
-   'A single vendor table in the central hall area.',
-   10000, 120, '#f472b6', 1),
+   'A single vendor table.',
+   10000, 24, '#f472b6', 1),
 
   ('corner',
-   'Corner Table',
-   'End-of-row position with additional aisle exposure.',
-   20000, 12, '#34d399', 2),
+   'End Corner',
+   'End-of-row corner — two tables at a right angle.',
+   20000, 60, '#34d399', 2),
 
   ('premier_corner',
    'Premier Corner',
-   'Premium unit of two joined tables — maximum footprint and prime floor exposure.',
-   27500, 16, '#60a5fa', 3)
+   'Premium corner — two tables at a right angle, prime floor position.',
+   27500, 32, '#60a5fa', 3)
 ) AS v(type_key, label, description, price_pence, total_available, display_color, sort_order);
