@@ -56,91 +56,77 @@ interface AvailabilityData {
 }
 
 // ─── Floor plan layout ────────────────────────────────────────────────────────
-// Tidy representation of the Excel floor plan.
-// Sellable units: 24 standard / 60 corner / 32 premier = 116 total.
-// 12 pods in two blocks (6 top, 6 bottom) split by a centre aisle. Each pod is
-// two short strips of stacked units. Corner & premier are drawn as L-shapes
-// (two tables at a right angle); standard tables are plain rectangles.
+// Exact mirror of the vendor spreadsheet. Each character is one table cell:
+//   1 = standard (green) · 2 = end corner (blue) · 3 = premier corner (red)
+//   . = empty (aisle / booth interior)
+// Tables form hollow rectangular booth islands — a top block and a bottom block
+// split by a centre aisle — exactly as laid out in the spreadsheet.
+// Counts: 48 standard · 120 end corner · 64 premier corner.
 //
-// SVG viewBox: "0 0 560 360"
+// SVG viewBox: "0 0 774 510"
+const FLOOR_GRID = [
+  ".11...11...11...11...11...11......",
+  "1..1.1..1.1..1.1..1.1..1.1..1.....",
+  "2..2.2..2.2..2.2..2.2..2.2..2.....",
+  "2..2.2..2.2..2.2..2.2..2.2..2.....",
+  "2..2.2..2.2..2.2..2.2..2.2..2.....",
+  "2..2.2..2.2..2.3..3.2..2.2..2..33.",
+  "2..2.2..2.2..2..33..2..2.2..2.3..3",
+  "2..2.2..2.2..2......2..2.2..2.3..3",
+  "3..3.3..3.3..3......3..3.3..3..33.",
+  ".33...33...33........33...33......",
+  "..................................",
+  "..................................",
+  ".33...33...33...33...33...33...33.",
+  "3..3.3..3.3..3.3..3.3..3.3..3.3..3",
+  "3..3.2..2.2..2.2..2.2..2.2..2.2..2",
+  ".33..2..2.2..2.2..2.2..2.2..2.2..2",
+  ".....2..2.2..2.1..1.2..2.2..2.2..2",
+  ".....2..2.2..2..11..2..2.2..2.2..2",
+  ".....2..2.2..2......2..2.2..2.2..2",
+  ".....1..1.1..1......1..1.1..1.1..1",
+  "......11...11........11...11...11.",
+];
+
+const CELL = 19;   // table square size
+const STEP = 22;   // grid pitch
+const ORIGIN_X = 12;
+const ORIGIN_Y = 12;
+
+const VALUE_TYPE: Record<string, TableTypeKey> = {
+  "1": "standard",
+  "2": "corner",
+  "3": "premier_corner",
+};
 
 function generateTableLayout(): TableCell[] {
   const cells: TableCell[] = [];
-
-  const COL_W = 30;
-  const STRIP_GAP = 4;
-  const POD_STEP = COL_W * 2 + STRIP_GAP + 26; // pod width (64) + gap (26) = 90
-  const START_X = 24;
-  const TOP_Y = 40;
-  const BOTTOM_Y = 212;
-
-  const STD_H = 15;
-  const UNIT_H = 24;
-  const V_GAP = 5;
-
-  // Premier units per pod sum to 32 over 12 pods; every pod also has 2 standard
-  // (caps) and 5 corner units → 24 standard + 60 corner + 32 premier.
-  const premierPerPod = [3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3];
-
-  let sIdx = 1, cIdx = 1, pIdx = 1;
-
-  for (let pod = 0; pod < 12; pod++) {
-    const baseX = START_X + (pod % 6) * POD_STEP;
-    const blockY = pod < 6 ? TOP_Y : BOTTOM_Y;
-
-    // Ordered units, top→bottom: std cap, premiers, 5 corners, premiers, std cap
-    const nPrem = premierPerPod[pod];
-    const premTop = Math.ceil(nPrem / 2);
-    const premBot = nPrem - premTop;
-    const order: TableTypeKey[] = ["standard"];
-    for (let i = 0; i < premTop; i++) order.push("premier_corner");
-    for (let i = 0; i < 5; i++) order.push("corner");
-    for (let i = 0; i < premBot; i++) order.push("premier_corner");
-    order.push("standard");
-
-    // Split the ordered units across the pod's two strips
-    const half = Math.ceil(order.length / 2);
-    const strips: TableTypeKey[][] = [order.slice(0, half), order.slice(half)];
-
-    strips.forEach((stripUnits, strip) => {
-      const x = baseX + strip * (COL_W + STRIP_GAP);
-      let y = blockY;
-      stripUnits.forEach((t) => {
-        const h = t === "standard" ? STD_H : UNIT_H;
-        const id =
-          t === "standard"
-            ? `S-${String(sIdx++).padStart(3, "0")}`
-            : t === "corner"
-            ? `C-${String(cIdx++).padStart(2, "0")}`
-            : `PC-${String(pIdx++).padStart(2, "0")}`;
-        cells.push({ id, type: t, x, y, w: COL_W, h, flip: strip === 1 });
-        y += h + V_GAP;
+  FLOOR_GRID.forEach((row, r) => {
+    for (let c = 0; c < row.length; c++) {
+      const type = VALUE_TYPE[row[c]];
+      if (!type) continue;
+      cells.push({
+        id: `${row[c]}-r${r}c${c}`,
+        type,
+        x: ORIGIN_X + c * STEP,
+        y: ORIGIN_Y + r * STEP,
+        w: CELL,
+        h: CELL,
       });
-    });
-  }
-
+    }
+  });
   return cells;
-}
-
-// L-shape polygon points — two tables at a right angle. `flip` mirrors it for
-// the right-hand strip so each pod reads symmetrically.
-function lShape(x: number, y: number, w: number, h: number, flip?: boolean): string {
-  const t = 0.55; // vertical-bar thickness (fraction of width)
-  const f = 0.58; // where the foot begins (fraction of height)
-  const pts = flip
-    ? [[x + w, y], [x + w * (1 - t), y], [x + w * (1 - t), y + h * f], [x, y + h * f], [x, y + h], [x + w, y + h]]
-    : [[x, y], [x + w * t, y], [x + w * t, y + h * f], [x + w, y + h * f], [x + w, y + h], [x, y + h]];
-  return pts.map((p) => p.join(",")).join(" ");
 }
 
 const TABLE_LAYOUT = generateTableLayout();
 
 const CARD_TYPES: CardType[] = ["TCG", "Sports", "Collectibles", "Memorabilia", "Other"];
 
+// Colours mirror the spreadsheet: standard = green, end corner = blue, premier = red.
 const TYPE_COLORS: Record<TableTypeKey, { fill: string; selected: string; sold: string; label: string }> = {
-  standard:       { fill: "#f472b6", selected: "#f9a8d4", sold: "#4b5563", label: "Standard" },
-  corner:         { fill: "#34d399", selected: "#6ee7b7", sold: "#4b5563", label: "End Corner" },
-  premier_corner: { fill: "#60a5fa", selected: "#93c5fd", sold: "#4b5563", label: "Premier Corner" },
+  standard:       { fill: "#22c55e", selected: "#86efac", sold: "#374151", label: "Standard" },
+  corner:         { fill: "#3b82f6", selected: "#93c5fd", sold: "#374151", label: "End Corner" },
+  premier_corner: { fill: "#ef4444", selected: "#fca5a5", sold: "#374151", label: "Premier Corner" },
 };
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -693,56 +679,42 @@ export default function EventPage() {
               {/* SVG floor plan */}
               <div className="border border-border/40 rounded-xl overflow-hidden bg-[#111] p-2">
                 <svg
-                  viewBox="0 0 560 360"
+                  viewBox="0 0 774 510"
                   style={{ width: "100%", height: "auto", display: "block" }}
                   role="img"
                   aria-label="Interactive floor plan — click tables to select them"
                 >
                   {/* Hall outline */}
-                  <rect x="6" y="6" width="548" height="348" rx="6"
+                  <rect x="4" y="4" width="766" height="494" rx="6"
                     fill="none" stroke="#2a2a2a" strokeWidth="2" />
 
-                  {/* Centre aisle */}
-                  <line x1="20" y1="190" x2="540" y2="190" stroke="#1f2937" strokeWidth="1" strokeDasharray="4 4" />
-                  <text x="280" y="186" textAnchor="middle" fill="#374151" fontSize="8"
+                  {/* Centre aisle (between the top and bottom blocks) */}
+                  <line x1="10" y1="254" x2="764" y2="254" stroke="#1f2937" strokeWidth="1" strokeDasharray="5 4" />
+                  <text x="387" y="251" textAnchor="middle" fill="#374151" fontSize="9"
                     fontFamily="Inter, sans-serif" letterSpacing="3">CENTRE AISLE</text>
 
-                  {/* Tables */}
+                  {/* Tables — one rect per spreadsheet cell */}
                   {TABLE_LAYOUT.map((cell) => {
                     const isSelected = selectedCells[activeDay].has(cell.id);
                     const sold = !loadingAvail && isCellSold(cell, activeDay) && !isSelected;
                     const colors = TYPE_COLORS[cell.type];
                     const fill = sold ? colors.sold : isSelected ? colors.selected : colors.fill;
                     const opacity = sold ? 0.35 : 1;
-                    const shapeProps = {
-                      fill,
-                      opacity,
-                      stroke: isSelected ? "#D4AF37" : "transparent",
-                      strokeWidth: isSelected ? 2 : 0,
-                      className: `table-cell ${sold ? "sold" : ""}`,
-                      onClick: () => !sold && handleCellClick(cell),
-                    };
                     return (
-                      <g key={cell.id}>
-                        {cell.type === "standard" ? (
-                          <rect x={cell.x} y={cell.y} width={cell.w} height={cell.h} rx={2} {...shapeProps} />
-                        ) : (
-                          <polygon points={lShape(cell.x, cell.y, cell.w, cell.h, cell.flip)} {...shapeProps} />
-                        )}
-                        {isSelected && (
-                          <text
-                            x={cell.x + cell.w / 2}
-                            y={cell.y + cell.h - 4}
-                            textAnchor="middle"
-                            fill="#D4AF37"
-                            fontSize="9"
-                            fontWeight="bold"
-                            pointerEvents="none"
-                          >
-                            ✓
-                          </text>
-                        )}
-                      </g>
+                      <rect
+                        key={cell.id}
+                        x={cell.x}
+                        y={cell.y}
+                        width={cell.w}
+                        height={cell.h}
+                        rx={2}
+                        fill={fill}
+                        opacity={opacity}
+                        stroke={isSelected ? "#D4AF37" : "rgba(0,0,0,0.25)"}
+                        strokeWidth={isSelected ? 2 : 0.5}
+                        className={`table-cell ${sold ? "sold" : ""}`}
+                        onClick={() => !sold && handleCellClick(cell)}
+                      />
                     );
                   })}
                 </svg>

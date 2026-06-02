@@ -118,15 +118,15 @@ FROM ins, (VALUES
   ('standard',
    'Standard Table',
    'A single vendor table.',
-   10000, 24, '#f472b6', 1),
+   10000, 48, '#22c55e', 1),
 
   ('corner',
    'End Corner',
    'End-of-row corner — two tables at a right angle.',
-   20000, 60, '#34d399', 2),
+   20000, 120, '#3b82f6', 2),
 
   ('premier_corner',
    'Premier Corner',
    'Premium corner — two tables at a right angle, prime floor position.',
-   27500, 32, '#60a5fa', 3)
+   27500, 64, '#ef4444', 3)
 ) AS v(type_key, label, description, price_pence, total_available, display_color, sort_order);
