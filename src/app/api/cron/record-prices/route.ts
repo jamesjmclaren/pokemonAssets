@@ -101,8 +101,11 @@ export async function GET(request: NextRequest) {
 
         // If a grade is specified but no graded price was found, skip —
         // don't fall back to raw price.
+        // Still touch price_updated_at so the cron doesn't retry this asset
+        // every single day with the same result.
         if (marketPrice == null && asset.psa_grade) {
-          console.log(`[cron]   Grade "${asset.psa_grade}" has no graded price for "${asset.name}" — skipping (N/A)`);
+          console.log(`[cron]   Grade "${asset.psa_grade}" has no graded price for "${asset.name}" — skipping (N/A), touching timestamp`);
+          await supabase.from("assets").update({ price_updated_at: new Date().toISOString() }).eq("id", asset.id);
           continue;
         }
 
@@ -119,13 +122,15 @@ export async function GET(request: NextRequest) {
           }
 
           if (results.length === 0) {
-            console.warn(`[cron]   ✗ No results for "${asset.name}" — skipping`);
+            console.warn(`[cron]   ✗ No results for "${asset.name}" — skipping, touching timestamp`);
+            await supabase.from("assets").update({ price_updated_at: new Date().toISOString() }).eq("id", asset.id);
             continue;
           }
 
           const match = results.find((c: Record<string, unknown>) => c.id === asset.external_id) || results[0];
           if (!match) {
-            console.warn(`[cron]   ✗ No matching card for "${asset.name}" — skipping`);
+            console.warn(`[cron]   ✗ No matching card for "${asset.name}" — skipping, touching timestamp`);
+            await supabase.from("assets").update({ price_updated_at: new Date().toISOString() }).eq("id", asset.id);
             continue;
           }
 

@@ -44,6 +44,7 @@ export default function DashboardPage() {
         const list: PortfolioAsset[] = Array.isArray(data) ? data : [];
         setAssets(list);
         const latest = list.reduce<Date | null>((max, a) => {
+          if (a.manual_price) return max;
           if (!a.price_updated_at) return max;
           const d = new Date(a.price_updated_at);
           return max === null || d > max ? d : max;
