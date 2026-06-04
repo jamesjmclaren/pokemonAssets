@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
     // Track last known price per asset
     const lastKnownPrice = new Map<string, number>();
     for (const a of assets) {
-      lastKnownPrice.set(a.id, a.purchase_price); // default to purchase price
+      lastKnownPrice.set(a.id, a.current_price ?? a.purchase_price);
     }
 
     const chartPoints: Array<{
@@ -185,7 +185,7 @@ export async function GET(request: NextRequest) {
       let raw = 0, graded = 0, sealed = 0;
       for (const a of assets) {
         const info = assetMap.get(a.id)!;
-        const price = lastKnownPrice.get(a.id) ?? info.purchasePrice;
+        const price = lastKnownPrice.get(a.id) ?? (info.currentPrice ?? info.purchasePrice);
         const value = price * info.qty;
         if (info.category === "raw") raw += value;
         else if (info.category === "graded") graded += value;
