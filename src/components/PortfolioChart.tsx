@@ -105,6 +105,21 @@ export default function PortfolioChart({ portfolioId, data: staticData, classNam
     return map;
   }, [data]);
 
+  // Y-axis domain is based on visible stacked series only so toggling rescales the chart.
+  // Cost basis is excluded — it reflects total portfolio cost and can dwarf single-category views.
+  const yAxisMax = useMemo(() => {
+    if (chartData.length === 0) return undefined;
+    let max = 0;
+    for (const point of chartData) {
+      const stackedTotal = STACKED_SERIES.reduce(
+        (sum, s) => sum + ((point as unknown as Record<string, number>)[s.key] ?? 0),
+        0
+      );
+      max = Math.max(max, stackedTotal);
+    }
+    return max > 0 ? max * 1.1 : undefined;
+  }, [chartData]);
+
   if (loading) {
     return (
       <div className={`bg-surface border border-border rounded-2xl p-6 ${className}`}>
@@ -259,6 +274,7 @@ export default function PortfolioChart({ portfolioId, data: staticData, classNam
             axisLine={false}
           />
           <YAxis
+            domain={yAxisMax !== undefined ? [0, yAxisMax] : undefined}
             tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0)}`}
             stroke="#606078"
             fontSize={11}
