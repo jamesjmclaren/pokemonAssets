@@ -10,13 +10,17 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { formatCurrency, formatDateShort } from "@/lib/format";
+import { formatDateShort } from "@/lib/format";
+import { useFormatCurrency } from "@/lib/currency-context";
 import type { PriceHistoryPoint } from "@/types";
 
 interface PriceChartProps {
   externalId: string;
+  assetId?: string;
   cardName?: string;
   purchasePrice?: number;
+  assetType?: "card" | "sealed";
+  poketraceId?: string | null;
   className?: string;
 }
 
@@ -24,14 +28,19 @@ const TIME_RANGES = [
   { label: "30D", days: 30 },
   { label: "90D", days: 90 },
   { label: "1Y", days: 365 },
+  { label: "All", days: 9999 },
 ];
 
 export default function PriceChart({
   externalId,
+  assetId,
   cardName,
   purchasePrice,
+  assetType,
+  poketraceId,
   className = "",
 }: PriceChartProps) {
+  const formatCurrency = useFormatCurrency();
   const [data, setData] = useState<PriceHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,8 +56,11 @@ export default function PriceChart({
           .toISOString()
           .split("T")[0];
         const nameParam = cardName ? `&name=${encodeURIComponent(cardName)}` : "";
+        const typeParam = assetType ? `&assetType=${assetType}` : "";
+        const assetIdParam = assetId ? `&assetId=${assetId}` : "";
+        const poketraceParam = poketraceId ? `&poketraceId=${encodeURIComponent(poketraceId)}` : "";
         const res = await fetch(
-          `/api/price-history?cardId=${encodeURIComponent(externalId)}&startDate=${startDate}&endDate=${endDate}${nameParam}`
+          `/api/price-history?cardId=${encodeURIComponent(externalId)}&startDate=${startDate}&endDate=${endDate}${nameParam}${typeParam}${assetIdParam}${poketraceParam}`
         );
         if (!res.ok) throw new Error("Failed to fetch price history");
         const json = await res.json();
@@ -65,7 +77,7 @@ export default function PriceChart({
       }
     }
     fetchHistory();
-  }, [externalId, cardName, range]);
+  }, [externalId, assetId, cardName, assetType, poketraceId, range]);
 
   if (loading) {
     return (
@@ -95,7 +107,16 @@ export default function PriceChart({
   const maxPrice = Math.max(...prices) * 1.05;
   const currentPrice = prices[prices.length - 1];
   const startPrice = prices[0];
+  const pctChange = startPrice > 0 ? ((currentPrice - startPrice) / startPrice * 100) : 0;
   const isUp = currentPrice >= startPrice;
+
+  // Calculate actual data span for display
+  const actualDays = data.length >= 2
+    ? Math.round((new Date(data[data.length - 1].date).getTime() - new Date(data[0].date).getTime()) / 86400000)
+    : 0;
+  const rangeLabel = actualDays >= 365
+    ? `${(actualDays / 365).toFixed(1).replace(/\.0$/, "")}y`
+    : `${actualDays}d`;
 
   return (
     <div className={`bg-surface border border-border rounded-2xl p-6 ${className}`}>
@@ -104,10 +125,10 @@ export default function PriceChart({
           <h3 className="text-sm font-semibold text-text-primary">
             Price History
           </h3>
-          <p className={`text-xs mt-1 ${isUp ? "text-success" : "text-danger"}`}>
-            {isUp ? "+" : ""}
-            {((currentPrice - startPrice) / startPrice * 100).toFixed(2)}% over{" "}
-            {range} days
+          <p className={`text-xs mt-1 ${data.length <= 1 ? "text-text-muted" : isUp ? "text-success" : "text-danger"}`}>
+            {data.length <= 1
+              ? "Tracking started — history will build over time"
+              : `${isUp ? "+" : ""}${pctChange.toFixed(2)}% over ${rangeLabel}`}
           </p>
         </div>
         <div className="flex gap-1 bg-background rounded-xl p-1">
@@ -117,7 +138,7 @@ export default function PriceChart({
               onClick={() => setRange(r.days)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
                 range === r.days
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-black"
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
@@ -145,7 +166,7 @@ export default function PriceChart({
           </defs>
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="#2a2a3a"
+            stroke="#2a2a2a"
             vertical={false}
           />
           <XAxis
@@ -167,8 +188,8 @@ export default function PriceChart({
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#1e1e2a",
-              border: "1px solid #2a2a3a",
+              backgroundColor: "#1e1e1e",
+              border: "1px solid #2a2a2a",
               borderRadius: "12px",
               padding: "12px",
             }}
@@ -179,7 +200,7 @@ export default function PriceChart({
           {purchasePrice && (
             <CartesianGrid
               horizontalPoints={[purchasePrice]}
-              stroke="#6366f1"
+              stroke="#D4AF37"
               strokeDasharray="8 4"
               strokeOpacity={0.5}
             />

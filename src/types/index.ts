@@ -45,6 +45,8 @@ export interface PriceHistoryPoint {
   date: string;
   price: number;
   source?: string;
+  currency?: string;
+  isConverted?: boolean;
 }
 
 export interface PortfolioAsset {
@@ -66,6 +68,29 @@ export interface PortfolioAsset {
   updated_at: string;
   rarity?: string;
   card_number?: string;
+  psa_grade?: string | null;
+  manual_price?: boolean;
+  quantity?: number;
+  language?: string;
+  storage_location?: string;
+  is_manual_submission?: boolean;
+  pc_product_id?: string | null;
+  pc_url?: string | null;
+  pc_grade_field?: string | null;
+  evidence_url?: string | null;
+  status?: 'ACTIVE' | 'SOLD';
+  sell_price?: number | null;
+  sell_date?: string | null;
+  // Marketplace fields
+  for_sale?: boolean;
+  sale_price?: number | null;
+  // Poketrace fields
+  poketrace_id?: string | null;
+  poketrace_market?: string;
+  price_currency?: string;
+  is_converted_price?: boolean;
+  // Preferred price source: 'tcgplayer' | 'ebay' | 'cardmarket' | null (auto)
+  price_source?: string | null;
 }
 
 export interface PortfolioSummary {
@@ -85,6 +110,26 @@ export interface SearchFilters {
   type?: "card" | "sealed" | "all";
 }
 
+export interface Vendor {
+  id: string;
+  user_id: string;
+  shop_name: string;
+  description: string | null;
+  shop_image_url: string | null;
+  website_url: string | null;
+  ebay_url: string | null;
+  whatsapp_number: string | null;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string;
+  updated_at: string;
+  item_count?: number;
+}
+
+export interface MarketplaceItem extends PortfolioAsset {
+  vendor: Vendor;
+}
+
 export interface ApiSet {
   id: string;
   name: string;
@@ -92,4 +137,45 @@ export interface ApiSet {
   releaseDate: string;
   totalCards: number;
   imageUrl?: string;
+}
+
+export interface PriceAlert {
+  id: string;
+  user_id: string;
+  poketrace_id: string;
+  card_name: string;
+  set_name: string;
+  image_url: string | null;
+  condition_tier: string;
+  track_tcgplayer: boolean;
+  track_ebay: boolean;
+  track_cardmarket: boolean;
+  market: "US" | "EU";
+  currency: string;
+  alert_daily_digest: boolean;
+  target_low_price: number | null;
+  target_high_price: number | null;
+  last_price_tcgplayer: number | null;
+  last_price_ebay: number | null;
+  last_price_cardmarket: number | null;
+  last_notified_at: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreatePriceAlertPayload {
+  poketrace_id: string;
+  card_name: string;
+  set_name?: string;
+  image_url?: string | null;
+  condition_tier: string;
+  track_tcgplayer: boolean;
+  track_ebay: boolean;
+  track_cardmarket: boolean;
+  market?: "US" | "EU";
+  currency?: string;
+  alert_daily_digest: boolean;
+  target_low_price?: number | null;
+  target_high_price?: number | null;
 }

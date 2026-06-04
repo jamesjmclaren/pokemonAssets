@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -10,10 +10,17 @@ import {
   Loader2,
   CheckCircle2,
   Search,
+  AlertTriangle,
+  PenLine,
+  Link2,
 } from "lucide-react";
-import { formatCurrency, extractCardPrice } from "@/lib/format";
+import { formatCurrency, extractCardPrice, fixStorageUrl, getMarketDisclaimer } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
+import { usePortfolio } from "@/lib/portfolio-context";
+import { useCurrency, SUPPORTED_CURRENCIES, type DisplayCurrency } from "@/lib/currency-context";
 import SearchModal from "./SearchModal";
+
+const CURRENCY_SYMBOL: Record<DisplayCurrency, string> = { USD: "$", GBP: "£", EUR: "€" };
 
 interface SelectedCard {
   id: string;
@@ -21,45 +28,227 @@ interface SelectedCard {
   number?: string;
   rarity?: string;
   setName?: string;
-  set?: string;
   imageUrl?: string;
-  image?: string;
+  type: "card" | "sealed";
   prices?: {
-    tcgplayer?: { market?: number; low?: number };
+    raw?: number;
+    market?: number;
+    psa10?: number;
+    psa9?: number;
+    cgc10?: number;
+    bgs10?: number;
   };
-  tcgplayerPrice?: number;
   marketPrice?: number;
 }
 
-export default function AddAssetForm() {
+const PSA_GRADES = [
+  { value: "", label: "None (Raw)" },
+  { value: "PSA 10", label: "PSA 10 - Gem Mint" },
+  { value: "PSA 9", label: "PSA 9 - Mint" },
+  { value: "PSA 8", label: "PSA 8 - NM-MT" },
+  { value: "PSA 7", label: "PSA 7 - Near Mint" },
+  { value: "PSA 6", label: "PSA 6 - EX-MT" },
+  { value: "PSA 5", label: "PSA 5 - Excellent" },
+  { value: "PSA 4", label: "PSA 4 - VG-EX" },
+  { value: "PSA 3", label: "PSA 3 - Very Good" },
+  { value: "PSA 2", label: "PSA 2 - Good" },
+  { value: "PSA 1", label: "PSA 1 - Poor" },
+  { value: "CGC 10", label: "CGC 10 - Pristine" },
+  { value: "CGC 9.5", label: "CGC 9.5 - Gem Mint" },
+  { value: "CGC 9", label: "CGC 9 - Mint" },
+  { value: "BGS 10", label: "BGS 10 - Pristine" },
+  { value: "BGS 9.5", label: "BGS 9.5 - Gem Mint" },
+  { value: "BGS 9", label: "BGS 9 - Mint" },
+];
+
+const LANGUAGES = [
+  "English",
+  "Japanese",
+  "Korean",
+  "Chinese (Simplified)",
+  "Chinese (Traditional)",
+  "French",
+  "German",
+  "Italian",
+  "Spanish",
+  "Portuguese",
+  "Dutch",
+  "Polish",
+  "Thai",
+  "Indonesian",
+];
+
+export type { SelectedCard };
+
+interface AddAssetFormProps {
+  initialCard?: SelectedCard;
+  onSuccess?: () => void;
+}
+
+export default function AddAssetForm({ initialCard, onSuccess }: AddAssetFormProps = {}) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { currentPortfolio, portfolios, setCurrentPortfolio, loading: portfolioLoading, isReadOnly } = usePortfolio();
+  const { currency: displayCurrency, rates: fxRates } = useCurrency();
+
+  const convertToUsd = useCallback(
+    (amount: number, fromCurrency: DisplayCurrency): number => {
+      if (!Number.isFinite(amount)) return 0;
+      if (fromCurrency === "USD") return amount;
+      const rate = fxRates[fromCurrency];
+      if (!rate || rate <= 0) return amount;
+      return Math.round((amount / rate) * 100) / 100;
+    },
+    [fxRates]
+  );
+
+  const convertFromUsd = useCallback(
+    (usd: number, toCurrency: DisplayCurrency): number => {
+      if (!Number.isFinite(usd)) return 0;
+      if (toCurrency === "USD") return usd;
+      const rate = fxRates[toCurrency];
+      if (!rate || rate <= 0) return usd;
+      return Math.round(usd * rate * 100) / 100;
+    },
+    [fxRates]
+  );
 
   const [searchOpen, setSearchOpen] = useState(false);
-  const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null);
+  const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(initialCard ?? null);
+  const [isManualSubmission, setIsManualSubmission] = useState(false);
   const [customImage, setCustomImage] = useState<File | null>(null);
   const [customImagePreview, setCustomImagePreview] = useState<string | null>(
     null
   );
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [gradedPrice, setGradedPrice] = useState<number | null>(null);
+  const [gradedPriceLoading, setGradedPriceLoading] = useState(false);
+  type PriceSource = "tcgplayer" | "ebay" | "cardmarket";
+  const [sourceBreakdown, setSourceBreakdown] = useState<Partial<Record<PriceSource, number>>>({});
+  const [selectedSource, setSelectedSource] = useState<PriceSource | null>(null);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+
+  interface TetherCandidate {
+    id: string;
+    name: string;
+    setName: string;
+    poketraceId: string;
+    poketraceMarket: string;
+    imageUrl?: string;
+    currency: string;
+    rawPrice?: number | null;
+    prices: {
+      ungraded?: number;
+      grade7?: number;
+      grade8?: number;
+      grade9?: number;
+      grade95?: number;
+      psa10?: number;
+    };
+  }
+
+  const [tetherCandidates, setTetherCandidates] = useState<TetherCandidate[]>([]);
+  const [selectedTether, setSelectedTether] = useState<TetherCandidate | null>(null);
+  const [tetherLoading, setTetherLoading] = useState(false);
+
+  // Pre-fill form when an initialCard is provided
+  useEffect(() => {
+    if (initialCard) {
+      const price = initialCard.marketPrice || extractCardPrice(initialCard as unknown as Record<string, unknown>);
+      setForm((f) => {
+        const updates: Partial<typeof f> = {
+          assetType: initialCard.type,
+          condition: initialCard.type === "sealed" ? "Sealed" : f.condition,
+        };
+        if (price && !f.purchasePrice) {
+          const inDisplay = convertFromUsd(price, f.purchaseCurrency);
+          updates.purchasePrice = inDisplay.toFixed(2);
+        }
+        return { ...f, ...updates };
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [tetherSearchQuery, setTetherSearchQuery] = useState("");
 
   const [form, setForm] = useState({
+    manualName: "",
+    manualSetName: "",
     purchasePrice: "",
+    purchaseCurrency: "USD" as DisplayCurrency,
     purchaseDate: new Date().toISOString().split("T")[0],
     purchaseLocation: "",
     condition: "Near Mint",
     assetType: "card" as "card" | "sealed",
+    psaGrade: "",
+    manualPrice: false,
+    manualPriceValue: "",
+    evidenceUrl: "",
+    quantity: "1",
     notes: "",
+    language: "English",
+    storageLocation: "",
   });
+
+  // Sync the purchase currency to the user's selected display currency once it loads.
+  useEffect(() => {
+    setForm((f) =>
+      f.purchasePrice || f.purchaseCurrency !== "USD"
+        ? f
+        : { ...f, purchaseCurrency: displayCurrency }
+    );
+    // Only run when the user's display currency first becomes known.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayCurrency]);
+
+  const handlePurchaseCurrencyChange = (next: DisplayCurrency) => {
+    setForm((f) => {
+      if (f.purchaseCurrency === next) return f;
+      const amount = parseFloat(f.purchasePrice);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return { ...f, purchaseCurrency: next };
+      }
+      const usd = convertToUsd(amount, f.purchaseCurrency);
+      const converted = convertFromUsd(usd, next);
+      return {
+        ...f,
+        purchaseCurrency: next,
+        purchasePrice: converted ? converted.toFixed(2) : "",
+      };
+    });
+  };
 
   const handleCardSelect = (card: SelectedCard) => {
     setSelectedCard(card);
+    setIsManualSubmission(false);
     setSearchOpen(false);
-    const price = extractCardPrice(card as unknown as Record<string, unknown>);
+    const price = card.marketPrice || extractCardPrice(card as unknown as Record<string, unknown>);
+    const updates: Partial<typeof form> = {};
     if (price && !form.purchasePrice) {
-      setForm((f) => ({ ...f, purchasePrice: price.toFixed(2) }));
+      const inDisplay = convertFromUsd(price, form.purchaseCurrency);
+      updates.purchasePrice = inDisplay.toFixed(2);
     }
+    if (card.type === "sealed") {
+      updates.assetType = "sealed";
+      updates.condition = "Sealed";
+    } else {
+      updates.assetType = "card";
+    }
+    if (Object.keys(updates).length > 0) {
+      setForm((f) => ({ ...f, ...updates }));
+    }
+  };
+
+  const handleManualEntry = (query: string) => {
+    setIsManualSubmission(true);
+    setSelectedCard(null);
+    setSearchOpen(false);
+    setForm((f) => ({
+      ...f,
+      manualName: query,
+      manualPrice: true,
+    }));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,11 +266,133 @@ export default function AddAssetForm() {
       setCustomImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+
+    // If no card selected and no manual entry yet, switch to manual mode
+    if (!selectedCard && !isManualSubmission) {
+      setIsManualSubmission(true);
+      setForm((f) => ({ ...f, manualPrice: true }));
+    }
   };
+
+  const clearSelection = () => {
+    setSelectedCard(null);
+    setIsManualSubmission(false);
+    setForm((f) => ({ ...f, manualName: "", manualSetName: "" }));
+    setTetherCandidates([]);
+    setSelectedTether(null);
+    setTetherSearchQuery("");
+    setSourceBreakdown({});
+    setSelectedSource(null);
+    setGradedPrice(null);
+  };
+
+  // Search Poketrace for tether candidates
+  const searchTether = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+    setTetherLoading(true);
+    setSelectedTether(null);
+    try {
+      const res = await fetch(
+        `/api/graded-search?q=${encodeURIComponent(query)}`
+      );
+      if (!res.ok) throw new Error("Failed to search Poketrace");
+      const data = await res.json();
+      setTetherCandidates(data.candidates || []);
+    } catch (error) {
+      console.error("Tether search failed:", error);
+      setTetherCandidates([]);
+    } finally {
+      setTetherLoading(false);
+    }
+  }, []);
+
+  // Get the price field name for the current grade
+  const getTetherGradeField = useCallback((): string => {
+    if (!form.psaGrade) return "ungraded";
+    const g = form.psaGrade.toLowerCase();
+    if (g.includes("10")) return "psa10";
+    if (g.includes("9.5")) return "grade95";
+    if (g.includes("9")) return "grade9";
+    if (g.includes("8")) return "grade8";
+    if (g.includes("7")) return "grade7";
+    return "ungraded";
+  }, [form.psaGrade]);
+
+  // Fetch per-source price breakdown (TCGPlayer / eBay / CardMarket) whenever
+  // the linked card / tether / grade changes. Works for both API-sourced cards
+  // and manual submissions tethered to a Poketrace listing.
+  useEffect(() => {
+    const poketraceId =
+      (!isManualSubmission
+        ? (selectedCard as unknown as Record<string, unknown>)?.poketraceId
+        : selectedTether?.poketraceId) as string | undefined;
+
+    if (!poketraceId) {
+      setGradedPrice(null);
+      setSourceBreakdown({});
+      setSelectedSource(null);
+      return;
+    }
+
+    const isGraded = !!form.psaGrade;
+    setBreakdownLoading(true);
+    if (isGraded) setGradedPriceLoading(true);
+
+    const url = `/api/card-price?poketraceId=${encodeURIComponent(poketraceId)}${
+      isGraded ? `&grade=${encodeURIComponent(form.psaGrade)}` : ""
+    }`;
+
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => {
+        const breakdown = (data.breakdown || {}) as Partial<Record<PriceSource, number>>;
+        setSourceBreakdown(breakdown);
+        setGradedPrice(isGraded ? (data.price ?? null) : null);
+        // Reset selection if the previously chosen source no longer has a price
+        setSelectedSource((prev) => (prev && breakdown[prev] != null ? prev : null));
+      })
+      .catch(() => {
+        setSourceBreakdown({});
+        setGradedPrice(null);
+        setSelectedSource(null);
+      })
+      .finally(() => {
+        setBreakdownLoading(false);
+        setGradedPriceLoading(false);
+      });
+  }, [selectedCard, selectedTether, form.psaGrade, isManualSubmission]);
+
+  // When user selects a tether candidate, populate the price
+  const handleTetherSelect = useCallback((candidate: TetherCandidate) => {
+    setSelectedTether(candidate);
+    const field = getTetherGradeField();
+    const price = candidate.prices[field as keyof typeof candidate.prices];
+    if (price != null) {
+      setForm((f) => ({
+        ...f,
+        manualPrice: true,
+        manualPriceValue: price.toFixed(2),
+      }));
+    }
+  }, [getTetherGradeField]);
+
+  // Auto-search tether when manual name changes or graded card selected
+  useEffect(() => {
+    const name = isManualSubmission ? form.manualName : selectedCard?.name;
+    if (name && (isManualSubmission || form.psaGrade)) {
+      setTetherSearchQuery(name);
+    }
+  }, [isManualSubmission, form.manualName, form.psaGrade, selectedCard?.name]);
+
+  // Determine the effective name/id for submission
+  const effectiveName = isManualSubmission ? form.manualName : selectedCard?.name || "";
+  const canSubmit = isManualSubmission
+    ? form.manualName.trim().length > 0 && !!form.purchasePrice && !!currentPortfolio
+    : !!selectedCard && !!form.purchasePrice && !!currentPortfolio;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCard) return;
+    if (!canSubmit) return;
 
     setSubmitting(true);
     try {
@@ -94,46 +405,103 @@ export default function AddAssetForm() {
           .from("asset-images")
           .upload(fileName, customImage);
 
-        if (!uploadError) {
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from("asset-images").getPublicUrl(fileName);
-          customImageUrl = publicUrl;
+        if (uploadError) {
+          throw new Error(`Failed to upload image: ${uploadError.message}`);
+        }
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("asset-images").getPublicUrl(fileName);
+        customImageUrl = fixStorageUrl(publicUrl);
+      }
+
+      // Determine current market price
+      const hasTether = !!selectedTether;
+      let currentPrice: number | null = null;
+
+      if (hasTether) {
+        if (selectedSource && sourceBreakdown[selectedSource] != null) {
+          currentPrice = sourceBreakdown[selectedSource]!;
+        } else {
+          const field = getTetherGradeField();
+          currentPrice = selectedTether!.prices[field as keyof typeof selectedTether.prices] ?? null;
+        }
+      } else if (form.manualPrice && form.manualPriceValue) {
+        currentPrice = parseFloat(form.manualPriceValue);
+      } else if (selectedCard) {
+        // User explicitly picked a source → use that price
+        if (selectedSource && sourceBreakdown[selectedSource] != null) {
+          currentPrice = sourceBreakdown[selectedSource]!;
+        } else if (form.psaGrade && gradedPrice != null) {
+          currentPrice = gradedPrice;
+        } else if (form.psaGrade) {
+          // Grade selected but no graded price found — leave as null (N/A)
+          currentPrice = null;
+        } else {
+          // No grade selected — use raw/market price
+          currentPrice = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
         }
       }
 
-      const currentPrice = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
+      // Tethered assets should NOT be marked manual so the cron can auto-refresh
+      const isManualPrice = hasTether
+        ? false
+        : (form.manualPrice || isManualSubmission);
+
+      const purchasePriceUsd = convertToUsd(parseFloat(form.purchasePrice) || 0, form.purchaseCurrency);
 
       const res = await fetch("/api/assets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          external_id: selectedCard.id,
-          name: selectedCard.name,
-          set_name: selectedCard.setName || selectedCard.set || "",
-          asset_type: form.assetType,
-          image_url: selectedCard.imageUrl || selectedCard.image || null,
+          portfolio_id: currentPortfolio!.id,
+          external_id: isManualSubmission
+            ? `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`
+            : selectedCard!.id,
+          name: isManualSubmission ? form.manualName.trim() : selectedCard!.name,
+          set_name: isManualSubmission ? form.manualSetName : (selectedCard!.setName || ""),
+          asset_type: isManualSubmission
+            ? form.assetType
+            : (selectedCard!.type === "sealed" ? "sealed" : form.assetType),
+          image_url: isManualSubmission ? null : (selectedCard!.imageUrl || null),
           custom_image_url: customImageUrl,
-          purchase_price: form.purchasePrice,
+          purchase_price: purchasePriceUsd,
           purchase_date: form.purchaseDate,
           purchase_location: form.purchaseLocation,
           condition: form.condition,
           notes: form.notes || null,
+          evidence_url: form.evidenceUrl.trim() || null,
           current_price: currentPrice,
-          rarity: selectedCard.rarity || null,
-          card_number: selectedCard.number || null,
+          rarity: isManualSubmission ? null : (selectedCard!.rarity || null),
+          card_number: isManualSubmission ? null : (selectedCard!.number || null),
+          psa_grade: form.psaGrade || null,
+          manual_price: isManualPrice,
+          quantity: form.quantity,
+          language: form.language,
+          storage_location: form.storageLocation,
+          is_manual_submission: isManualSubmission,
+          poketrace_id: selectedTether?.poketraceId || (selectedCard as unknown as Record<string, unknown>)?.poketraceId || null,
+          poketrace_market: selectedTether?.poketraceMarket || (selectedCard as unknown as Record<string, unknown>)?.poketraceMarket || "US",
+          price_source: selectedSource,
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to add asset");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to add asset");
+      }
 
       setSuccess(true);
       setTimeout(() => {
-        router.push("/collection");
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          router.push("/collection");
+        }
       }, 1500);
     } catch (error) {
       console.error("Submit error:", error);
-      alert("Failed to add asset. Please try again.");
+      alert(error instanceof Error ? error.message : "Failed to add asset. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -142,8 +510,23 @@ export default function AddAssetForm() {
   const cardImage =
     customImagePreview ||
     selectedCard?.imageUrl ||
-    selectedCard?.image ||
     "";
+
+  if (isReadOnly) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-surface border border-border rounded-2xl p-12 text-center">
+          <Upload className="w-16 h-16 text-text-muted mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-text-primary">
+            Read-Only Access
+          </h2>
+          <p className="text-text-secondary mt-2">
+            You don&apos;t have permission to add assets to this portfolio.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (success) {
     return (
@@ -167,27 +550,39 @@ export default function AddAssetForm() {
         isOpen={searchOpen}
         onClose={() => setSearchOpen(false)}
         onSelect={handleCardSelect}
+        onManualEntry={handleManualEntry}
+        assetType={form.assetType}
       />
 
       <div className="max-w-4xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 md:gap-8">
           {/* Left: Preview */}
           <div className="lg:col-span-2">
-            <div className="bg-surface border border-border rounded-2xl p-6 sticky top-6">
+            <div className="bg-surface border border-border rounded-2xl p-4 md:p-6 sticky top-18 lg:top-6">
               {/* Card preview */}
-              <div className="aspect-[3/4] bg-background rounded-xl overflow-hidden relative mb-4">
+              <div className="aspect-[3/4] max-h-[40vh] md:max-h-none bg-background rounded-xl overflow-hidden relative mb-4 mx-auto max-w-[220px] md:max-w-none">
                 {cardImage ? (
                   <Image
                     src={cardImage}
-                    alt={selectedCard?.name || "Card preview"}
+                    alt={effectiveName || "Card preview"}
                     fill
-                    className="object-contain p-4"
-                    sizes="300px"
+                    className="object-contain p-3 md:p-4"
+                    sizes="(max-width: 768px) 220px, 300px"
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-text-muted">
-                    <Search className="w-10 h-10 mb-2" />
-                    <p className="text-sm">Search for a card</p>
+                    {isManualSubmission ? (
+                      <>
+                        <PenLine className="w-8 h-8 md:w-10 md:h-10 mb-2" />
+                        <p className="text-sm">Manual Entry</p>
+                        <p className="text-xs mt-1">Upload a photo below</p>
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-8 h-8 md:w-10 md:h-10 mb-2" />
+                        <p className="text-sm">Search for a card</p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -231,17 +626,17 @@ export default function AddAssetForm() {
               )}
 
               {/* Selected info */}
-              {selectedCard && (
+              {selectedCard && !isManualSubmission && (
                 <div className="mt-4 pt-4 border-t border-border space-y-2">
                   <h3 className="text-sm font-semibold text-text-primary">
                     {selectedCard.name}
                   </h3>
                   <p className="text-xs text-text-muted">
-                    {selectedCard.setName || selectedCard.set}
+                    {selectedCard.setName}
                     {selectedCard.number ? ` #${selectedCard.number}` : ""}
                   </p>
                   {selectedCard.rarity && (
-                    <p className="text-xs text-accent">{selectedCard.rarity}</p>
+                    <p className="text-xs text-gold">{selectedCard.rarity}</p>
                   )}
                   {(() => {
                     const p = extractCardPrice(selectedCard as unknown as Record<string, unknown>);
@@ -253,46 +648,115 @@ export default function AddAssetForm() {
                   })()}
                 </div>
               )}
+
+              {/* Manual submission info */}
+              {isManualSubmission && (
+                <div className="mt-4 pt-4 border-t border-warning/30 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <PenLine className="w-4 h-4 text-warning" />
+                    <h3 className="text-sm font-semibold text-warning">
+                      Manual Submission
+                    </h3>
+                  </div>
+                  <p className="text-xs text-text-muted">
+                    This asset was not found in the API. You&apos;ll need to manage the price manually.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right: Form */}
           <div className="lg:col-span-3">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Search button */}
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Select Asset *
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setSearchOpen(true)}
-                  className="w-full flex items-center gap-3 px-4 py-4 bg-surface border border-border rounded-xl text-left hover:border-border-hover hover:bg-surface-hover"
-                >
-                  <Search className="w-5 h-5 text-text-muted" />
-                  <span
-                    className={
-                      selectedCard ? "text-text-primary" : "text-text-muted"
-                    }
-                  >
-                    {selectedCard
-                      ? selectedCard.name
-                      : "Search for a card or product..."}
-                  </span>
-                  {selectedCard && (
+              {/* Search button / Manual entry toggle */}
+              {!isManualSubmission ? (
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Select Asset *
+                  </label>
+                  <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCard(null);
-                      }}
-                      className="ml-auto p-1 hover:bg-surface rounded-lg"
+                      onClick={() => setSearchOpen(true)}
+                      className="flex-1 flex items-center gap-3 px-4 py-4 bg-surface border border-border rounded-xl text-left hover:border-border-hover hover:bg-surface-hover"
                     >
-                      <X className="w-4 h-4 text-text-muted" />
+                      <Search className="w-5 h-5 text-text-muted" />
+                      <span
+                        className={
+                          selectedCard ? "text-text-primary" : "text-text-muted"
+                        }
+                      >
+                        {selectedCard
+                          ? selectedCard.name
+                          : "Search for a card or product..."}
+                      </span>
                     </button>
-                  )}
-                </button>
-              </div>
+                    {selectedCard && (
+                      <button
+                        type="button"
+                        onClick={clearSelection}
+                        className="px-3 bg-surface border border-border rounded-xl hover:bg-surface-hover hover:border-border-hover"
+                      >
+                        <X className="w-4 h-4 text-text-muted" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-text-secondary">
+                      Manual Entry
+                    </label>
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      className="text-xs text-accent hover:text-accent-hover font-medium"
+                    >
+                      Switch to search
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-warning/10 border border-warning/30 rounded-xl">
+                    <div className="flex items-center gap-2 text-warning text-xs">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                      Manual submission &mdash; prices won&apos;t auto-refresh from the API.
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-2">
+                      Card / Product Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={form.manualName}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, manualName: e.target.value }))
+                      }
+                      className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                      placeholder="e.g. Charizard VMAX 074/073"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-2">
+                      Set Name
+                    </label>
+                    <input
+                      type="text"
+                      value={form.manualSetName}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, manualSetName: e.target.value }))
+                      }
+                      className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                      placeholder="e.g. Champion's Path"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Asset type */}
               <div>
@@ -322,32 +786,417 @@ export default function AddAssetForm() {
                 </div>
               </div>
 
+              {/* PSA Grade selector - always show for cards */}
+              {form.assetType === "card" && (
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    PSA / Grading
+                  </label>
+                  <select
+                    value={form.psaGrade}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, psaGrade: e.target.value }))
+                    }
+                    className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
+                  >
+                    {PSA_GRADES.map((grade) => (
+                      <option key={grade.value} value={grade.value}>
+                        {grade.label}
+                      </option>
+                    ))}
+                  </select>
+                  {form.psaGrade && (
+                    <div className="mt-1.5">
+                      <p className="text-xs text-gold">
+                        Graded: {form.psaGrade}
+                      </p>
+                      {!isManualSubmission && selectedCard && (
+                        <p className="text-xs text-text-muted mt-0.5">
+                          {gradedPriceLoading ? (
+                            <span className="text-accent">Fetching graded price...</span>
+                          ) : gradedPrice != null ? (
+                            <span className="text-success">
+                              {form.psaGrade} price: {formatCurrency(gradedPrice)}
+                            </span>
+                          ) : (
+                            <span className="text-warning">
+                              No graded price available — price will show as N/A
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Price Source selector - for API-sourced cards */}
+              {!isManualSubmission && selectedCard && (
+                <div className="bg-surface-hover border border-border rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-text-primary">
+                      Price source
+                    </label>
+                    {breakdownLoading && (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-text-muted" />
+                    )}
+                  </div>
+                  <p className="text-xs text-text-muted mb-3">
+                    {form.psaGrade
+                      ? `Pick which marketplace's ${form.psaGrade} price to use. Leave on Auto to let us pick.`
+                      : "Pick which marketplace's price to use. Leave on Auto to let us pick."}
+                  </p>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {(["auto", "tcgplayer", "ebay", "cardmarket"] as const).map((opt) => {
+                      const isAuto = opt === "auto";
+                      const isSelected = isAuto ? selectedSource === null : selectedSource === opt;
+                      const price = isAuto ? null : sourceBreakdown[opt as PriceSource];
+                      const unavailable = !isAuto && price == null;
+                      const label =
+                        opt === "tcgplayer" ? "TCGPlayer"
+                          : opt === "ebay" ? "eBay"
+                          : opt === "cardmarket" ? "CardMarket"
+                          : "Auto";
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          disabled={unavailable}
+                          onClick={() => setSelectedSource(isAuto ? null : (opt as PriceSource))}
+                          className={`px-3 py-2 rounded-lg border text-left transition-colors ${
+                            isSelected
+                              ? "bg-accent-muted border-accent text-accent-hover"
+                              : unavailable
+                                ? "bg-surface border-border text-text-muted opacity-50 cursor-not-allowed"
+                                : "bg-surface border-border text-text-secondary hover:border-border-hover"
+                          }`}
+                        >
+                          <div className="text-xs font-semibold">{label}</div>
+                          <div className="text-xs mt-0.5">
+                            {isAuto
+                              ? <span className="text-text-muted">Best available</span>
+                              : price != null
+                                ? <span>{formatCurrency(price)}</span>
+                                : <span className="text-text-muted">N/A</span>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Poketrace Tether - only show for manual submissions (API cards already have a poketraceId) */}
+              {isManualSubmission && (
+                <div className="bg-surface-hover border border-border rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Link2 className="w-4 h-4 text-accent" />
+                    <span className="text-sm font-medium text-text-primary">
+                      Link to Poketrace
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-muted mb-3">
+                    Link this asset to a Poketrace listing for automatic price updates from TCGPlayer and eBay data.
+                  </p>
+
+                  {/* Search input */}
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={tetherSearchQuery}
+                      onChange={(e) => setTetherSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          searchTether(tetherSearchQuery);
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                      placeholder="Search Poketrace..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => searchTether(tetherSearchQuery)}
+                      disabled={tetherLoading || !tetherSearchQuery.trim()}
+                      className="px-3 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-black rounded-lg text-sm font-medium flex items-center gap-1.5"
+                    >
+                      {tetherLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Search className="w-3.5 h-3.5" />
+                      )}
+                      Search
+                    </button>
+                  </div>
+
+                  {/* Results */}
+                  {tetherLoading && (
+                    <div className="flex items-center gap-2 text-xs text-text-muted py-2">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Searching Poketrace…
+                    </div>
+                  )}
+
+                  {!tetherLoading && tetherCandidates.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-text-secondary">
+                        Select a listing to tether:
+                      </p>
+                      <div className="max-h-64 overflow-y-auto space-y-1 border border-border rounded-xl p-2 bg-surface">
+                        {tetherCandidates.map((candidate) => {
+                          const isSelected = selectedTether?.id === candidate.id;
+                          const field = getTetherGradeField();
+                          const relevantPrice = candidate.prices[field as keyof typeof candidate.prices];
+                          return (
+                            <button
+                              key={candidate.id}
+                              type="button"
+                              onClick={() => handleTetherSelect(candidate)}
+                              className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition-colors ${
+                                isSelected
+                                  ? "bg-accent-muted border border-accent"
+                                  : "hover:bg-surface-hover border border-transparent"
+                              }`}
+                            >
+                              {candidate.imageUrl && (
+                                <div className="w-10 h-14 bg-background rounded-md overflow-hidden flex-shrink-0 relative">
+                                  <Image
+                                    src={candidate.imageUrl}
+                                    alt={candidate.name}
+                                    fill
+                                    className="object-contain p-0.5"
+                                    sizes="40px"
+                                    unoptimized
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-text-primary truncate">
+                                  {candidate.name}
+                                </p>
+                                <p className="text-[10px] text-text-muted truncate">
+                                  {candidate.setName}
+                                </p>
+                                <div className="flex gap-3 mt-1 flex-wrap">
+                                  {candidate.prices.ungraded != null && (
+                                    <span className="text-[10px] text-text-muted">
+                                      Raw: {formatCurrency(candidate.prices.ungraded)}
+                                    </span>
+                                  )}
+                                  {relevantPrice != null && field !== "ungraded" && (
+                                    <span className="text-[10px] text-amber-400">
+                                      {form.psaGrade || "Selected"}: {formatCurrency(relevantPrice)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <CheckCircle2 className="w-4 h-4 text-accent flex-shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Selected tether summary */}
+                  {selectedTether && (
+                    <div className="mt-3 bg-accent-muted/30 border border-accent/30 rounded-xl p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Link2 className="w-3.5 h-3.5 text-accent" />
+                        <p className="text-xs font-medium text-accent-hover">
+                          Tethered to: {selectedTether.name}
+                        </p>
+                      </div>
+                      <div className="flex gap-3 flex-wrap">
+                        {selectedTether.prices.ungraded != null && (
+                          <span className="text-xs text-text-muted">
+                            Raw: {formatCurrency(selectedTether.prices.ungraded)}
+                          </span>
+                        )}
+                        {selectedTether.prices.grade7 != null && (
+                          <span className="text-xs text-text-secondary">
+                            Grade 7: {formatCurrency(selectedTether.prices.grade7)}
+                          </span>
+                        )}
+                        {selectedTether.prices.grade8 != null && (
+                          <span className="text-xs text-text-secondary">
+                            Grade 8: {formatCurrency(selectedTether.prices.grade8)}
+                          </span>
+                        )}
+                        {selectedTether.prices.grade9 != null && (
+                          <span className="text-xs text-amber-400/70">
+                            Grade 9: {formatCurrency(selectedTether.prices.grade9)}
+                          </span>
+                        )}
+                        {selectedTether.prices.grade95 != null && (
+                          <span className="text-xs text-amber-400/80">
+                            Grade 9.5: {formatCurrency(selectedTether.prices.grade95)}
+                          </span>
+                        )}
+                        {selectedTether.prices.psa10 != null && (
+                          <span className="text-xs text-amber-400">
+                            PSA 10: {formatCurrency(selectedTether.prices.psa10)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-text-muted mt-1">
+                        {getMarketDisclaimer(selectedTether.poketraceMarket, "long")} Prices auto-refresh daily.
+                      </p>
+
+                      {/* Price source selector for tethered assets */}
+                      <div className="mt-3 pt-3 border-t border-accent/20">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-medium text-text-primary">
+                            Price source
+                          </p>
+                          {breakdownLoading && (
+                            <Loader2 className="w-3 h-3 animate-spin text-text-muted" />
+                          )}
+                        </div>
+                        <p className="text-[10px] text-text-muted mb-2">
+                          {form.psaGrade
+                            ? `Pick which marketplace's ${form.psaGrade} price to use.`
+                            : "Pick which marketplace's price to use."}
+                        </p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+                          {(["auto", "tcgplayer", "ebay", "cardmarket"] as const).map((opt) => {
+                            const isAuto = opt === "auto";
+                            const isSelected = isAuto ? selectedSource === null : selectedSource === opt;
+                            const price = isAuto ? null : sourceBreakdown[opt as PriceSource];
+                            const unavailable = !isAuto && price == null;
+                            const label =
+                              opt === "tcgplayer" ? "TCGPlayer"
+                                : opt === "ebay" ? "eBay"
+                                : opt === "cardmarket" ? "CardMarket"
+                                : "Auto";
+                            return (
+                              <button
+                                key={opt}
+                                type="button"
+                                disabled={unavailable}
+                                onClick={() => setSelectedSource(isAuto ? null : (opt as PriceSource))}
+                                className={`px-2 py-1.5 rounded-lg border text-left transition-colors ${
+                                  isSelected
+                                    ? "bg-accent-muted border-accent text-accent-hover"
+                                    : unavailable
+                                      ? "bg-surface border-border text-text-muted opacity-50 cursor-not-allowed"
+                                      : "bg-surface border-border text-text-secondary hover:border-border-hover"
+                                }`}
+                              >
+                                <div className="text-[10px] font-semibold">{label}</div>
+                                <div className="text-[10px] mt-0.5">
+                                  {isAuto
+                                    ? <span className="text-text-muted">Best available</span>
+                                    : price != null
+                                      ? <span>{formatCurrency(price)}</span>
+                                      : <span className="text-text-muted">N/A</span>}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTether(null);
+                          setTetherCandidates([]);
+                        }}
+                        className="text-[10px] text-danger hover:text-danger mt-3"
+                      >
+                        Remove link
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Language */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Language
+                </label>
+                <select
+                  value={form.language}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, language: e.target.value }))
+                  }
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
+                >
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang} value={lang}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quantity */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.quantity}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, quantity: e.target.value }))
+                  }
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
+                />
+              </div>
+
               {/* Purchase details */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Purchase Price *
+                    Purchase Price (per unit) *
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">
-                      $
-                    </span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      required
-                      value={form.purchasePrice}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          purchasePrice: e.target.value,
-                        }))
-                      }
-                      className="w-full pl-8 pr-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
-                      placeholder="0.00"
-                    />
+                  <div className="flex">
+                    <select
+                      value={form.purchaseCurrency}
+                      onChange={(e) => handlePurchaseCurrencyChange(e.target.value as DisplayCurrency)}
+                      className="bg-surface border border-border border-r-0 rounded-l-xl px-3 text-text-primary text-sm outline-none focus:border-accent cursor-pointer"
+                      aria-label="Purchase price currency"
+                    >
+                      {SUPPORTED_CURRENCIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
+                        {CURRENCY_SYMBOL[form.purchaseCurrency]}
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={form.purchasePrice}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            purchasePrice: e.target.value,
+                          }))
+                        }
+                        className="w-full pl-7 pr-3 py-3 bg-surface border border-border rounded-r-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                        placeholder="0.00"
+                      />
+                    </div>
                   </div>
+                  {form.purchaseCurrency !== "USD" && parseFloat(form.purchasePrice) > 0 && (
+                    <p className="mt-1 text-[11px] text-accent/80">
+                      ≈ ${convertToUsd(parseFloat(form.purchasePrice), form.purchaseCurrency).toFixed(2)} USD will be saved at today&apos;s rate.
+                    </p>
+                  )}
+                  <p className="mt-1.5 text-[11px] text-text-muted leading-relaxed">
+                    All market prices are sourced from Poketrace in USD. Enter your purchase price in any currency — it will be converted and stored in USD at today&apos;s exchange rate.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -394,8 +1243,8 @@ export default function AddAssetForm() {
                   }
                   className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
                 >
-                  <option value="Gem Mint (PSA 10)">Gem Mint (PSA 10)</option>
-                  <option value="Mint (PSA 9)">Mint (PSA 9)</option>
+                  <option value="Gem Mint">Gem Mint</option>
+                  <option value="Mint">Mint</option>
                   <option value="Near Mint">Near Mint</option>
                   <option value="Lightly Played">Lightly Played</option>
                   <option value="Moderately Played">Moderately Played</option>
@@ -404,6 +1253,125 @@ export default function AddAssetForm() {
                   <option value="Sealed">Sealed</option>
                 </select>
               </div>
+
+              {/* Manual Price Toggle - not shown for manual submissions (always manual) */}
+              {!isManualSubmission && (
+                <div className="bg-surface-hover border border-border rounded-xl p-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.manualPrice}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, manualPrice: e.target.checked }))
+                      }
+                      className="w-4 h-4 accent-gold rounded"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-text-primary">
+                        Manually enter market price
+                      </span>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        Override the API price. You will manage this value yourself.
+                      </p>
+                    </div>
+                  </label>
+                  {form.manualPrice && (
+                    <div className="mt-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="w-4 h-4 text-warning" />
+                        <span className="text-xs text-warning">
+                          This price will not auto-refresh. You&apos;ll be warned if not updated in 30 days.
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">
+                          $
+                        </span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={form.manualPriceValue}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              manualPriceValue: e.target.value,
+                            }))
+                          }
+                          className="w-full pl-8 pr-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                          placeholder="Enter current market value..."
+                        />
+                      </div>
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-text-secondary mb-2">
+                      Evidence URL
+                    </label>
+                    <input
+                      type="url"
+                      value={form.evidenceUrl}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, evidenceUrl: e.target.value }))
+                      }
+                      className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                      placeholder="e.g. https://www.ebay.com/itm/..."
+                    />
+                    <p className="text-xs text-text-muted mt-1">
+                      Provide a link to an eBay listing, TCGPlayer sale, or other evidence for this price
+                    </p>
+                  </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Manual price for manual submissions */}
+              {isManualSubmission && (
+                <div className="bg-warning/5 border border-warning/20 rounded-xl p-4">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Current Market Price
+                  </label>
+                  <p className="text-xs text-text-muted mb-3">
+                    Since this is a manual submission, enter the current market value.
+                    You&apos;ll be reminded to update it every 30 days.
+                  </p>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.manualPriceValue}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          manualPriceValue: e.target.value,
+                        }))
+                      }
+                      className="w-full pl-8 pr-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                      placeholder="Enter current market value..."
+                    />
+                    </div>
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-text-secondary mb-2">
+                        Evidence URL
+                      </label>
+                      <input
+                        type="url"
+                        value={form.evidenceUrl}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, evidenceUrl: e.target.value }))
+                        }
+                        className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted outline-none focus:border-accent text-sm"
+                        placeholder="e.g. https://www.ebay.com/itm/..."
+                      />
+                      <p className="text-xs text-text-muted mt-1">
+                        Provide a link to an eBay listing, TCGPlayer sale, or other evidence for this price
+                      </p>
+                    </div>
+                  </div>
+                )}
 
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -420,10 +1388,38 @@ export default function AddAssetForm() {
                 />
               </div>
 
+              {!currentPortfolio && !portfolioLoading && (
+                <div className="p-4 bg-warning/10 border border-warning/30 rounded-xl">
+                  <div className="flex items-center gap-2 text-warning text-sm mb-3">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    No portfolio selected.
+                  </div>
+                  {portfolios.length > 0 ? (
+                    <select
+                      onChange={(e) => {
+                        const p = portfolios.find((p) => p.id === e.target.value);
+                        if (p) setCurrentPortfolio(p);
+                      }}
+                      className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary outline-none focus:border-accent text-sm"
+                      defaultValue=""
+                    >
+                      <option value="" disabled>Select a portfolio...</option>
+                      {portfolios.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-sm text-text-muted">
+                      No portfolios found. Please create one first.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={!selectedCard || !form.purchasePrice || submitting}
-                className="w-full py-4 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2"
+                disabled={!canSubmit || submitting}
+                className="w-full py-4 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-xl flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <>

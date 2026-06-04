@@ -1,108 +1,170 @@
-const API_BASE = "https://www.pokemonpricetracker.com";
+/**
+ * Unified Pokemon pricing API — powered by Poketrace.
+ *
+ * This module provides the same exported function signatures as before
+ * so all consumers (API routes, components) continue to work without changes.
+ * Under the hood, everything now routes through the Poketrace API.
+ *
+ * Previously used:
+ *   - JustTCG for cards
+ *   - PokemonPriceTracker for sealed products
+ *   - PriceCharting for graded prices (scraping)
+ *
+ * Now all handled by Poketrace.
+ */
 
-function getApiKey(): string {
-  const key = process.env.POKEMON_PRICE_API_KEY?.trim();
-  if (!key) {
-    throw new Error("POKEMON_PRICE_API_KEY is not configured");
-  }
-  return key;
+import {
+  searchPoketrace,
+  searchPoketraceByType,
+  getPoketraceCardById,
+  getPoketracePriceHistory,
+  getPoketraceSets,
+  fetchPoketracePrice,
+  gradeToPoketraceTier,
+  type NormalizedCard,
+} from "./poketrace";
+
+// Re-export Poketrace functions for direct usage
+export {
+  fetchPoketracePrice,
+  getPoketraceCardById,
+  gradeToPoketraceTier,
+  searchPoketrace,
+  searchPoketraceByType,
+  type NormalizedCard,
+};
+
+// ---------------------------------------------------------------------------
+// Query helpers (preserved from original)
+// ---------------------------------------------------------------------------
+
+/**
+ * Sanitize a user search query.
+ */
+function sanitizeQuery(raw: string): string {
+  return raw
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+    .replace(/\s+[-#]\s*\d+\s*$/, "")
+    .trim();
 }
 
-async function apiFetch(path: string, params?: Record<string, string>) {
-  const url = new URL(path, API_BASE);
-  if (params) {
-    Object.entries(params).forEach(([key, value]) => {
-      if (value) url.searchParams.set(key, value);
-    });
-  }
+// ---------------------------------------------------------------------------
+// Public API functions — same signatures as before
+// ---------------------------------------------------------------------------
 
-  const apiKey = getApiKey();
-  const res = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    next: { revalidate: 3600 },
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API error ${res.status}: ${text}`);
-  }
-
-  return res.json();
-}
-
+/**
+ * Search for cards (and sealed products detected as cards by Poketrace).
+ */
 export async function searchCards(query: string, setId?: string, limit = 20) {
-  const params: Record<string, string> = {
-    search: query,
-    limit: String(limit),
-  };
-  if (setId) {
-    params.setId = setId;
-  }
-  return apiFetch("/api/v2/cards", params);
+  const cleaned = sanitizeQuery(query);
+  return searchPoketrace(cleaned, {
+    setSlug: setId,
+    limit,
+    market: "US",
+  });
 }
 
+/**
+ * Search for sealed products via Poketrace.
+ * Poketrace merges cards and sealed, so we filter post-response.
+ */
+export async function searchSealedProducts(
+  query: string,
+  setId?: string,
+  limit = 20
+) {
+  const cleaned = sanitizeQuery(query);
+  return searchPoketraceByType(cleaned, "sealed", {
+    setSlug: setId,
+    limit,
+    market: "US",
+  });
+}
+
+/**
+ * Get cards by ID search.
+ */
 export async function getCardById(cardId: string) {
-  return apiFetch(`/api/v2/cards`, { search: cardId, limit: "1" });
+  const cleaned = sanitizeQuery(cardId);
+  return searchPoketrace(cleaned, { limit: 5, market: "US" });
 }
 
+/**
+ * Get price history for a card.
+ */
 export async function getPriceHistory(
   cardId: string,
   startDate?: string,
   endDate?: string,
   cardName?: string
 ) {
-  // Price history is embedded in the card response from /api/v2/cards
-  // Search by name (text search) since the API doesn't support lookup by MongoDB ObjectId
-  const searchTerm = cardName || cardId;
-  const results = await apiFetch("/api/v2/cards", {
-    search: searchTerm,
-    limit: "5",
-  });
+  // Try direct ID lookup first
+  const history = await getPoketracePriceHistory(cardId, "NEAR_MINT", startDate, endDate);
 
-  const cards = Array.isArray(results)
-    ? results
-    : results.data || results.cards || [];
-  // Prefer exact ID match, fall back to first result
-  const card =
-    (cardId && cards.find((c: { id?: string }) => c.id === cardId)) ||
-    cards[0];
-  if (!card) return [];
+  if (history.length > 0) return history;
 
-  const history = card.priceHistory || card.price_history || {};
-
-  // Convert priceHistory object (date->price map or array) into PriceHistoryPoint[]
-  let points: { date: string; price: number; source?: string }[] = [];
-  if (Array.isArray(history)) {
-    points = history;
-  } else if (typeof history === "object") {
-    points = Object.entries(history).map(([date, price]) => ({
-      date,
-      price: typeof price === "number" ? price : Number(price) || 0,
-      source: "tcgplayer",
-    }));
+  // If no history by ID, try searching by name and getting history for first match
+  if (cardName) {
+    const results = await searchPoketrace(cardName, { limit: 1, market: "US" });
+    if (results.length > 0) {
+      return getPoketracePriceHistory(results[0].poketraceId, "NEAR_MINT", startDate, endDate);
+    }
   }
 
-  // Filter by date range if provided
-  if (startDate) {
-    points = points.filter((p) => p.date >= startDate);
-  }
-  if (endDate) {
-    points = points.filter((p) => p.date <= endDate);
-  }
-
-  return points.sort((a, b) => a.date.localeCompare(b.date));
+  return [];
 }
 
+/**
+ * Get all Pokemon sets.
+ */
 export async function getSets(sortBy = "releaseDate", sortOrder = "desc") {
-  return apiFetch("/api/v2/sets", { sortBy, sortOrder });
+  return getPoketraceSets(sortBy, sortOrder);
 }
 
+/**
+ * Get cards in a specific set.
+ */
 export async function getCardsInSet(setId: string) {
-  return apiFetch("/api/v2/cards", {
-    set: setId,
-    fetchAllInSet: "true",
+  return searchPoketrace("", { setSlug: setId, limit: 100, market: "US" });
+}
+
+// ---------------------------------------------------------------------------
+// Unified search — same interface as before
+// ---------------------------------------------------------------------------
+
+/**
+ * Search for assets across all types.
+ *
+ * - type "card"   → Poketrace filtered to cards
+ * - type "sealed" → Poketrace filtered to sealed
+ * - type "all"    → Poketrace unfiltered
+ */
+export async function searchAssets(
+  query: string,
+  type: "card" | "sealed" | "all" = "all",
+  setId?: string,
+  limit = 20
+) {
+  const cleaned = sanitizeQuery(query);
+  return searchPoketraceByType(cleaned, type, {
+    setSlug: setId,
+    limit,
+    market: "US",
   });
+}
+
+/**
+ * Fetch price history, routing to the right tier based on asset type.
+ * Since Poketrace handles both cards and sealed, this is simplified.
+ */
+export async function getPriceHistoryByType(
+  assetType: "card" | "sealed",
+  cardId: string,
+  cardName?: string,
+  startDate?: string,
+  endDate?: string
+) {
+  // Poketrace handles both types through the same endpoint
+  return getPriceHistory(cardId, startDate, endDate, cardName);
 }

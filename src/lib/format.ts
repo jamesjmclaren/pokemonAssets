@@ -8,6 +8,35 @@ export function formatCurrency(value: number | null | undefined): string {
   }).format(value);
 }
 
+const CURRENCY_LOCALE: Record<string, string> = {
+  USD: "en-US",
+  GBP: "en-GB",
+  EUR: "en-IE",
+};
+
+/**
+ * Format a USD value in the chosen display currency using today's rate.
+ * The raw value is always treated as USD; pass rate=1 for USD itself.
+ * When the display currency is not USD, appends "~GBP" / "~EUR" to signal
+ * the figure is a converted estimate, not a native market price.
+ */
+export function formatCurrencyIn(
+  usdValue: number | null | undefined,
+  currency: string,
+  rate: number
+): string {
+  if (usdValue == null) return "N/A";
+  const locale = CURRENCY_LOCALE[currency] || "en-US";
+  const converted = usdValue * rate;
+  const formatted = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(converted);
+  return currency === "USD" ? formatted : `${formatted} ~${currency}`;
+}
+
 export function formatPercentage(value: number | null | undefined): string {
   if (value == null) return "N/A";
   const sign = value >= 0 ? "+" : "";
@@ -42,62 +71,102 @@ export function getProfitBgColor(profit: number): string {
 }
 
 /**
- * Extract a market price from an API card object.
- * Checks multiple field name conventions since the API response format varies.
+ * Fix Supabase storage URLs that are missing the /public/ segment.
+ * e.g. /storage/v1/object/asset-images/... → /storage/v1/object/public/asset-images/...
+ */
+export function fixStorageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.includes("/storage/v1/object/") && !url.includes("/storage/v1/object/public/")) {
+    return url.replace("/storage/v1/object/", "/storage/v1/object/public/");
+  }
+  return url;
+}
+
+/**
+ * Extract a market price from a card object.
+ * Handles Poketrace, JustTCG, and legacy API formats.
  */
 export function extractCardPrice(card: Record<string, unknown>): number | null {
-  const prices = card.prices as Record<string, unknown> | undefined;
+  // Flat price field (Poketrace normalized and JustTCG normalized)
+  if (typeof card.marketPrice === "number") return card.marketPrice;
 
-  // Direct prices.market / prices.low (pokemonpricetracker.com format)
+  // Nested prices object
+  const prices = card.prices as Record<string, unknown> | undefined;
   if (prices) {
+    // Poketrace format: prices.tcgplayer.NEAR_MINT.avg
+    const tcgp = prices.tcgplayer as Record<string, unknown> | undefined;
+    if (tcgp) {
+      const nm = tcgp["NEAR_MINT"] as Record<string, unknown> | undefined;
+      if (nm && typeof nm.avg === "number") return nm.avg;
+      // Try first tier
+      const firstKey = Object.keys(tcgp)[0];
+      if (firstKey) {
+        const tier = tcgp[firstKey] as Record<string, unknown> | undefined;
+        if (tier && typeof tier.avg === "number") return tier.avg;
+        // Legacy nested format: prices.tcgplayer.market
+        if (typeof tcgp.market === "number") return tcgp.market;
+        if (typeof tcgp.low === "number") return tcgp.low;
+      }
+    }
+
+    // Poketrace format: prices.ebay.NEAR_MINT.avg
+    const ebay = prices.ebay as Record<string, unknown> | undefined;
+    if (ebay) {
+      const nm = ebay["NEAR_MINT"] as Record<string, unknown> | undefined;
+      if (nm && typeof nm.avg === "number") return nm.avg;
+    }
+
+    // Legacy flat prices format
+    const raw = prices.raw as number | undefined;
+    if (raw != null) return raw;
+
+    const market = prices.market as number | undefined;
+    if (market != null) return market;
+
     const direct =
       (prices.market as number) ?? (prices.low as number) ?? null;
     if (direct != null) return direct;
-
-    // Nested under tcgplayer/cardmarket/ebay
-    const tcg = prices.tcgplayer as Record<string, unknown> | undefined;
-    const cm = prices.cardmarket as Record<string, unknown> | undefined;
-    const ebay = prices.ebay as Record<string, unknown> | undefined;
-    const nested =
-      (tcg?.market as number) ??
-      (tcg?.low as number) ??
-      (cm?.average as number) ??
-      (cm?.trend as number) ??
-      (ebay?.average as number) ??
-      null;
-    if (nested != null) return nested;
   }
 
-  // Flat price fields on the card object itself
+  // Other flat fields
   const flat =
-    (card.tcgplayerPrice as number) ??
-    (card.marketPrice as number) ??
     (card.price as number) ??
     (card.latestPrice as number) ??
-    (card.value as number) ??
-    (card.averagePrice as number) ??
     null;
   if (flat != null) return flat;
 
-  // Fall back to most recent price history entry
-  const history = (card.priceHistory || card.price_history) as
-    | Record<string, number>
-    | Array<{ date: string; price: number }>
-    | undefined;
-  if (history) {
-    if (Array.isArray(history) && history.length > 0) {
-      const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date));
-      return sorted[0].price ?? null;
-    }
-    if (typeof history === "object" && !Array.isArray(history)) {
-      const entries = Object.entries(history);
-      if (entries.length > 0) {
-        const sorted = entries.sort((a, b) => b[0].localeCompare(a[0]));
-        const val = Number(sorted[0][1]);
-        return isNaN(val) ? null : val;
-      }
-    }
-  }
-
   return null;
+}
+
+/**
+ * Format a currency value with a conversion indicator.
+ * Shows "~USD" suffix when the price was converted from a foreign currency.
+ */
+export function formatCurrencyWithNote(
+  value: number | null | undefined,
+  isConverted?: boolean
+): string {
+  if (value == null) return "N/A";
+  const formatted = formatCurrency(value);
+  if (isConverted) return `${formatted} ~USD`;
+  return formatted;
+}
+
+/**
+ * Return a disclaimer string describing which market a Poketrace price comes from.
+ * Used to make the US-vs-EU provenance explicit wherever prices render.
+ */
+export function getMarketDisclaimer(
+  market?: string | null,
+  variant: "short" | "long" = "short"
+): string {
+  const isEu = (market || "").toUpperCase() === "EU";
+  if (isEu) {
+    return variant === "long"
+      ? "Based on European market pricing (CardMarket, EUR; converted to USD)."
+      : "European market (CardMarket)";
+  }
+  return variant === "long"
+    ? "Based on US market pricing (TCGPlayer + eBay data, USD)."
+    : "US market (TCGPlayer + eBay)";
 }

@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchCards, getSets } from "@/lib/pokemon-api";
+import { searchAssets, getSets } from "@/lib/pokemon-api";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q");
-  const setId = searchParams.get("setId");
   const type = searchParams.get("type");
 
   try {
+    // Return sets list
     if (type === "sets" || (!query && !type)) {
-      const data = await getSets();
-      return NextResponse.json(data);
+      const sets = await getSets();
+      return NextResponse.json(sets);
     }
 
     if (!query) {
@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = await searchCards(query, setId || undefined);
+    // Search using Poketrace via unified search
+    const data = await searchAssets(query, (type as "card" | "sealed" | "all") || "all");
     return NextResponse.json(data);
   } catch (error) {
     console.error("Search API error:", error);

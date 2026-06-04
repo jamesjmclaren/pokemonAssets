@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPriceHistory } from "@/lib/pokemon-api";
+import { getPriceHistoryByType, getPriceHistory } from "@/lib/pokemon-api";
+import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -7,22 +8,116 @@ export async function GET(request: NextRequest) {
   const name = searchParams.get("name");
   const startDate = searchParams.get("startDate");
   const endDate = searchParams.get("endDate");
+  const assetType = searchParams.get("assetType") as "card" | "sealed" | null;
+  const assetId = searchParams.get("assetId");
+  const poketraceId = searchParams.get("poketraceId");
 
-  if (!cardId && !name) {
+  console.log(`[price-history] Request: cardId=${cardId}, assetId=${assetId}, poketraceId=${poketraceId}, name=${name}, range=${startDate}..${endDate}`);
+
+  if (!cardId && !name && !assetId && !poketraceId) {
     return NextResponse.json(
-      { error: "cardId or name parameter is required" },
+      { error: "cardId, name, assetId, or poketraceId parameter is required" },
       { status: 400 }
     );
   }
 
   try {
-    const data = await getPriceHistory(
-      cardId || "",
-      startDate || undefined,
-      endDate || undefined,
-      name || undefined
-    );
-    return NextResponse.json(data);
+    // First, try to get price snapshots from Supabase (our recorded history)
+    let snapshotData: { date: string; price: number; source?: string }[] = [];
+
+    if (assetId) {
+      let query = supabase
+        .from("price_snapshots")
+        .select("price, source, recorded_at")
+        .eq("asset_id", assetId)
+        .order("recorded_at", { ascending: true });
+
+      if (startDate) {
+        query = query.gte("recorded_at", `${startDate}T00:00:00.000Z`);
+      }
+      if (endDate) {
+        query = query.lte("recorded_at", `${endDate}T23:59:59.999Z`);
+      }
+
+      const { data: snapshots, error: snapError } = await query;
+
+      console.log(`[price-history] Supabase snapshots: ${snapshots?.length ?? 0} rows, error=${snapError?.message || "none"}`);
+
+      if (snapshots && snapshots.length > 0) {
+        // Deduplicate by date (keep only one entry per day)
+        const byDate = new Map<string, { price: number; source: string }>();
+        for (const snap of snapshots) {
+          const date = new Date(snap.recorded_at).toISOString().split("T")[0];
+          byDate.set(date, { price: snap.price, source: snap.source });
+        }
+        snapshotData = Array.from(byDate.entries()).map(([date, val]) => ({
+          date,
+          price: val.price,
+          source: val.source,
+        }));
+      }
+    }
+
+    // Try to get external API price history from Poketrace
+    let apiPoints: { date: string; price: number; source?: string }[] = [];
+    try {
+      const lookupId = poketraceId || cardId || "";
+      console.log(`[price-history] Fetching Poketrace history for: ${lookupId}`);
+      let apiData;
+      if (poketraceId) {
+        apiData = await getPriceHistory(
+          poketraceId,
+          startDate || undefined,
+          endDate || undefined,
+          name || undefined
+        );
+      } else if (assetType) {
+        apiData = await getPriceHistoryByType(
+          assetType,
+          lookupId,
+          name || undefined,
+          startDate || undefined,
+          endDate || undefined
+        );
+      } else {
+        apiData = await getPriceHistory(
+          lookupId,
+          startDate || undefined,
+          endDate || undefined,
+          name || undefined
+        );
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawPoints = Array.isArray(apiData) ? apiData : (apiData as any)?.data || [];
+      apiPoints = rawPoints as { date: string; price: number; source?: string }[];
+      console.log(`[price-history] Poketrace API returned ${apiPoints.length} points`);
+    } catch (apiError) {
+      console.warn("[price-history] External API failed, using snapshots only:", apiError instanceof Error ? apiError.message : apiError);
+    }
+
+    console.log(`[price-history] Final: ${snapshotData.length} snapshots, ${apiPoints.length} API points`);
+
+    // Merge both sources, preferring snapshot data for overlapping dates
+    if (snapshotData.length > 0 && apiPoints.length > 0) {
+      const merged = new Map<string, { price: number; source?: string }>();
+      for (const point of apiPoints) {
+        merged.set(point.date, { price: point.price, source: point.source });
+      }
+      for (const point of snapshotData) {
+        merged.set(point.date, { price: point.price, source: point.source });
+      }
+      const result = Array.from(merged.entries())
+        .map(([date, val]) => ({ date, ...val }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      return NextResponse.json(result);
+    }
+
+    // Return whichever source has data
+    if (snapshotData.length > 0) {
+      return NextResponse.json(snapshotData);
+    }
+
+    return NextResponse.json(apiPoints);
   } catch (error) {
     console.error("Price history API error:", error);
     return NextResponse.json(
