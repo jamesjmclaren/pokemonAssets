@@ -77,8 +77,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS event_bookings_v2_updated_at ON event_bookings_v2;
-CREATE TRIGGER event_bookings_v2_updated_at
+CREATE OR REPLACE TRIGGER event_bookings_v2_updated_at
   BEFORE UPDATE ON event_bookings_v2
   FOR EACH ROW EXECUTE FUNCTION update_event_bookings_v2_updated_at();
 
