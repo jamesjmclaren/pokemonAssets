@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { escapeHtml } from "@/lib/escape-html";
+import {
+  TABLE_TYPE_BY_LABEL,
+  TYPE_LABELS,
+  TYPE_PRICE_PENCE,
+  type TableTypeKey,
+} from "@/lib/event-floor-plan";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -331,54 +337,54 @@ async function handleEventTableV2Booking(
   const amountPaidPence = session.amount_total || 0;
   const vendorName = `${firstName} ${lastName}`.trim() || businessName;
 
-  // Parse compact items array: [{tk, d, q}, ...]
-  let items: { tk: string; d: string; q: number }[] = [];
-  try {
-    items = JSON.parse(metadata.items || "[]");
-  } catch {
-    console.error("handleEventTableV2Booking: failed to parse items metadata");
+  // Parse selected table numbers per day (comma-separated labels in metadata)
+  const parseLabels = (s: string | undefined): string[] =>
+    (s || "")
+      .split(",")
+      .map((l) => l.trim())
+      .filter((l) => l && l in TABLE_TYPE_BY_LABEL);
+  const tables: { label: string; type: TableTypeKey; day: string }[] = [
+    ...parseLabels(metadata.sat_tables).map((label) => ({
+      label,
+      type: TABLE_TYPE_BY_LABEL[label],
+      day: "Saturday",
+    })),
+    ...parseLabels(metadata.sun_tables).map((label) => ({
+      label,
+      type: TABLE_TYPE_BY_LABEL[label],
+      day: "Sunday",
+    })),
+  ];
+
+  if (tables.length === 0) {
+    console.error("handleEventTableV2Booking: no tables in metadata");
     return;
   }
 
-  if (items.length === 0) {
-    console.error("handleEventTableV2Booking: no items in metadata");
-    return;
-  }
-
-  // Look up event and table types
+  // Look up event (for FK + emails)
   const supabase = getSupabaseAdmin();
-
   const { data: event } = await supabase
     .from("events")
     .select("id, name, venue")
     .eq("slug", eventSlug)
     .single();
-
   if (!event) {
     console.error(`handleEventTableV2Booking: event not found for slug "${eventSlug}"`);
     return;
   }
 
-  const { data: tableTypes } = await supabase
-    .from("event_table_types")
-    .select("type_key, label, price_pence")
-    .eq("event_id", event.id);
-
-  const typeMap = Object.fromEntries(
-    (tableTypes || []).map((t) => [t.type_key, t])
-  ) as Record<string, { type_key: string; label: string; price_pence: number }>;
-
-  // Insert one event_bookings_v2 row per line item
-  for (const [idx, item] of items.entries()) {
-    const itemAmountPence = (typeMap[item.tk]?.price_pence ?? 0) * item.q;
+  // Insert one event_bookings_v2 row per specific table
+  for (const [idx, t] of tables.entries()) {
     try {
       await supabase.from("event_bookings_v2").insert({
-        stripe_session_id: items.length > 1 ? `${session.id}_${idx}` : session.id,
+        // Suffix keeps the session id unique across this order's table rows
+        stripe_session_id: tables.length > 1 ? `${session.id}_${idx}` : session.id,
         payment_status: "paid",
         event_id: event.id,
-        event_day: item.d,
-        table_type_key: item.tk,
-        quantity: item.q,
+        event_day: t.day,
+        table_type_key: t.type,
+        table_label: t.label,
+        quantity: 1,
         first_name: firstName,
         last_name: lastName,
         business_name: businessName,
@@ -386,18 +392,24 @@ async function handleEventTableV2Booking(
         email,
         phone,
         card_types: cardTypes,
-        amount_paid_pence: itemAmountPence,
+        amount_paid_pence: TYPE_PRICE_PENCE[t.type],
       });
     } catch (dbError) {
-      console.error(`handleEventTableV2Booking: insert failed for item ${idx}:`, dbError);
+      console.error(`handleEventTableV2Booking: insert failed for table ${t.label}:`, dbError);
     }
   }
 
-  // Build readable booking summary lines for emails
-  const itemLines = items.map((item) => {
-    const label = typeMap[item.tk]?.label ?? item.tk;
-    const linePence = (typeMap[item.tk]?.price_pence ?? 0) * item.q;
-    return `${label} × ${item.q} — ${item.d}: £${(linePence / 100).toFixed(2)}`;
+  // Build readable booking summary lines for emails (grouped by type × day, with table numbers)
+  const grouped = new Map<string, string[]>();
+  for (const t of tables) {
+    const k = `${t.day}|${t.type}`;
+    if (!grouped.has(k)) grouped.set(k, []);
+    grouped.get(k)!.push(t.label);
+  }
+  const itemLines = [...grouped.entries()].map(([k, labels]) => {
+    const [day, type] = k.split("|") as [string, TableTypeKey];
+    const linePence = TYPE_PRICE_PENCE[type] * labels.length;
+    return `${TYPE_LABELS[type]} × ${labels.length} (${labels.join(", ")}) — ${day}: £${(linePence / 100).toFixed(2)}`;
   });
 
   const amountFormatted = `£${(amountPaidPence / 100).toFixed(2)}`;

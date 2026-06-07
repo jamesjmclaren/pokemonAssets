@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { TABLE_TYPE_BY_LABEL, type TableTypeKey } from "@/lib/event-floor-plan";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-03-25.dahlia" });
@@ -14,18 +15,21 @@ function getSupabaseAdmin() {
 }
 
 const VALID_CARD_TYPES = ["TCG", "Sports", "Collectibles", "Memorabilia", "Other"];
-
-interface CheckoutItem {
-  type_key: string;
-  day: string;
-  quantity: number;
-}
+const MAX_TABLES_PER_ORDER = 80; // keeps the Stripe metadata within its 500-char/value limit
 
 // Day display labels — update if event dates change
 const DAY_LABELS: Record<string, string> = {
   Saturday: "Saturday — The Collectors Exhibition",
   Sunday: "Sunday — The Collectors Exhibition",
 };
+
+/** De-dupe, keep only valid known table labels. */
+function cleanLabels(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return [...new Set(input)].filter(
+    (l: unknown): l is string => typeof l === "string" && l in TABLE_TYPE_BY_LABEL
+  );
+}
 
 export async function POST(
   req: NextRequest,
@@ -36,7 +40,8 @@ export async function POST(
     const body = await req.json();
 
     const {
-      items,
+      sat_tables,
+      sun_tables,
       first_name,
       last_name,
       business_name,
@@ -46,7 +51,7 @@ export async function POST(
       card_types,
     } = body;
 
-    // ── Personal info validation ──────────────────────────────────────────────
+    // ── Personal info ─────────────────────────────────────────────────────────
     if (
       !first_name?.trim() ||
       !last_name?.trim() ||
@@ -59,146 +64,127 @@ export async function POST(
         { status: 400 }
       );
     }
-
     const tooLong = [first_name, last_name, business_name, email, phone, instagram_handle].some(
       (v) => typeof v === "string" && v.length > 200
     );
     if (tooLong) {
-      return NextResponse.json(
-        { error: "One or more fields exceed the maximum length." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "One or more fields exceed the maximum length." }, { status: 400 });
     }
-
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      return NextResponse.json(
-        { error: "Please enter a valid email address." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
     }
 
     // ── Card types ────────────────────────────────────────────────────────────
     const validatedCardTypes = Array.isArray(card_types)
       ? [...new Set(card_types)].filter(
-          (t: unknown): t is string =>
-            typeof t === "string" && VALID_CARD_TYPES.includes(t)
+          (t: unknown): t is string => typeof t === "string" && VALID_CARD_TYPES.includes(t)
         )
       : [];
     if (validatedCardTypes.length === 0) {
+      return NextResponse.json({ error: "Please select at least one card type." }, { status: 400 });
+    }
+
+    // ── Selected tables ───────────────────────────────────────────────────────
+    const satLabels = cleanLabels(sat_tables);
+    const sunLabels = cleanLabels(sun_tables);
+    if (satLabels.length === 0 && sunLabels.length === 0) {
+      return NextResponse.json({ error: "Please select at least one table." }, { status: 400 });
+    }
+    if (satLabels.length + sunLabels.length > MAX_TABLES_PER_ORDER) {
       return NextResponse.json(
-        { error: "Please select at least one card type." },
+        { error: `You can book up to ${MAX_TABLES_PER_ORDER} tables per order. Please split into multiple orders.` },
         { status: 400 }
       );
     }
 
-    // ── Items ─────────────────────────────────────────────────────────────────
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { error: "Please select at least one table." },
-        { status: 400 }
-      );
-    }
-
-    // ── Fetch event ───────────────────────────────────────────────────────────
+    // ── Fetch event + types ───────────────────────────────────────────────────
     const supabase = getSupabaseAdmin();
     const { data: event, error: eventError } = await supabase
       .from("events")
       .select("id, name, venue, event_days, is_active")
       .eq("slug", slug)
       .single();
-
     if (eventError || !event) {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }
     if (!event.is_active) {
-      return NextResponse.json(
-        { error: "This event is no longer accepting bookings." },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "This event is no longer accepting bookings." }, { status: 403 });
     }
 
-    // ── Fetch table types ─────────────────────────────────────────────────────
+    const validDays: string[] = event.event_days;
+    if (satLabels.length && !validDays.includes("Saturday")) {
+      return NextResponse.json({ error: "Saturday is not part of this event." }, { status: 400 });
+    }
+    if (sunLabels.length && !validDays.includes("Sunday")) {
+      return NextResponse.json({ error: "Sunday is not part of this event." }, { status: 400 });
+    }
+
     const { data: tableTypes, error: typesError } = await supabase
       .from("event_table_types")
-      .select("type_key, label, price_pence, total_available")
+      .select("type_key, label, price_pence")
       .eq("event_id", event.id);
-
     if (typesError) throw typesError;
-
-    const validTypeKeys = (tableTypes ?? []).map((t) => t.type_key);
-    const validDays: string[] = event.event_days;
-
-    // ── Validate + clean items ────────────────────────────────────────────────
-    const cleanItems: CheckoutItem[] = [];
-    for (const item of items) {
-      const qty = Number(item.quantity ?? 0);
-      if (!validTypeKeys.includes(item.type_key)) {
-        return NextResponse.json(
-          { error: `Invalid table type: ${item.type_key}` },
-          { status: 400 }
-        );
-      }
-      if (!validDays.includes(item.day)) {
-        return NextResponse.json({ error: `Invalid day: ${item.day}` }, { status: 400 });
-      }
-      if (!Number.isInteger(qty) || qty < 1) {
-        return NextResponse.json({ error: "Quantity must be at least 1." }, { status: 400 });
-      }
-      cleanItems.push({ type_key: item.type_key, day: item.day, quantity: qty });
+    const priceByType = new Map<string, number>();
+    const labelByType = new Map<string, string>();
+    for (const t of tableTypes ?? []) {
+      priceByType.set(t.type_key, t.price_pence);
+      labelByType.set(t.type_key, t.label);
     }
 
-    // ── Server-side availability check (re-query under lock) ──────────────────
-    const { data: bookings, error: bookingsError } = await supabase
+    // ── Conflict check: reject tables already paid for, per day ────────────────
+    const { data: booked, error: bookedError } = await supabase
       .from("event_bookings_v2")
-      .select("table_type_key, event_day, quantity")
+      .select("table_label, event_day")
       .eq("event_id", event.id)
       .eq("payment_status", "paid");
+    if (bookedError) throw bookedError;
 
-    if (bookingsError) throw bookingsError;
+    const bookedByDay: Record<string, Set<string>> = { Saturday: new Set(), Sunday: new Set() };
+    for (const row of booked ?? []) {
+      if (row.table_label) bookedByDay[row.event_day]?.add(row.table_label);
+    }
 
-    const bookedRows = bookings ?? [];
-
-    for (const item of cleanItems) {
-      const typeData = (tableTypes ?? []).find((t) => t.type_key === item.type_key);
-      if (!typeData) continue;
-      const alreadyBooked = bookedRows
-        .filter((r) => r.table_type_key === item.type_key && r.event_day === item.day)
-        .reduce((s, r) => s + r.quantity, 0);
-      const available = Math.max(0, typeData.total_available - alreadyBooked);
-      if (item.quantity > available) {
-        return NextResponse.json(
-          {
-            error:
-              available === 0
-                ? `${typeData.label} tables for ${item.day} are sold out.`
-                : `Only ${available} ${typeData.label} table${available === 1 ? "" : "s"} remaining for ${item.day}.`,
-          },
-          { status: 409 }
-        );
+    const dayLabels: { day: string; labels: string[] }[] = [
+      { day: "Saturday", labels: satLabels },
+      { day: "Sunday", labels: sunLabels },
+    ];
+    for (const { day, labels } of dayLabels) {
+      for (const label of labels) {
+        if (bookedByDay[day]?.has(label)) {
+          return NextResponse.json(
+            { error: `Table ${label} for ${day} has just been taken. Please pick another.` },
+            { status: 409 }
+          );
+        }
       }
     }
 
-    // ── Build Stripe line items ───────────────────────────────────────────────
-    const lineItems: Stripe.Checkout.SessionCreateParams["line_items"] = cleanItems.map((item) => {
-      const typeData = (tableTypes ?? []).find((t) => t.type_key === item.type_key)!;
-      return {
-        price_data: {
-          currency: "gbp",
-          unit_amount: typeData.price_pence,
-          product_data: {
-            name: `${typeData.label} — ${DAY_LABELS[item.day] ?? item.day}`,
-            description: `${item.quantity} unit${item.quantity > 1 ? "s" : ""} — ${event.name} at ${event.venue}`,
+    // ── Build Stripe line items (grouped by type × day) ───────────────────────
+    const lineItems: Stripe.Checkout.SessionCreateParams["line_items"] = [];
+    for (const { day, labels } of dayLabels) {
+      const countByType: Partial<Record<TableTypeKey, number>> = {};
+      for (const label of labels) {
+        const tk = TABLE_TYPE_BY_LABEL[label];
+        countByType[tk] = (countByType[tk] ?? 0) + 1;
+      }
+      for (const [typeKey, count] of Object.entries(countByType) as [TableTypeKey, number][]) {
+        const price = priceByType.get(typeKey);
+        if (!price) {
+          return NextResponse.json({ error: `Pricing not configured for ${typeKey}.` }, { status: 503 });
+        }
+        lineItems.push({
+          price_data: {
+            currency: "gbp",
+            unit_amount: price,
+            product_data: {
+              name: `${labelByType.get(typeKey) ?? typeKey} — ${DAY_LABELS[day] ?? day}`,
+              description: `${count} table${count > 1 ? "s" : ""} — ${event.name} at ${event.venue}`,
+            },
           },
-        },
-        quantity: item.quantity,
-      };
-    });
-
-    const cardTypesStr = validatedCardTypes.join(",");
-    // Compact JSON for Stripe metadata (500-char value limit)
-    const itemsJson = JSON.stringify(
-      cleanItems.map((i) => ({ tk: i.type_key, d: i.day, q: i.quantity }))
-    );
+          quantity: count,
+        });
+      }
+    }
 
     const session = await getStripe().checkout.sessions.create({
       payment_method_types: ["card"],
@@ -216,8 +202,9 @@ export async function POST(
         instagram_handle: (instagram_handle || "").trim(),
         email: email.trim(),
         phone: phone.trim(),
-        card_types: cardTypesStr,
-        items: itemsJson,
+        card_types: validatedCardTypes.join(","),
+        sat_tables: satLabels.join(","),
+        sun_tables: sunLabels.join(","),
       },
     });
 

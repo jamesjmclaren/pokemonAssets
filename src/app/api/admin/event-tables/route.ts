@@ -1,0 +1,107 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@supabase/supabase-js";
+import { isCurrentUserAdmin } from "@/lib/admin";
+import { EVENT_TABLES, TYPE_LABELS, type TableTypeKey } from "@/lib/event-floor-plan";
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
+const DEFAULT_SLUG = "collectors-exhibition-june-2027";
+
+interface Buyer {
+  business_name: string;
+  name: string;
+  email: string;
+  phone: string;
+  instagram_handle: string | null;
+  created_at: string;
+}
+
+/** Admin-only: full table list for an event annotated with who has bought each. */
+export async function GET(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isCurrentUserAdmin())) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const slug = req.nextUrl.searchParams.get("slug") || DEFAULT_SLUG;
+  const supabase = getSupabaseAdmin();
+
+  const { data: event, error: eventError } = await supabase
+    .from("events")
+    .select("id, name, venue, event_days")
+    .eq("slug", slug)
+    .single();
+  if (eventError || !event) {
+    return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  }
+
+  const days: string[] = event.event_days;
+
+  const { data: bookings, error: bookingsError } = await supabase
+    .from("event_bookings_v2")
+    .select(
+      "table_label, table_type_key, event_day, first_name, last_name, business_name, email, phone, instagram_handle, created_at, amount_paid_pence"
+    )
+    .eq("event_id", event.id)
+    .eq("payment_status", "paid");
+  if (bookingsError) {
+    return NextResponse.json({ error: "Failed to load bookings." }, { status: 500 });
+  }
+
+  // Index bookings by day → label
+  const byDayLabel: Record<string, Record<string, Buyer>> = {};
+  for (const day of days) byDayLabel[day] = {};
+  for (const b of bookings ?? []) {
+    if (!b.table_label || !byDayLabel[b.event_day]) continue;
+    byDayLabel[b.event_day][b.table_label] = {
+      business_name: b.business_name,
+      name: `${b.first_name} ${b.last_name}`.trim(),
+      email: b.email,
+      phone: b.phone,
+      instagram_handle: b.instagram_handle ?? null,
+      created_at: b.created_at,
+    };
+  }
+
+  // Full table list with per-day buyer (or null = available)
+  const rows = EVENT_TABLES.map((t) => {
+    const perDay: Record<string, Buyer | null> = {};
+    for (const day of days) perDay[day] = byDayLabel[day][t.label] ?? null;
+    return {
+      label: t.label,
+      type: t.type,
+      typeLabel: TYPE_LABELS[t.type],
+      days: perDay,
+    };
+  });
+
+  // Summary: sold / total per type per day
+  const summary: Record<string, Record<string, { sold: number; total: number }>> = {};
+  const totalsByType = EVENT_TABLES.reduce((acc, t) => {
+    acc[t.type] = (acc[t.type] ?? 0) + 1;
+    return acc;
+  }, {} as Record<TableTypeKey, number>);
+  for (const type of Object.keys(totalsByType) as TableTypeKey[]) {
+    summary[type] = {};
+    for (const day of days) {
+      const sold = (bookings ?? []).filter(
+        (b) => b.table_type_key === type && b.event_day === day
+      ).length;
+      summary[type][day] = { sold, total: totalsByType[type] };
+    }
+  }
+
+  return NextResponse.json({
+    event: { name: event.name, venue: event.venue, days },
+    rows,
+    summary,
+    typeLabels: TYPE_LABELS,
+  });
+}

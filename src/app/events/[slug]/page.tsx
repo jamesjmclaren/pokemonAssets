@@ -16,19 +16,18 @@ import {
   Trash2,
   Hotel,
 } from "lucide-react";
+import {
+  FLOOR_PLAN,
+  VIEWBOX_W,
+  VIEWBOX_H,
+  type TableUnit,
+  type TableTypeKey,
+} from "@/lib/event-floor-plan";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type DayKey = "Saturday" | "Sunday";
-type TableTypeKey = "standard" | "corner" | "premier_corner";
 type CardType = "TCG" | "Sports" | "Collectibles" | "Memorabilia" | "Other";
-
-interface TableUnit {
-  id: string;
-  type: TableTypeKey;
-  // A unit is one or more grid cells drawn together and sold as a single item.
-  rects: { x: number; y: number; w: number; h: number }[];
-}
 
 interface AvailabilityTypeData {
   type_key: string;
@@ -50,111 +49,12 @@ interface AvailabilityData {
   days: string[];
   is_active: boolean;
   tableTypes: AvailabilityTypeData[];
+  // Specific table labels already paid for, keyed by day.
+  booked?: Record<string, string[]>;
 }
 
-// ─── Floor plan layout ────────────────────────────────────────────────────────
-// Exact mirror of the vendor spreadsheet. Each character is one grid cell:
-//   2 (blue)  = a single standard table, sold individually (£100)
-//   1 (green) = end corner — a cell cluster sold as one unit (£200)
-//   3 (red)   = premier corner — a cell cluster sold as one unit (£275)
-//   . = empty (aisle / booth interior)
-// Tables form hollow rectangular booth islands — a top block and a bottom block
-// split by a centre aisle — exactly as laid out in the spreadsheet.
-// Units: 120 standard singles · 24 end corner (L-pairs) · 32 premier corner (L-pairs).
-//
-// SVG viewBox: "0 0 774 510"
-const FLOOR_GRID = [
-  ".11...11...11...11...11...11......",
-  "1..1.1..1.1..1.1..1.1..1.1..1.....",
-  "2..2.2..2.2..2.2..2.2..2.2..2.....",
-  "2..2.2..2.2..2.2..2.2..2.2..2.....",
-  "2..2.2..2.2..2.2..2.2..2.2..2.....",
-  "2..2.2..2.2..2.3..3.2..2.2..2..33.",
-  "2..2.2..2.2..2..33..2..2.2..2.3..3",
-  "2..2.2..2.2..2......2..2.2..2.3..3",
-  "3..3.3..3.3..3......3..3.3..3..33.",
-  ".33...33...33........33...33......",
-  "..................................",
-  "..................................",
-  ".33...33...33...33...33...33...33.",
-  "3..3.3..3.3..3.3..3.3..3.3..3.3..3",
-  "3..3.2..2.2..2.2..2.2..2.2..2.2..2",
-  ".33..2..2.2..2.2..2.2..2.2..2.2..2",
-  ".....2..2.2..2.1..1.2..2.2..2.2..2",
-  ".....2..2.2..2..11..2..2.2..2.2..2",
-  ".....2..2.2..2......2..2.2..2.2..2",
-  ".....1..1.1..1......1..1.1..1.1..1",
-  "......11...11........11...11...11.",
-];
-
-const CELL = 19;   // table square size
-const STEP = 22;   // grid pitch
-const ORIGIN_X = 12;
-const ORIGIN_Y = 12;
-
-function cellRect(r: number, c: number) {
-  return { x: ORIGIN_X + c * STEP, y: ORIGIN_Y + r * STEP, w: CELL, h: CELL };
-}
-
-function generateTableLayout(): TableUnit[] {
-  const units: TableUnit[] = [];
-  const R = FLOOR_GRID.length;
-  const val = (r: number, c: number): string => {
-    if (r < 0 || r >= R) return ".";
-    const row = FLOOR_GRID[r];
-    return c < 0 || c >= row.length ? "." : row[c] || ".";
-  };
-
-  // Standard singles — every blue "2" cell is its own table (£100).
-  let sIdx = 1;
-  for (let r = 0; r < R; r++) {
-    for (let c = 0; c < FLOOR_GRID[r].length; c++) {
-      if (val(r, c) === "2") {
-        units.push({ id: `S-${sIdx++}`, type: "standard", rects: [cellRect(r, c)] });
-      }
-    }
-  }
-
-  // Grouped units — green ("1") and red ("3") cells pair up into L-shaped units
-  // (two tables at a right angle), each sold as one item (£200 / £275).
-  const groups: { value: string; type: TableTypeKey; prefix: string }[] = [
-    { value: "1", type: "corner", prefix: "C" },
-    { value: "3", type: "premier_corner", prefix: "PC" },
-  ];
-  // Partner search: diagonals first (these form the right-angle L), then orthogonals.
-  const NEIGHBOURS = [
-    [-1, -1], [-1, 1], [1, -1], [1, 1], // diagonal
-    [-1, 0], [1, 0], [0, -1], [0, 1],   // orthogonal
-  ];
-  for (const { value, type, prefix } of groups) {
-    const used = FLOOR_GRID.map((row) => Array(row.length).fill(false));
-    let uIdx = 1;
-    for (let r = 0; r < R; r++) {
-      for (let c = 0; c < FLOOR_GRID[r].length; c++) {
-        if (val(r, c) !== value || used[r][c]) continue;
-        used[r][c] = true;
-        // Find one partner cell to form a 2-table (L-shaped) unit
-        let partner: [number, number] | null = null;
-        for (const [dy, dx] of NEIGHBOURS) {
-          const ny = r + dy;
-          const nx = c + dx;
-          if (val(ny, nx) === value && used[ny] && !used[ny][nx]) {
-            used[ny][nx] = true;
-            partner = [ny, nx];
-            break;
-          }
-        }
-        const rects = [cellRect(r, c)];
-        if (partner) rects.push(cellRect(partner[0], partner[1]));
-        units.push({ id: `${prefix}-${uIdx++}`, type, rects });
-      }
-    }
-  }
-
-  return units;
-}
-
-const TABLE_LAYOUT = generateTableLayout();
+// Floor plan units come from the shared module (also used by the API + admin).
+const TABLE_LAYOUT = FLOOR_PLAN;
 
 const CARD_TYPES: CardType[] = ["TCG", "Sports", "Collectibles", "Memorabilia", "Other"];
 
@@ -268,12 +168,22 @@ export default function EventPage() {
 
   const isCellSold = useCallback(
     (cell: TableUnit, day: DayKey): boolean => {
+      // A specific table is sold if its number has already been paid for that day.
+      if (availability?.booked?.[day]?.includes(cell.id)) return true;
+      // Also cap selection to the per-type remaining count.
       const td = getTypeData(cell.type);
       const available = td ? td[day].available : TYPE_META[cell.type].total_available;
       return available <= selectedCountForType(cell.type, day);
     },
-    [getTypeData, selectedCountForType]
+    [availability, getTypeData, selectedCountForType]
   );
+
+  // Sort table numbers like S1, S2, … S10 (numeric within the letter prefix).
+  const sortLabels = (a: string, b: string) => {
+    const na = parseInt(a.replace(/\D/g, ""), 10);
+    const nb = parseInt(b.replace(/\D/g, ""), 10);
+    return a[0] === b[0] ? na - nb : a.localeCompare(b);
+  };
 
   const handleCellClick = useCallback(
     (cell: TableUnit) => {
@@ -301,24 +211,26 @@ export default function EventPage() {
     day: DayKey;
     quantity: number;
     unitPricePence: number;
+    tables: string[]; // specific table numbers, e.g. ["S1", "S5"]
   }
 
   const cartItems: CartItem[] = [];
   for (const day of ["Saturday", "Sunday"] as DayKey[]) {
-    const typeGroups: Partial<Record<TableTypeKey, number>> = {};
+    const byType: Partial<Record<TableTypeKey, string[]>> = {};
     for (const cellId of selectedCells[day]) {
       const cell = TABLE_LAYOUT.find((c) => c.id === cellId);
-      if (cell) typeGroups[cell.type] = (typeGroups[cell.type] ?? 0) + 1;
+      if (cell) (byType[cell.type] ??= []).push(cell.id);
     }
-    for (const [typeKey, qty] of Object.entries(typeGroups) as [TableTypeKey, number][]) {
-      if (qty > 0) {
+    for (const [typeKey, labels] of Object.entries(byType) as [TableTypeKey, string[]][]) {
+      if (labels.length > 0) {
         const meta = getTypeMeta(typeKey);
         cartItems.push({
           typeKey,
           label: meta.label,
           day,
-          quantity: qty,
+          quantity: labels.length,
           unitPricePence: meta.price_pence,
+          tables: labels.slice().sort(sortLabels),
         });
       }
     }
@@ -380,11 +292,9 @@ export default function EventPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: cartItems.map((i) => ({
-            type_key: i.typeKey,
-            day: i.day,
-            quantity: i.quantity,
-          })),
+          // Specific table numbers selected per day
+          sat_tables: [...selectedCells.Saturday],
+          sun_tables: [...selectedCells.Sunday],
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           business_name: businessName.trim(),
@@ -736,7 +646,7 @@ export default function EventPage() {
               {/* SVG floor plan */}
               <div className="border border-border/40 rounded-xl overflow-hidden bg-[#111] p-2">
                 <svg
-                  viewBox="0 0 774 510"
+                  viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
                   style={{ width: "100%", height: "auto", display: "block" }}
                   role="img"
                   aria-label="Interactive floor plan — click tables to select them"
@@ -748,24 +658,23 @@ export default function EventPage() {
                   </defs>
 
                   {/* Hall outline */}
-                  <rect x="4" y="4" width="766" height="494" rx="6"
+                  <rect x="4" y="4" width={VIEWBOX_W - 8} height={VIEWBOX_H - 8} rx="6"
                     fill="none" stroke="#2a2a2a" strokeWidth="2" />
 
                   {/* Centre aisle (between the top and bottom blocks) */}
-                  <line x1="10" y1="254" x2="764" y2="254" stroke="#1f2937" strokeWidth="1" strokeDasharray="5 4" />
-                  <text x="387" y="251" textAnchor="middle" fill="#374151" fontSize="9"
+                  <line x1="10" y1="254" x2={VIEWBOX_W - 10} y2="254" stroke="#1f2937" strokeWidth="1" strokeDasharray="5 4" />
+                  <text x={VIEWBOX_W / 2} y="251" textAnchor="middle" fill="#374151" fontSize="9"
                     fontFamily="Inter, sans-serif" letterSpacing="3">CENTRE AISLE</text>
 
-                  {/* Tables — one group per sellable unit (blue = single table; green/red clusters sold as one) */}
+                  {/* Tables — one group per sellable unit. Blue = single table;
+                      green = an end-corner L of two joined tables; red = a premier
+                      corner of two tables at a right angle (with a gap). */}
                   {TABLE_LAYOUT.map((unit) => {
                     const isSelected = selectedCells[activeDay].has(unit.id);
                     const sold = !loadingAvail && isCellSold(unit, activeDay) && !isSelected;
                     const colors = TYPE_COLORS[unit.type];
-                    const fill = sold ? colors.sold : colors.fill;
+                    const fill = sold ? colors.sold : isSelected ? "#D4AF37" : colors.fill;
                     const opacity = sold ? 0.35 : 1;
-                    // Centroid of the unit, for the selected check badge
-                    const cx = unit.rects.reduce((s, r) => s + r.x + r.w / 2, 0) / unit.rects.length;
-                    const cy = unit.rects.reduce((s, r) => s + r.y + r.h / 2, 0) / unit.rects.length;
                     return (
                       <g
                         key={unit.id}
@@ -773,33 +682,35 @@ export default function EventPage() {
                         onClick={() => !sold && handleCellClick(unit)}
                         filter={isSelected ? "url(#tableGlow)" : undefined}
                       >
+                        <title>{`Table ${unit.label} — ${colors.label}${sold ? " (sold)" : ""}`}</title>
                         {unit.rects.map((rc, i) => (
                           <rect
                             key={i}
-                            x={rc.x}
-                            y={rc.y}
-                            width={rc.w}
-                            height={rc.h}
-                            rx={2}
-                            fill={isSelected ? "#D4AF37" : fill}
+                            x={rc.x + 0.5}
+                            y={rc.y + 0.5}
+                            width={rc.w - 1}
+                            height={rc.h - 1}
+                            rx={3}
+                            fill={fill}
                             opacity={opacity}
-                            stroke={isSelected ? "#fffbe6" : "rgba(0,0,0,0.25)"}
-                            strokeWidth={isSelected ? 2 : 0.5}
+                            stroke={isSelected ? "#fffbe6" : "rgba(255,255,255,0.22)"}
+                            strokeWidth={isSelected ? 1.6 : 0.75}
                           />
                         ))}
-                        {isSelected && (
-                          <g pointerEvents="none">
-                            <circle cx={cx} cy={cy} r={6.5} fill="#1a1a1a" stroke="#fffbe6" strokeWidth={1} />
-                            <path
-                              d={`M ${cx - 3} ${cy} L ${cx - 0.8} ${cy + 2.4} L ${cx + 3.3} ${cy - 2.8}`}
-                              fill="none"
-                              stroke="#D4AF37"
-                              strokeWidth={1.8}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </g>
-                        )}
+                        {/* Table number */}
+                        <text
+                          x={unit.cx}
+                          y={unit.cy + 2}
+                          textAnchor="middle"
+                          fontSize={isSelected ? 7 : 5.5}
+                          fontWeight={isSelected ? 700 : 600}
+                          fill={isSelected ? "#1a1a1a" : "#ffffff"}
+                          fillOpacity={sold ? 0.5 : isSelected ? 1 : 0.92}
+                          fontFamily="Inter, sans-serif"
+                          pointerEvents="none"
+                        >
+                          {unit.label}
+                        </text>
                       </g>
                     );
                   })}
@@ -874,9 +785,12 @@ export default function EventPage() {
                           key={`${item.typeKey}-${item.day}`}
                           className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
                         >
-                          <div>
+                          <div className="min-w-0 pr-2">
                             <p className="text-text-primary text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
                               {item.label} × {item.quantity}
+                            </p>
+                            <p className="text-accent/80 text-xs font-medium" style={{ fontFamily: "Inter, sans-serif" }}>
+                              {item.tables.join(", ")}
                             </p>
                             <p className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
                               {item.day} · £{(item.unitPricePence / 100).toFixed(0)} each

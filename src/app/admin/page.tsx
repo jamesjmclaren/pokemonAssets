@@ -15,6 +15,7 @@ import {
   Store,
   BadgeCheck,
   RefreshCw,
+  LayoutGrid,
 } from "lucide-react";
 import type { Vendor } from "@/types";
 
@@ -230,9 +231,17 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-text-primary mb-1">Admin</h1>
-        <p className="text-text-secondary text-sm">Manage members and marketplace vendors.</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary mb-1">Admin</h1>
+          <p className="text-text-secondary text-sm">Manage members and marketplace vendors.</p>
+        </div>
+        <a
+          href="/admin/event-tables"
+          className="inline-flex items-center gap-2 px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-secondary hover:text-text-primary hover:border-border-hover transition-colors shrink-0"
+        >
+          <LayoutGrid className="w-4 h-4" /> Event Tables
+        </a>
       </div>
 
       {/* TEMPORARY — set-trends cron trigger. Remove once slug coverage is dialed in. */}

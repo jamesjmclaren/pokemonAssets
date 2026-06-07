@@ -36,10 +36,10 @@ export async function GET(
 
     if (typesError) throw typesError;
 
-    // Count paid bookings per type per day
+    // Fetch paid bookings (type, day, quantity, and the specific table number)
     const { data: bookings, error: bookingsError } = await supabase
       .from("event_bookings_v2")
-      .select("table_type_key, event_day, quantity")
+      .select("table_type_key, event_day, quantity, table_label")
       .eq("event_id", event.id)
       .eq("payment_status", "paid");
 
@@ -59,6 +59,15 @@ export async function GET(
       return { ...tt, ...perDay };
     });
 
+    // Specific table numbers already paid for, per day, for the floor plan
+    const bookedLabels: Record<string, string[]> = {};
+    for (const day of days) bookedLabels[day] = [];
+    for (const r of rows) {
+      if (r.table_label && bookedLabels[r.event_day]) {
+        bookedLabels[r.event_day].push(r.table_label);
+      }
+    }
+
     return NextResponse.json(
       {
         eventId: event.id,
@@ -70,6 +79,7 @@ export async function GET(
         end_date: event.end_date,
         is_active: event.is_active,
         tableTypes: tableTypesWithAvailability,
+        booked: bookedLabels,
       },
       { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" } }
     );
