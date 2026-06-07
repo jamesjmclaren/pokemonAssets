@@ -63,8 +63,37 @@ export const ORIGIN_Y = 12;
 export const VIEWBOX_W = ORIGIN_X * 2 + 34 * STEP; // 772
 export const VIEWBOX_H = ORIGIN_Y * 2 + FLOOR_GRID.length * STEP; // 464
 
-function cellRect(r: number, c: number): TableRect {
-  return { x: ORIGIN_X + c * STEP, y: ORIGIN_Y + r * STEP, w: CELL, h: CELL };
+const TABLE_LONG = CELL; // length of a table along its run
+const TABLE_SHORT = 11;  // table depth (gives a rectangle, not a square)
+
+function gridVal(r: number, c: number): string {
+  if (r < 0 || r >= FLOOR_GRID.length) return ".";
+  const row = FLOOR_GRID[r];
+  return c < 0 || c >= row.length ? "." : row[c] || ".";
+}
+
+// A table runs vertically if it sits in a vertical run of tiles (e.g. a booth
+// side), horizontally if in a horizontal run (e.g. a top/bottom edge).
+function isVerticalTable(r: number, c: number): boolean {
+  const vert = gridVal(r - 1, c) !== "." || gridVal(r + 1, c) !== ".";
+  const horz = gridVal(r, c - 1) !== "." || gridVal(r, c + 1) !== ".";
+  if (vert && !horz) return true;
+  if (horz && !vert) return false;
+  return vert; // corner / isolated → prefer vertical
+}
+
+// A rectangular table tile, oriented along its run and centred in its grid cell.
+function tableRect(r: number, c: number): TableRect {
+  const x = ORIGIN_X + c * STEP;
+  const y = ORIGIN_Y + r * STEP;
+  const inset = (CELL - TABLE_SHORT) / 2;
+  return isVerticalTable(r, c)
+    ? { x: x + inset, y, w: TABLE_SHORT, h: TABLE_LONG }
+    : { x, y: y + inset, w: TABLE_LONG, h: TABLE_SHORT };
+}
+
+function cellCenter(r: number, c: number): { cx: number; cy: number } {
+  return { cx: ORIGIN_X + c * STEP + CELL / 2, cy: ORIGIN_Y + r * STEP + CELL / 2 };
 }
 
 export function generateFloorPlan(): TableUnit[] {
@@ -75,18 +104,14 @@ export function generateFloorPlan(): TableUnit[] {
     const row = FLOOR_GRID[r];
     return c < 0 || c >= row.length ? "." : row[c] || ".";
   };
-  const centroid = (rects: TableRect[]) => ({
-    cx: rects.reduce((s, t) => s + t.x + t.w / 2, 0) / rects.length,
-    cy: rects.reduce((s, t) => s + t.y + t.h / 2, 0) / rects.length,
-  });
 
   // Standard singles — every blue "2" cell is its own table (£100).
   let sIdx = 1;
   for (let r = 0; r < R; r++) {
     for (let c = 0; c < FLOOR_GRID[r].length; c++) {
       if (val(r, c) === "2") {
-        const rects = [cellRect(r, c)];
-        const { cx, cy } = centroid(rects);
+        const rects = [tableRect(r, c)];
+        const { cx, cy } = cellCenter(r, c);
         const label = `S${sIdx++}`;
         units.push({ id: label, label, type: "standard", rects, cx, cy });
       }
@@ -121,12 +146,10 @@ export function generateFloorPlan(): TableUnit[] {
             break;
           }
         }
-        const rects: TableRect[] = [cellRect(r, c)];
-        if (partner) rects.push(cellRect(partner[0], partner[1]));
-        // Place the number on the first table tile so it sits on colour, not in
-        // the gap between the two diagonal tiles.
-        const cx = rects[0].x + rects[0].w / 2;
-        const cy = rects[0].y + rects[0].h / 2;
+        const rects: TableRect[] = [tableRect(r, c)];
+        if (partner) rects.push(tableRect(partner[0], partner[1]));
+        // Number sits on the first tile (centred on its grid cell).
+        const { cx, cy } = cellCenter(r, c);
 
         const label = `${prefix}${idx++}`;
         units.push({ id: label, label, type, rects, cx, cy });
