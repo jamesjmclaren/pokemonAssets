@@ -25,8 +25,8 @@ export interface TableUnit {
   id: string; // == label, e.g. "S1", "E3", "P12"
   label: string;
   type: TableTypeKey;
-  rects: TableRect[]; // cells to draw (corner connector included for green L)
-  cx: number; // centroid of the actual table cells (for number/badge)
+  rects: TableRect[]; // the table squares that make up this unit
+  cx: number; // where to draw the table number (on a real tile, not the gap)
   cy: number;
 }
 
@@ -121,18 +121,12 @@ export function generateFloorPlan(): TableUnit[] {
             break;
           }
         }
-        const tableCells: TableRect[] = [cellRect(r, c)];
-        if (partner) tableCells.push(cellRect(partner[0], partner[1]));
-        const { cx, cy } = centroid(tableCells);
-
-        const rects = [...tableCells];
-        // For end corners (green) fill the elbow so the two tables read as a
-        // perfect, connected L. Premier (red) is left with the natural gap.
-        if (type === "corner" && partner) {
-          const topRow = Math.min(r, partner[0]);
-          const botCol = r < partner[0] ? partner[1] : c;
-          if (val(topRow, botCol) === ".") rects.push(cellRect(topRow, botCol));
-        }
+        const rects: TableRect[] = [cellRect(r, c)];
+        if (partner) rects.push(cellRect(partner[0], partner[1]));
+        // Place the number on the first table tile so it sits on colour, not in
+        // the gap between the two diagonal tiles.
+        const cx = rects[0].x + rects[0].w / 2;
+        const cy = rects[0].y + rects[0].h / 2;
 
         const label = `${prefix}${idx++}`;
         units.push({ id: label, label, type, rects, cx, cy });
