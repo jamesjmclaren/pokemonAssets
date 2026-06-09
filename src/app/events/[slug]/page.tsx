@@ -56,6 +56,15 @@ interface AvailabilityData {
 // Floor plan units come from the shared module (also used by the API + admin).
 const TABLE_LAYOUT = FLOOR_PLAN;
 
+// Sponsor areas — decorative, non-bookable zones. Coordinates are in SVG units
+// (viewBox 0 0 772 464). Easy to nudge: change x/y/w/h below.
+const SPONSOR_AREAS: { x: number; y: number; w: number; h: number; label: string }[] = [
+  // Centre column, between the top group of tables and the centre aisle
+  { x: 320, y: 168, w: 126, h: 60, label: "SPONSOR" },
+  // Top-right, north of the corner (red) tables
+  { x: 648, y: 16, w: 110, h: 86, label: "SPONSOR" },
+];
+
 const CARD_TYPES: CardType[] = ["TCG", "Sports", "Collectibles", "Memorabilia", "Other"];
 
 // Colours mirror the spreadsheet: standard = green, end corner = blue, premier = red.
@@ -714,6 +723,37 @@ export default function EventPage() {
                       </g>
                     );
                   })}
+
+                  {/* Sponsor areas (non-bookable) */}
+                  {SPONSOR_AREAS.map((s, i) => (
+                    <g key={`sponsor-${i}`} pointerEvents="none">
+                      <rect
+                        x={s.x}
+                        y={s.y}
+                        width={s.w}
+                        height={s.h}
+                        rx={4}
+                        fill="rgba(212,175,55,0.07)"
+                        stroke="#D4AF37"
+                        strokeOpacity={0.5}
+                        strokeWidth={1}
+                        strokeDasharray="5 4"
+                      />
+                      <text
+                        x={s.x + s.w / 2}
+                        y={s.y + s.h / 2 + 3}
+                        textAnchor="middle"
+                        fontSize="9"
+                        fontWeight={700}
+                        fill="#D4AF37"
+                        fillOpacity={0.85}
+                        fontFamily="Inter, sans-serif"
+                        letterSpacing="1.5"
+                      >
+                        {s.label}
+                      </text>
+                    </g>
+                  ))}
                 </svg>
               </div>
 
