@@ -36,16 +36,22 @@ export async function GET(
 
     if (typesError) throw typesError;
 
-    // Fetch paid bookings (type, day, quantity, and the specific table number)
+    // Fetch paid bookings AND live pending holds — both make a table unavailable.
     const { data: bookings, error: bookingsError } = await supabase
       .from("event_bookings_v2")
-      .select("table_type_key, event_day, quantity, table_label")
+      .select("table_type_key, event_day, quantity, table_label, payment_status, hold_expires_at")
       .eq("event_id", event.id)
-      .eq("payment_status", "paid");
+      .in("payment_status", ["paid", "pending"]);
 
     if (bookingsError) throw bookingsError;
 
-    const rows = bookings ?? [];
+    // Keep paid rows + pending holds that haven't expired yet
+    const nowMs = Date.now();
+    const rows = (bookings ?? []).filter(
+      (r) =>
+        r.payment_status === "paid" ||
+        (r.hold_expires_at && new Date(r.hold_expires_at).getTime() > nowMs)
+    );
     const days: string[] = event.event_days;
 
     const tableTypesWithAvailability = (tableTypes ?? []).map((tt) => {
@@ -81,7 +87,7 @@ export async function GET(
         tableTypes: tableTypesWithAvailability,
         booked: bookedLabels,
       },
-      { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" } }
+      { headers: { "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30" } }
     );
   } catch (error) {
     console.error("Event availability error:", error);

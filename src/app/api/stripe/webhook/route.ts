@@ -373,29 +373,58 @@ async function handleEventTableV2Booking(
     return;
   }
 
-  // Insert one event_bookings_v2 row per specific table
-  for (const [idx, t] of tables.entries()) {
+  // Convert this reservation's pending holds into paid bookings.
+  const reservationId = metadata.reservation_id || "";
+  if (reservationId) {
     try {
-      await supabase.from("event_bookings_v2").insert({
-        // Suffix keeps the session id unique across this order's table rows
-        stripe_session_id: tables.length > 1 ? `${session.id}_${idx}` : session.id,
-        payment_status: "paid",
-        event_id: event.id,
-        event_day: t.day,
-        table_type_key: t.type,
-        table_label: t.label,
-        quantity: 1,
-        first_name: firstName,
-        last_name: lastName,
-        business_name: businessName,
-        instagram_handle: instagramHandle || null,
-        email,
-        phone,
-        card_types: cardTypes,
-        amount_paid_pence: TYPE_PRICE_PENCE[t.type],
-      });
+      await supabase
+        .from("event_bookings_v2")
+        .update({ payment_status: "paid", hold_expires_at: null })
+        .like("stripe_session_id", `hold_${reservationId}_%`)
+        .eq("payment_status", "pending");
     } catch (dbError) {
-      console.error(`handleEventTableV2Booking: insert failed for table ${t.label}:`, dbError);
+      console.error("handleEventTableV2Booking: failed to confirm holds:", dbError);
+    }
+  }
+
+  // Fallback: if any table from the order isn't paid yet (e.g. the hold expired
+  // before payment landed), insert it now. The unique index blocks any table
+  // that was reclaimed by someone else — log those for manual review/refund.
+  const { data: paidRows } = await supabase
+    .from("event_bookings_v2")
+    .select("table_label, event_day")
+    .eq("event_id", event.id)
+    .eq("payment_status", "paid")
+    .like("stripe_session_id", reservationId ? `hold_${reservationId}_%` : session.id);
+  const paidSet = new Set((paidRows ?? []).map((r) => `${r.event_day}|${r.table_label}`));
+
+  for (const [idx, t] of tables.entries()) {
+    if (paidSet.has(`${t.day}|${t.label}`)) continue;
+    const { error } = await supabase.from("event_bookings_v2").insert({
+      stripe_session_id: `${session.id}_fb_${idx}`,
+      payment_status: "paid",
+      event_id: event.id,
+      event_day: t.day,
+      table_type_key: t.type,
+      table_label: t.label,
+      quantity: 1,
+      first_name: firstName,
+      last_name: lastName,
+      business_name: businessName,
+      instagram_handle: instagramHandle || null,
+      email,
+      phone,
+      card_types: cardTypes,
+      amount_paid_pence: TYPE_PRICE_PENCE[t.type],
+    });
+    if (error) {
+      if (error.code === "23505") {
+        console.error(
+          `handleEventTableV2Booking: table ${t.label} (${t.day}) was already taken — paid order needs manual review/refund. Session ${session.id}`
+        );
+      } else {
+        console.error(`handleEventTableV2Booking: fallback insert failed for ${t.label}:`, error);
+      }
     }
   }
 

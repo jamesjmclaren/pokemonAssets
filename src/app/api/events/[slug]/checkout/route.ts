@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "crypto";
 import { TABLE_TYPE_BY_LABEL, type TableTypeKey } from "@/lib/event-floor-plan";
 
 function getStripe() {
@@ -15,7 +16,8 @@ function getSupabaseAdmin() {
 }
 
 const VALID_CARD_TYPES = ["TCG", "Sports", "Collectibles", "Memorabilia", "Other"];
-const MAX_TABLES_PER_ORDER = 80; // keeps the Stripe metadata within its 500-char/value limit
+const MAX_TABLES_PER_ORDER = 80; // keeps Stripe metadata within its 500-char/value limit
+const HOLD_MINUTES = 15;
 
 // Day display labels — update if event dates change
 const DAY_LABELS: Record<string, string> = {
@@ -23,7 +25,6 @@ const DAY_LABELS: Record<string, string> = {
   Sunday: "Sunday — The Collectors Exhibition",
 };
 
-/** De-dupe, keep only valid known table labels. */
 function cleanLabels(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
   return [...new Set(input)].filter(
@@ -131,47 +132,89 @@ export async function POST(
       labelByType.set(t.type_key, t.label);
     }
 
-    // ── Conflict check: reject tables already paid for, per day ────────────────
-    const { data: booked, error: bookedError } = await supabase
-      .from("event_bookings_v2")
-      .select("table_label, event_day")
-      .eq("event_id", event.id)
-      .eq("payment_status", "paid");
-    if (bookedError) throw bookedError;
+    // Flat list of (day, label, type) for the selection
+    const selection: { day: string; label: string; type: TableTypeKey }[] = [
+      ...satLabels.map((label) => ({ day: "Saturday", label, type: TABLE_TYPE_BY_LABEL[label] })),
+      ...sunLabels.map((label) => ({ day: "Sunday", label, type: TABLE_TYPE_BY_LABEL[label] })),
+    ];
 
-    const bookedByDay: Record<string, Set<string>> = { Saturday: new Set(), Sunday: new Set() };
-    for (const row of booked ?? []) {
-      if (row.table_label) bookedByDay[row.event_day]?.add(row.table_label);
+    // ── Release expired holds for this event (frees their unique-index slots) ──
+    await supabase
+      .from("event_bookings_v2")
+      .update({ payment_status: "expired" })
+      .eq("event_id", event.id)
+      .eq("payment_status", "pending")
+      .lt("hold_expires_at", new Date().toISOString());
+
+    // ── Friendly conflict pre-check (the unique index is the hard guarantee) ──
+    const { data: activeRows, error: activeError } = await supabase
+      .from("event_bookings_v2")
+      .select("table_label, event_day, payment_status, hold_expires_at")
+      .eq("event_id", event.id)
+      .in("payment_status", ["paid", "pending"]);
+    if (activeError) throw activeError;
+
+    const nowMs = Date.now();
+    const takenByDay: Record<string, Set<string>> = { Saturday: new Set(), Sunday: new Set() };
+    for (const r of activeRows ?? []) {
+      const live =
+        r.payment_status === "paid" ||
+        (r.hold_expires_at && new Date(r.hold_expires_at).getTime() > nowMs);
+      if (live && r.table_label) takenByDay[r.event_day]?.add(r.table_label);
+    }
+    for (const s of selection) {
+      if (takenByDay[s.day]?.has(s.label)) {
+        return NextResponse.json(
+          { error: `Table ${s.label} (${s.day}) has just been taken. Please pick another.` },
+          { status: 409 }
+        );
+      }
     }
 
-    const dayLabels: { day: string; labels: string[] }[] = [
-      { day: "Saturday", labels: satLabels },
-      { day: "Sunday", labels: sunLabels },
-    ];
-    for (const { day, labels } of dayLabels) {
-      for (const label of labels) {
-        if (bookedByDay[day]?.has(label)) {
-          return NextResponse.json(
-            { error: `Table ${label} for ${day} has just been taken. Please pick another.` },
-            { status: 409 }
-          );
-        }
+    // ── Reserve: insert pending hold rows (atomic — unique index blocks races) ─
+    const reservationId = randomUUID();
+    const holdExpires = new Date(Date.now() + HOLD_MINUTES * 60 * 1000).toISOString();
+    const reserveRows = selection.map((s, i) => ({
+      stripe_session_id: `hold_${reservationId}_${i}`,
+      payment_status: "pending",
+      hold_expires_at: holdExpires,
+      event_id: event.id,
+      event_day: s.day,
+      table_type_key: s.type,
+      table_label: s.label,
+      quantity: 1,
+      first_name: first_name.trim(),
+      last_name: last_name.trim(),
+      business_name: business_name.trim(),
+      instagram_handle: (instagram_handle || "").trim() || null,
+      email: email.trim(),
+      phone: phone.trim(),
+      card_types: validatedCardTypes.join(","),
+      amount_paid_pence: priceByType.get(s.type) ?? 0,
+    }));
+
+    const { error: reserveError } = await supabase.from("event_bookings_v2").insert(reserveRows);
+    if (reserveError) {
+      if (reserveError.code === "23505") {
+        return NextResponse.json(
+          { error: "One or more of those tables were just taken. Please refresh and try again." },
+          { status: 409 }
+        );
       }
+      throw reserveError;
     }
 
     // ── Build Stripe line items (grouped by type × day) ───────────────────────
     const lineItems: Stripe.Checkout.SessionCreateParams["line_items"] = [];
-    for (const { day, labels } of dayLabels) {
+    for (const day of ["Saturday", "Sunday"]) {
       const countByType: Partial<Record<TableTypeKey, number>> = {};
-      for (const label of labels) {
-        const tk = TABLE_TYPE_BY_LABEL[label];
-        countByType[tk] = (countByType[tk] ?? 0) + 1;
+      for (const s of selection) {
+        if (s.day !== day) continue;
+        countByType[s.type] = (countByType[s.type] ?? 0) + 1;
       }
       for (const [typeKey, count] of Object.entries(countByType) as [TableTypeKey, number][]) {
         const price = priceByType.get(typeKey);
-        if (!price) {
-          return NextResponse.json({ error: `Pricing not configured for ${typeKey}.` }, { status: 503 });
-        }
+        if (!price) continue;
         lineItems.push({
           price_data: {
             currency: "gbp",
@@ -186,27 +229,40 @@ export async function POST(
       }
     }
 
-    const session = await getStripe().checkout.sessions.create({
-      payment_method_types: ["card"],
-      customer_email: email.trim(),
-      line_items: lineItems,
-      mode: "payment",
-      success_url: `${req.nextUrl.origin}/events/${slug}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.nextUrl.origin}/events/${slug}`,
-      metadata: {
-        booking_type: "event_table_v2",
-        event_slug: slug,
-        first_name: first_name.trim(),
-        last_name: last_name.trim(),
-        business_name: business_name.trim(),
-        instagram_handle: (instagram_handle || "").trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        card_types: validatedCardTypes.join(","),
-        sat_tables: satLabels.join(","),
-        sun_tables: sunLabels.join(","),
-      },
-    });
+    // ── Create the Stripe session (roll back the holds if this fails) ─────────
+    let session: Stripe.Checkout.Session;
+    try {
+      session = await getStripe().checkout.sessions.create({
+        payment_method_types: ["card"],
+        customer_email: email.trim(),
+        line_items: lineItems,
+        mode: "payment",
+        expires_at: Math.floor(Date.now() / 1000) + 30 * 60, // Stripe session lives 30 min
+        success_url: `${req.nextUrl.origin}/events/${slug}/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.nextUrl.origin}/events/${slug}`,
+        metadata: {
+          booking_type: "event_table_v2",
+          event_slug: slug,
+          reservation_id: reservationId,
+          first_name: first_name.trim(),
+          last_name: last_name.trim(),
+          business_name: business_name.trim(),
+          instagram_handle: (instagram_handle || "").trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          card_types: validatedCardTypes.join(","),
+          sat_tables: satLabels.join(","),
+          sun_tables: sunLabels.join(","),
+        },
+      });
+    } catch (stripeError) {
+      // Release the holds we just reserved
+      await supabase
+        .from("event_bookings_v2")
+        .delete()
+        .like("stripe_session_id", `hold_${reservationId}_%`);
+      throw stripeError;
+    }
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
