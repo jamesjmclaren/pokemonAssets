@@ -38,7 +38,6 @@ const navItems = [
   { href: "/dashboard/tracking", label: "Tracking", icon: Bell, adminOnly: false },
   { href: "/report", label: "Report", icon: FileText, adminOnly: false },
   { href: "/team", label: "Team", icon: Users, adminOnly: false },
-  { href: "/settings/api-keys", label: "Settings", icon: Settings, adminOnly: false },
 ];
 
 export default function Sidebar() {
@@ -142,23 +141,6 @@ export default function Sidebar() {
               );
             })}
 
-          {isPlatformAdmin && (
-            <>
-              <div className="my-3 mx-4 border-t border-border" />
-              <Link
-                href="/admin"
-                className={clsx(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium",
-                  pathname === "/admin"
-                    ? "bg-accent-muted text-accent-hover"
-                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-                )}
-              >
-                <Shield className="w-5 h-5" />
-                Admin
-              </Link>
-            </>
-          )}
         </nav>
 
         {/* Portfolio Switcher */}
@@ -250,7 +232,22 @@ export default function Sidebar() {
           <CurrencySelector />
           {isSignedIn ? (
             <div className="flex items-center gap-3 px-4 py-3">
-              <UserButton afterSignOutUrl="/" />
+              <UserButton afterSignOutUrl="/">
+                <UserButton.MenuItems>
+                  <UserButton.Link
+                    label="Settings"
+                    labelIcon={<Settings className="w-4 h-4" />}
+                    href="/settings/api-keys"
+                  />
+                  {isPlatformAdmin && (
+                    <UserButton.Link
+                      label="Admin"
+                      labelIcon={<Shield className="w-4 h-4" />}
+                      href="/admin"
+                    />
+                  )}
+                </UserButton.MenuItems>
+              </UserButton>
               <span className="text-sm text-text-secondary">Account</span>
             </div>
           ) : (
