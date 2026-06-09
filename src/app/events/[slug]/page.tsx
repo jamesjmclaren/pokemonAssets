@@ -61,6 +61,8 @@ const TABLE_LAYOUT = FLOOR_PLAN;
 const SPONSOR_AREAS: { x: number; y: number; w: number; h: number; label: string }[] = [
   // Centre column, between the top group of tables and the centre aisle
   { x: 320, y: 168, w: 126, h: 60, label: "SPONSOR" },
+  // Mirror of the above, just below the centre aisle (aisle is at y=254)
+  { x: 320, y: 280, w: 126, h: 60, label: "SPONSOR" },
   // Top-right, north of the corner (red) tables
   { x: 648, y: 16, w: 110, h: 86, label: "SPONSOR" },
 ];
