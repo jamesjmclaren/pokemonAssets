@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
-// /events → current active event
-// Update this slug when a new event is added
+// /events → the current event lives at /event
 export default function EventsIndexPage() {
-  redirect("/events/collectors-exhibition-june-2027");
+  redirect("/event");
 }
