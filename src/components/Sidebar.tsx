@@ -103,7 +103,7 @@ export default function Sidebar() {
         )}
       >
         {/* Logo */}
-        <div className="p-6 border-b border-border flex items-center justify-between">
+        <div className="shrink-0 p-6 border-b border-border flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3">
             <img src="/logo.png" alt="West Investments Ltd" className="h-14 object-contain" />
           </Link>
@@ -116,8 +116,8 @@ export default function Sidebar() {
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1">
+        {/* Navigation (scrolls internally if it can't all fit) */}
+        <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
           {navItems
             .filter((item) => !item.adminOnly || !isReadOnly)
             .map((item) => {
@@ -163,7 +163,7 @@ export default function Sidebar() {
 
         {/* Portfolio Switcher */}
         {isSignedIn && (
-          <div className="px-4 pb-4">
+          <div className="shrink-0 px-4 pb-4">
             <p className="text-xs text-text-muted mb-2 px-4">Portfolio</p>
             {portfolios.length > 0 ? (
               <div className="relative">
@@ -245,8 +245,8 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="p-4 border-t border-border space-y-3">
+        {/* Footer — always pinned to the bottom (profile / logout) */}
+        <div className="shrink-0 p-4 border-t border-border space-y-3">
           <CurrencySelector />
           {isSignedIn ? (
             <div className="flex items-center gap-3 px-4 py-3">
