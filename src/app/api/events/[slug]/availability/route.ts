@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { TABLE_TYPE_BY_LABEL } from "@/lib/event-floor-plan";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -16,7 +17,6 @@ export async function GET(
     const { slug } = await context.params;
     const supabase = getSupabaseAdmin();
 
-    // Fetch event
     const { data: event, error: eventError } = await supabase
       .from("events")
       .select("id, slug, name, venue, event_days, start_date, end_date, is_active")
@@ -27,52 +27,64 @@ export async function GET(
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }
 
-    // Fetch table types
     const { data: tableTypes, error: typesError } = await supabase
       .from("event_table_types")
       .select("type_key, label, description, price_pence, total_available, display_color, sort_order")
       .eq("event_id", event.id)
       .order("sort_order");
-
     if (typesError) throw typesError;
 
-    // Fetch paid bookings AND live pending holds — both make a table unavailable.
-    const { data: bookings, error: bookingsError } = await supabase
-      .from("event_bookings_v2")
-      .select("table_type_key, event_day, quantity, table_label, payment_status, hold_expires_at")
-      .eq("event_id", event.id)
-      .in("payment_status", ["paid", "pending"]);
+    const nowIso = new Date().toISOString();
+    // Paid bookings (sold) + live reserve-on-select holds (locked) — both
+    // make a table unavailable to everyone else.
+    const [{ data: paidRows }, { data: holdRows }] = await Promise.all([
+      supabase
+        .from("event_bookings_v2")
+        .select("event_day, table_label, table_type_key")
+        .eq("event_id", event.id)
+        .eq("payment_status", "paid"),
+      supabase
+        .from("event_table_holds")
+        .select("event_day, table_label")
+        .eq("event_id", event.id)
+        .gt("expires_at", nowIso),
+    ]);
 
-    if (bookingsError) throw bookingsError;
-
-    // Keep paid rows + pending holds that haven't expired yet
-    const nowMs = Date.now();
-    const rows = (bookings ?? []).filter(
-      (r) =>
-        r.payment_status === "paid" ||
-        (r.hold_expires_at && new Date(r.hold_expires_at).getTime() > nowMs)
-    );
     const days: string[] = event.event_days;
+    const paid = paidRows ?? [];
+    const holds = holdRows ?? [];
+
+    // Per-type counts: available = total − paid − held (for the active day)
+    const countFor = (typeKey: string, day: string) => {
+      const paidCount = paid.filter((r) => r.table_type_key === typeKey && r.event_day === day).length;
+      const heldCount = holds.filter(
+        (r) => r.event_day === day && TABLE_TYPE_BY_LABEL[r.table_label] === typeKey
+      ).length;
+      return { paidCount, heldCount };
+    };
 
     const tableTypesWithAvailability = (tableTypes ?? []).map((tt) => {
-      const perDay: Record<string, { booked: number; available: number }> = {};
+      const perDay: Record<string, { booked: number; held: number; available: number }> = {};
       for (const day of days) {
-        const booked = rows
-          .filter((r) => r.table_type_key === tt.type_key && r.event_day === day)
-          .reduce((s, r) => s + r.quantity, 0);
-        perDay[day] = { booked, available: Math.max(0, tt.total_available - booked) };
+        const { paidCount, heldCount } = countFor(tt.type_key, day);
+        perDay[day] = {
+          booked: paidCount,
+          held: heldCount,
+          available: Math.max(0, tt.total_available - paidCount - heldCount),
+        };
       }
       return { ...tt, ...perDay };
     });
 
-    // Specific table numbers already paid for, per day, for the floor plan
+    // Specific table numbers, per day, for the floor plan states
     const bookedLabels: Record<string, string[]> = {};
-    for (const day of days) bookedLabels[day] = [];
-    for (const r of rows) {
-      if (r.table_label && bookedLabels[r.event_day]) {
-        bookedLabels[r.event_day].push(r.table_label);
-      }
+    const heldLabels: Record<string, string[]> = {};
+    for (const day of days) {
+      bookedLabels[day] = [];
+      heldLabels[day] = [];
     }
+    for (const r of paid) if (r.table_label && bookedLabels[r.event_day]) bookedLabels[r.event_day].push(r.table_label);
+    for (const r of holds) if (r.table_label && heldLabels[r.event_day]) heldLabels[r.event_day].push(r.table_label);
 
     return NextResponse.json(
       {
@@ -86,8 +98,10 @@ export async function GET(
         is_active: event.is_active,
         tableTypes: tableTypesWithAvailability,
         booked: bookedLabels,
+        held: heldLabels,
       },
-      { headers: { "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30" } }
+      // Short cache so holds by others show up quickly
+      { headers: { "Cache-Control": "public, s-maxage=5, stale-while-revalidate=15" } }
     );
   } catch (error) {
     console.error("Event availability error:", error);

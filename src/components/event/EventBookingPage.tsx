@@ -15,6 +15,10 @@ import {
   ShoppingCart,
   Trash2,
   Hotel,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Clock,
 } from "lucide-react";
 import {
   FLOOR_PLAN,
@@ -37,8 +41,8 @@ interface AvailabilityTypeData {
   total_available: number;
   display_color: string;
   sort_order: number;
-  Saturday: { booked: number; available: number };
-  Sunday: { booked: number; available: number };
+  Saturday: { booked: number; held?: number; available: number };
+  Sunday: { booked: number; held?: number; available: number };
 }
 
 interface AvailabilityData {
@@ -49,8 +53,10 @@ interface AvailabilityData {
   days: string[];
   is_active: boolean;
   tableTypes: AvailabilityTypeData[];
-  // Specific table labels already paid for, keyed by day.
+  // Specific table labels already paid for (sold), keyed by day.
   booked?: Record<string, string[]>;
+  // Specific table labels currently held by anyone (incl. you), keyed by day.
+  held?: Record<string, string[]>;
 }
 
 // Floor plan units come from the shared module (also used by the API + admin).
@@ -95,11 +101,24 @@ export default function EventBookingPage({ slug }: { slug: string }) {
 
   // Floor plan state
   const [activeDay, setActiveDay] = useState<DayKey>("Saturday");
-  // Selected cell IDs per day
+  // Selected cell IDs per day (these are this browser's live holds)
   const [selectedCells, setSelectedCells] = useState<Record<DayKey, Set<string>>>({
     Saturday: new Set(),
     Sunday: new Set(),
   });
+  const [pendingCell, setPendingCell] = useState<string | null>(null); // table mid hold/release
+
+  // Reserve-on-select hold token + countdown
+  const holdTokenRef = useRef<string>("");
+  const [holdDeadline, setHoldDeadline] = useState<number | null>(null); // epoch ms
+  const [nowMs, setNowMs] = useState<number>(Date.now());
+
+  // Zoom & pan for the floor plan
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+  const movedRef = useRef(false); // true when a pan drag moved (suppresses the click)
+  const plotRef = useRef<HTMLDivElement>(null);
 
   // Form state
   const [firstName, setFirstName] = useState("");
@@ -135,16 +154,70 @@ export default function EventBookingPage({ slug }: { slug: string }) {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
+  // Availability fetch + polling (so others' holds/sales appear live)
+  const refreshAvailability = useCallback(() => {
     if (!slug) return;
     fetch(`/api/events/${slug}/availability`)
       .then((r) => r.json())
-      .then((d) => {
-        if (d.tableTypes) setAvailability(d as AvailabilityData);
-      })
+      .then((d) => { if (d.tableTypes) setAvailability(d as AvailabilityData); })
       .catch(() => {})
       .finally(() => setLoadingAvail(false));
   }, [slug]);
+
+  useEffect(() => {
+    refreshAvailability();
+    const id = setInterval(refreshAvailability, 8000);
+    return () => clearInterval(id);
+  }, [refreshAvailability]);
+
+  // One hold token per browser tab
+  useEffect(() => {
+    let t = sessionStorage.getItem("eventHoldToken");
+    if (!t) {
+      t = crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem("eventHoldToken", t);
+    }
+    holdTokenRef.current = t;
+    // Restore any holds this token still owns (e.g. after a refresh)
+    fetch(`/api/events/${slug}/holds?token=${encodeURIComponent(t)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.held) {
+          setSelectedCells({
+            Saturday: new Set<string>(d.held.Saturday ?? []),
+            Sunday: new Set<string>(d.held.Sunday ?? []),
+          });
+        }
+        if (d?.expires_at) setHoldDeadline(new Date(d.expires_at).getTime());
+      })
+      .catch(() => {});
+  }, [slug]);
+
+  // Countdown tick
+  useEffect(() => {
+    if (!holdDeadline) return;
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [holdDeadline]);
+
+  const totalSelected = selectedCells.Saturday.size + selectedCells.Sunday.size;
+
+  // When the hold runs out, clear the selection and tell the vendor
+  useEffect(() => {
+    if (holdDeadline && nowMs >= holdDeadline && totalSelected > 0) {
+      setSelectedCells({ Saturday: new Set(), Sunday: new Set() });
+      setHoldDeadline(null);
+      setError("Your 15-minute hold expired — please re-select your tables.");
+      refreshAvailability();
+    }
+  }, [nowMs, holdDeadline, totalSelected, refreshAvailability]);
+
+  // Drop the countdown once the cart is empty
+  useEffect(() => {
+    if (totalSelected === 0 && holdDeadline) setHoldDeadline(null);
+  }, [totalSelected, holdDeadline]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -167,24 +240,15 @@ export default function EventBookingPage({ slug }: { slug: string }) {
     [getTypeData]
   );
 
-  const selectedCountForType = useCallback(
-    (typeKey: TableTypeKey, day: DayKey): number =>
-      [...selectedCells[day]].filter(
-        (id) => TABLE_LAYOUT.find((c) => c.id === id)?.type === typeKey
-      ).length,
-    [selectedCells]
+  // Cell states. Sold = paid by anyone. Locked = held by someone else (not you).
+  const isPaidSold = useCallback(
+    (cell: TableUnit, day: DayKey) => !!availability?.booked?.[day]?.includes(cell.id),
+    [availability]
   );
-
-  const isCellSold = useCallback(
-    (cell: TableUnit, day: DayKey): boolean => {
-      // A specific table is sold if its number has already been paid for that day.
-      if (availability?.booked?.[day]?.includes(cell.id)) return true;
-      // Also cap selection to the per-type remaining count.
-      const td = getTypeData(cell.type);
-      const available = td ? td[day].available : TYPE_META[cell.type].total_available;
-      return available <= selectedCountForType(cell.type, day);
-    },
-    [availability, getTypeData, selectedCountForType]
+  const isHeldByOther = useCallback(
+    (cell: TableUnit, day: DayKey) =>
+      !!availability?.held?.[day]?.includes(cell.id) && !selectedCells[day].has(cell.id),
+    [availability, selectedCells]
   );
 
   // Sort table numbers like S1, S2, … S10 (numeric within the letter prefix).
@@ -194,23 +258,98 @@ export default function EventBookingPage({ slug }: { slug: string }) {
     return a[0] === b[0] ? na - nb : a.localeCompare(b);
   };
 
+  // Clicking a table reserves it (server hold) or releases it.
   const handleCellClick = useCallback(
-    (cell: TableUnit) => {
-      const isSelected = selectedCells[activeDay].has(cell.id);
-      if (isSelected) {
-        setSelectedCells((prev) => ({
-          ...prev,
-          [activeDay]: new Set([...prev[activeDay]].filter((id) => id !== cell.id)),
-        }));
-      } else if (!isCellSold(cell, activeDay)) {
-        setSelectedCells((prev) => ({
-          ...prev,
-          [activeDay]: new Set([...prev[activeDay], cell.id]),
-        }));
+    async (cell: TableUnit) => {
+      if (movedRef.current) { movedRef.current = false; return; } // was a pan, not a tap
+      const token = holdTokenRef.current;
+      if (!token || pendingCell) return;
+      const day = activeDay;
+      const isSelected = selectedCells[day].has(cell.id);
+      if (!isSelected && (isPaidSold(cell, day) || isHeldByOther(cell, day))) return;
+
+      setPendingCell(cell.id);
+      try {
+        if (isSelected) {
+          await fetch(`/api/events/${slug}/release`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ label: cell.id, day, holdToken: token }),
+          });
+          setSelectedCells((prev) => ({
+            ...prev,
+            [day]: new Set([...prev[day]].filter((id) => id !== cell.id)),
+          }));
+        } else {
+          const res = await fetch(`/api/events/${slug}/hold`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ label: cell.id, day, holdToken: token }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            setError(data.error || "That table is no longer available.");
+            refreshAvailability();
+            return;
+          }
+          setSelectedCells((prev) => ({ ...prev, [day]: new Set([...prev[day], cell.id]) }));
+          if (data.expires_at) setHoldDeadline(new Date(data.expires_at).getTime());
+          setError("");
+        }
+      } catch {
+        setError("Network hiccup — please try that table again.");
+      } finally {
+        setPendingCell(null);
+        refreshAvailability();
       }
     },
-    [activeDay, selectedCells, isCellSold]
+    [activeDay, selectedCells, slug, pendingCell, isPaidSold, isHeldByOther, refreshAvailability]
   );
+
+  // ── Zoom & pan ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const el = plotRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setZoom((z) => {
+        const nz = Math.min(3, Math.max(1, +(z - e.deltaY * 0.0016).toFixed(2)));
+        if (nz === 1) setPan({ x: 0, y: 0 });
+        return nz;
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const zoomBy = (delta: number) =>
+    setZoom((z) => {
+      const nz = Math.min(3, Math.max(1, +(z + delta).toFixed(2)));
+      if (nz === 1) setPan({ x: 0, y: 0 });
+      return nz;
+    });
+  const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (zoom <= 1) return;
+    dragRef.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y };
+    movedRef.current = false;
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    if (Math.abs(e.clientX - d.x) > 4 || Math.abs(e.clientY - d.y) > 4) movedRef.current = true;
+    setPan({ x: d.px + (e.clientX - d.x), y: d.py + (e.clientY - d.y) });
+  };
+  const onPointerUp = () => { dragRef.current = null; };
+
+  // ── Hold countdown ─────────────────────────────────────────────────────────
+  const secondsLeft = holdDeadline ? Math.max(0, Math.ceil((holdDeadline - nowMs) / 1000)) : null;
+  const countdown =
+    secondsLeft != null
+      ? `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`
+      : null;
+  const countdownPct = secondsLeft != null ? Math.max(0, Math.min(100, (secondsLeft / (15 * 60)) * 100)) : 0;
+  const countdownLow = secondsLeft != null && secondsLeft <= 120;
 
   // ── Cart derived state ─────────────────────────────────────────────────────
 
@@ -248,19 +387,39 @@ export default function EventBookingPage({ slug }: { slug: string }) {
   const totalPence = cartItems.reduce((s, i) => s + i.quantity * i.unitPricePence, 0);
   const cartIsEmpty = cartItems.length === 0;
 
+  // Release a set of holds on the server (fire-and-forget) then refresh.
+  const releaseHolds = (items: { label: string; day: DayKey }[]) => {
+    const token = holdTokenRef.current;
+    if (!token) return;
+    Promise.all(
+      items.map((it) =>
+        fetch(`/api/events/${slug}/release`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label: it.label, day: it.day, holdToken: token }),
+        }).catch(() => {})
+      )
+    ).finally(refreshAvailability);
+  };
+
   const removeCartItem = (typeKey: TableTypeKey, day: DayKey) => {
+    const labels = [...selectedCells[day]].filter(
+      (id) => TABLE_LAYOUT.find((c) => c.id === id)?.type === typeKey
+    );
+    releaseHolds(labels.map((label) => ({ label, day })));
     setSelectedCells((prev) => ({
       ...prev,
-      [day]: new Set(
-        [...prev[day]].filter(
-          (id) => TABLE_LAYOUT.find((c) => c.id === id)?.type !== typeKey
-        )
-      ),
+      [day]: new Set([...prev[day]].filter((id) => !labels.includes(id))),
     }));
   };
 
   const clearCart = () => {
+    releaseHolds([
+      ...[...selectedCells.Saturday].map((label) => ({ label, day: "Saturday" as DayKey })),
+      ...[...selectedCells.Sunday].map((label) => ({ label, day: "Sunday" as DayKey })),
+    ]);
     setSelectedCells({ Saturday: new Set(), Sunday: new Set() });
+    setHoldDeadline(null);
   };
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -301,9 +460,8 @@ export default function EventBookingPage({ slug }: { slug: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          // Specific table numbers selected per day
-          sat_tables: [...selectedCells.Saturday],
-          sun_tables: [...selectedCells.Sunday],
+          // The server reads the tables from this token's live holds
+          holdToken: holdTokenRef.current,
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           business_name: businessName.trim(),
@@ -349,9 +507,15 @@ export default function EventBookingPage({ slug }: { slug: string }) {
         .fade-up { opacity: 0; transform: translateY(24px); animation: fadeUp 0.8s cubic-bezier(0.16,1,0.3,1) forwards; }
         @keyframes fadeUp { to { opacity: 1; transform: none; } }
         .table-cell { cursor: pointer; transition: opacity 0.15s, filter 0.15s; }
-        .table-cell:hover { filter: brightness(1.25); }
+        .table-cell:hover { filter: brightness(1.3) drop-shadow(0 0 2px rgba(212,175,55,0.5)); }
         .table-cell.sold { cursor: not-allowed; }
         .table-cell.sold:hover { filter: none; }
+        .fade-table { opacity: 0; transform-box: fill-box; transform-origin: center; animation: fadeTable 0.5s ease-out forwards; }
+        @keyframes fadeTable { from { opacity: 0; transform: scale(0.55); } to { opacity: 1; transform: scale(1); } }
+        @keyframes pulseRing { 0%,100% { box-shadow: 0 0 0 0 rgba(212,175,55,0.35); } 50% { box-shadow: 0 0 0 4px rgba(212,175,55,0); } }
+        .countdown-pulse { animation: pulseRing 1.6s ease-in-out infinite; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        .slide-up { animation: slideUp 0.3s ease-out; }
       `}</style>
 
       {/* ── Navigation ─────────────────────────────────────────────────────── */}
@@ -657,69 +821,116 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                 ))}
               </div>
 
-              {/* SVG floor plan */}
-              <div className="border border-border/40 rounded-xl overflow-hidden bg-[#111] p-2">
+              {/* SVG floor plan with zoom & pan */}
+              <div
+                ref={plotRef}
+                className="relative rounded-2xl overflow-hidden border border-accent/15"
+                style={{
+                  background: "radial-gradient(130% 120% at 50% -10%, #17171d 0%, #0c0c0f 72%)",
+                  touchAction: "none",
+                }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerLeave={onPointerUp}
+              >
+                {/* Zoom controls */}
+                <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5">
+                  {[
+                    { icon: ZoomIn, on: () => zoomBy(0.4), label: "Zoom in" },
+                    { icon: ZoomOut, on: () => zoomBy(-0.4), label: "Zoom out" },
+                    { icon: Maximize2, on: resetView, label: "Reset view" },
+                  ].map(({ icon: Icon, on, label }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={on}
+                      aria-label={label}
+                      className="w-8 h-8 grid place-items-center rounded-lg bg-black/50 border border-white/10 text-text-secondary hover:text-accent hover:border-accent/40 backdrop-blur-sm transition-colors cursor-pointer"
+                    >
+                      <Icon className="w-4 h-4" />
+                    </button>
+                  ))}
+                </div>
+                {zoom > 1 && (
+                  <div
+                    className="absolute bottom-3 left-3 z-10 text-[10px] uppercase tracking-widest text-text-muted bg-black/40 px-2 py-1 rounded-md backdrop-blur-sm"
+                    style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em" }}
+                  >
+                    Drag to pan · {Math.round(zoom * 100)}%
+                  </div>
+                )}
+
                 <svg
                   viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
-                  style={{ width: "100%", height: "auto", display: "block" }}
+                  style={{
+                    width: "100%",
+                    height: "auto",
+                    display: "block",
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                    transformOrigin: "center center",
+                    transition: dragRef.current ? "none" : "transform 0.18s ease-out",
+                    cursor: zoom > 1 ? "grab" : "default",
+                  }}
                   role="img"
                   aria-label="Interactive floor plan — click tables to select them"
                 >
                   <defs>
                     <filter id="tableGlow" x="-60%" y="-60%" width="220%" height="220%">
-                      <feDropShadow dx="0" dy="0" stdDeviation="3.5" floodColor="#D4AF37" floodOpacity="0.95" />
+                      <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#D4AF37" floodOpacity="0.95" />
                     </filter>
                   </defs>
 
                   {/* Hall outline */}
-                  <rect x="4" y="4" width={VIEWBOX_W - 8} height={VIEWBOX_H - 8} rx="6"
-                    fill="none" stroke="#2a2a2a" strokeWidth="2" />
+                  <rect x="4" y="4" width={VIEWBOX_W - 8} height={VIEWBOX_H - 8} rx="8"
+                    fill="none" stroke="rgba(212,175,55,0.12)" strokeWidth="1.5" />
 
-                  {/* Centre aisle (between the top and bottom blocks) */}
-                  <line x1="10" y1="254" x2={VIEWBOX_W - 10} y2="254" stroke="#1f2937" strokeWidth="1" strokeDasharray="5 4" />
-                  <text x={VIEWBOX_W / 2} y="251" textAnchor="middle" fill="#374151" fontSize="9"
+                  {/* Centre aisle */}
+                  <line x1="14" y1="254" x2={VIEWBOX_W - 14} y2="254" stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="6 5" />
+                  <text x={VIEWBOX_W / 2} y="251" textAnchor="middle" fill="#4b5563" fontSize="8.5"
                     fontFamily="Inter, sans-serif" letterSpacing="3">CENTRE AISLE</text>
 
-                  {/* Tables — one group per sellable unit. Blue = single table;
-                      green = an end-corner L of two joined tables; red = a premier
-                      corner of two tables at a right angle (with a gap). */}
-                  {TABLE_LAYOUT.map((unit) => {
-                    const isSelected = selectedCells[activeDay].has(unit.id);
-                    const sold = !loadingAvail && isCellSold(unit, activeDay) && !isSelected;
+                  {/* Tables — yours (gold) · sold (grey) · on hold by others (amber) */}
+                  {TABLE_LAYOUT.map((unit, idx) => {
+                    const mine = selectedCells[activeDay].has(unit.id);
+                    const sold = !loadingAvail && isPaidSold(unit, activeDay);
+                    const locked = !loadingAvail && isHeldByOther(unit, activeDay);
                     const colors = TYPE_COLORS[unit.type];
-                    const fill = sold ? colors.sold : isSelected ? "#D4AF37" : colors.fill;
-                    const opacity = sold ? 0.35 : 1;
+                    const clickable = mine || (!sold && !locked);
+                    const fill = mine ? "#D4AF37" : sold ? "#34343b" : locked ? "#6b5417" : colors.fill;
+                    const opacity = sold ? 0.4 : locked ? 0.75 : 1;
+                    const stateLabel = sold ? " (sold)" : locked ? " (on hold)" : mine ? " (yours)" : "";
                     return (
                       <g
                         key={unit.id}
-                        className={`table-cell ${sold ? "sold" : ""}`}
-                        onClick={() => !sold && handleCellClick(unit)}
-                        filter={isSelected ? "url(#tableGlow)" : undefined}
+                        className={`table-cell ${clickable ? "" : "sold"} fade-table`}
+                        style={{ animationDelay: `${Math.min(idx * 3, 420)}ms` }}
+                        onClick={() => clickable && handleCellClick(unit)}
+                        filter={mine ? "url(#tableGlow)" : undefined}
                       >
-                        <title>{`Table ${unit.label} — ${colors.label}${sold ? " (sold)" : ""}`}</title>
+                        <title>{`Table ${unit.label} — ${colors.label}${stateLabel}`}</title>
                         {unit.rects.map((rc, i) => (
                           <rect
                             key={i}
-                            x={rc.x + 0.5}
-                            y={rc.y + 0.5}
-                            width={rc.w - 1}
-                            height={rc.h - 1}
+                            x={rc.x + 0.6}
+                            y={rc.y + 0.6}
+                            width={rc.w - 1.2}
+                            height={rc.h - 1.2}
                             rx={3}
                             fill={fill}
                             opacity={opacity}
-                            stroke={isSelected ? "#fffbe6" : "rgba(255,255,255,0.22)"}
-                            strokeWidth={isSelected ? 1.6 : 0.75}
+                            stroke={mine ? "#fffbe6" : "rgba(255,255,255,0.16)"}
+                            strokeWidth={mine ? 1.6 : 0.5}
                           />
                         ))}
-                        {/* Table number */}
                         <text
                           x={unit.cx}
                           y={unit.cy + 2}
                           textAnchor="middle"
-                          fontSize={isSelected ? 7 : 5.5}
-                          fontWeight={isSelected ? 700 : 600}
-                          fill={isSelected ? "#1a1a1a" : "#ffffff"}
-                          fillOpacity={sold ? 0.5 : isSelected ? 1 : 0.92}
+                          fontSize={mine ? 7 : 5.5}
+                          fontWeight={mine ? 800 : 600}
+                          fill={mine ? "#1a1a1a" : "#ffffff"}
+                          fillOpacity={sold || locked ? 0.5 : mine ? 1 : 0.9}
                           fontFamily="Inter, sans-serif"
                           pointerEvents="none"
                         >
@@ -732,31 +943,11 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                   {/* Sponsor areas (non-bookable) */}
                   {SPONSOR_AREAS.map((s, i) => (
                     <g key={`sponsor-${i}`} pointerEvents="none">
-                      <rect
-                        x={s.x}
-                        y={s.y}
-                        width={s.w}
-                        height={s.h}
-                        rx={4}
-                        fill="rgba(212,175,55,0.07)"
-                        stroke="#D4AF37"
-                        strokeOpacity={0.5}
-                        strokeWidth={1}
-                        strokeDasharray="5 4"
-                      />
-                      <text
-                        x={s.x + s.w / 2}
-                        y={s.y + s.h / 2 + 3}
-                        textAnchor="middle"
-                        fontSize="9"
-                        fontWeight={700}
-                        fill="#D4AF37"
-                        fillOpacity={0.85}
-                        fontFamily="Inter, sans-serif"
-                        letterSpacing="1.5"
-                      >
-                        {s.label}
-                      </text>
+                      <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={6}
+                        fill="rgba(212,175,55,0.06)" stroke="#D4AF37" strokeOpacity={0.45} strokeWidth={1} strokeDasharray="6 5" />
+                      <text x={s.x + s.w / 2} y={s.y + s.h / 2 + 3} textAnchor="middle"
+                        fontSize="9" fontWeight={700} fill="#D4AF37" fillOpacity={0.8}
+                        fontFamily="Inter, sans-serif" letterSpacing="2">{s.label}</text>
                     </g>
                   ))}
                 </svg>
@@ -781,12 +972,16 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                   );
                 })}
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-3 rounded-sm bg-[#4b5563] opacity-40" />
+                  <div className="w-4 h-3 rounded-sm" style={{ backgroundColor: "#6b5417" }} />
+                  <span className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>On hold</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-3 rounded-sm bg-[#34343b]" />
                   <span className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>Sold</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-3 rounded-sm bg-accent/30 border border-accent" />
-                  <span className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>Selected</span>
+                  <div className="w-4 h-3 rounded-sm" style={{ backgroundColor: "#D4AF37" }} />
+                  <span className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>Your pick</span>
                 </div>
               </div>
             </div>
@@ -817,6 +1012,39 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                     </button>
                   )}
                 </div>
+
+                {/* Hold countdown */}
+                {!cartIsEmpty && countdown && (
+                  <div
+                    className={`mb-4 rounded-xl border px-4 py-3 slide-up ${
+                      countdownLow ? "border-danger/40 bg-danger/10" : "border-accent/30 bg-accent/5"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span
+                        className={`flex items-center gap-1.5 text-xs font-medium ${countdownLow ? "text-danger" : "text-accent"}`}
+                        style={{ fontFamily: "Inter, sans-serif" }}
+                      >
+                        <Clock className="w-3.5 h-3.5" /> Tables held for you
+                      </span>
+                      <span
+                        className={`text-sm font-bold tabular-nums ${countdownLow ? "text-danger" : "text-accent"}`}
+                        style={{ fontFamily: "Inter, sans-serif" }}
+                      >
+                        {countdown}
+                      </span>
+                    </div>
+                    <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-1000 ease-linear ${countdownLow ? "bg-danger" : "bg-accent"}`}
+                        style={{ width: `${countdownPct}%` }}
+                      />
+                    </div>
+                    <p className="text-text-muted text-[10px] mt-1.5" style={{ fontFamily: "Inter, sans-serif" }}>
+                      Complete payment before the timer ends or your tables are released.
+                    </p>
+                  </div>
+                )}
 
                 {cartIsEmpty ? (
                   <p className="text-text-muted text-sm text-center py-8" style={{ fontFamily: "Inter, sans-serif", fontWeight: 300 }}>

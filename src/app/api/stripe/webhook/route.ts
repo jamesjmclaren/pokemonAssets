@@ -373,35 +373,14 @@ async function handleEventTableV2Booking(
     return;
   }
 
-  // Convert this reservation's pending holds into paid bookings.
+  // The reservation id IS the browser's hold token.
   const reservationId = metadata.reservation_id || "";
-  if (reservationId) {
-    try {
-      await supabase
-        .from("event_bookings_v2")
-        .update({ payment_status: "paid", hold_expires_at: null })
-        .like("stripe_session_id", `hold_${reservationId}_%`)
-        .eq("payment_status", "pending");
-    } catch (dbError) {
-      console.error("handleEventTableV2Booking: failed to confirm holds:", dbError);
-    }
-  }
 
-  // Fallback: if any table from the order isn't paid yet (e.g. the hold expired
-  // before payment landed), insert it now. The unique index blocks any table
-  // that was reclaimed by someone else — log those for manual review/refund.
-  const { data: paidRows } = await supabase
-    .from("event_bookings_v2")
-    .select("table_label, event_day")
-    .eq("event_id", event.id)
-    .eq("payment_status", "paid")
-    .like("stripe_session_id", reservationId ? `hold_${reservationId}_%` : session.id);
-  const paidSet = new Set((paidRows ?? []).map((r) => `${r.event_day}|${r.table_label}`));
-
+  // Insert one paid booking row per table. The unique index blocks any table
+  // that was already taken — log those for manual review/refund.
   for (const [idx, t] of tables.entries()) {
-    if (paidSet.has(`${t.day}|${t.label}`)) continue;
     const { error } = await supabase.from("event_bookings_v2").insert({
-      stripe_session_id: `${session.id}_fb_${idx}`,
+      stripe_session_id: `${session.id}_${idx}`,
       payment_status: "paid",
       event_id: event.id,
       event_day: t.day,
@@ -420,12 +399,21 @@ async function handleEventTableV2Booking(
     if (error) {
       if (error.code === "23505") {
         console.error(
-          `handleEventTableV2Booking: table ${t.label} (${t.day}) was already taken — paid order needs manual review/refund. Session ${session.id}`
+          `handleEventTableV2Booking: table ${t.label} (${t.day}) already booked — paid order needs manual review/refund. Session ${session.id}`
         );
       } else {
-        console.error(`handleEventTableV2Booking: fallback insert failed for ${t.label}:`, error);
+        console.error(`handleEventTableV2Booking: insert failed for ${t.label}:`, error);
       }
     }
+  }
+
+  // Release this token's reserve-on-select holds now that the tables are paid.
+  if (reservationId) {
+    await supabase
+      .from("event_table_holds")
+      .delete()
+      .eq("event_id", event.id)
+      .eq("hold_token", reservationId);
   }
 
   // Build readable booking summary lines for emails (grouped by type × day, with table numbers)
