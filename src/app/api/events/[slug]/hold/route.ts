@@ -3,10 +3,11 @@ import {
   getSupabaseAdmin,
   getEvent,
   purgeExpiredHolds,
-  tokenDeadline,
   isValidLabel,
   isValidToken,
+  rateLimited,
   HOLD_MINUTES,
+  MAX_HOLDS_PER_TOKEN,
 } from "@/lib/event-holds";
 
 // Reserve a single table the moment a vendor clicks it. Returns the shared
@@ -21,6 +22,12 @@ export async function POST(
 
     if (!isValidLabel(label) || (day !== "Saturday" && day !== "Sunday") || !isValidToken(holdToken)) {
       return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+    }
+
+    // Throttle rapid-fire requests (best-effort, per instance)
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || holdToken;
+    if (rateLimited(`hold:${ip}`, 40, 10000)) {
+      return NextResponse.json({ error: "Too many requests — slow down a moment." }, { status: 429 });
     }
 
     const supabase = getSupabaseAdmin();
@@ -46,8 +53,27 @@ export async function POST(
       return NextResponse.json({ error: "That table has already been booked." }, { status: 409 });
     }
 
+    // This token's current holds — for the per-token cap and the shared deadline.
+    const nowIso = new Date().toISOString();
+    const { data: tokenHolds } = await supabase
+      .from("event_table_holds")
+      .select("event_day, table_label, expires_at")
+      .eq("event_id", event.id)
+      .eq("hold_token", holdToken)
+      .gt("expires_at", nowIso);
+    const mine = tokenHolds ?? [];
+    const alreadyHeld = mine.some((h) => h.event_day === day && h.table_label === label);
+    if (!alreadyHeld && mine.length >= MAX_HOLDS_PER_TOKEN) {
+      return NextResponse.json(
+        { error: `You can hold up to ${MAX_HOLDS_PER_TOKEN} tables at once — please book or release some first.` },
+        { status: 429 }
+      );
+    }
     // All of this token's tables share one deadline so the countdown is single.
-    const existingDeadline = await tokenDeadline(supabase, event.id, holdToken);
+    const existingDeadline = mine.reduce<string | null>(
+      (min, h) => (!min || h.expires_at < min ? h.expires_at : min),
+      null
+    );
     const deadline = existingDeadline ?? new Date(Date.now() + HOLD_MINUTES * 60 * 1000).toISOString();
 
     // Take the hold. The unique index makes this race-safe.

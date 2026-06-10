@@ -3,6 +3,19 @@ import { TABLE_TYPE_BY_LABEL } from "./event-floor-plan";
 
 export const HOLD_MINUTES = 15;
 export const CHECKOUT_HOLD_MINUTES = 20; // a little longer to survive the Stripe redirect
+export const MAX_HOLDS_PER_TOKEN = 20; // one browser can't lock the whole hall
+
+// Best-effort in-memory rate limiter (per serverless instance). Combined with
+// the per-token cap above, this throttles rapid-fire hold/release abuse.
+const rlHits = new Map<string, number[]>();
+export function rateLimited(key: string, max: number, windowMs: number): boolean {
+  const now = Date.now();
+  const recent = (rlHits.get(key) ?? []).filter((t) => now - t < windowMs);
+  recent.push(now);
+  rlHits.set(key, recent);
+  if (rlHits.size > 5000) rlHits.clear(); // guard against unbounded growth
+  return recent.length > max;
+}
 
 export function getSupabaseAdmin(): SupabaseClient {
   return createClient(

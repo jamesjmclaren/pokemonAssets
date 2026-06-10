@@ -119,6 +119,24 @@ export default function EventBookingPage({ slug }: { slug: string }) {
   const dragRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const movedRef = useRef(false); // true when a pan drag moved (suppresses the click)
   const plotRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // Highlight a single table type (dim the rest)
+  const [highlightType, setHighlightType] = useState<TableTypeKey | null>(null);
+
+  // Waitlist (shown when a type is sold out for the active day)
+  const [waitlistType, setWaitlistType] = useState<TableTypeKey | "">("");
+  const [waitlistName, setWaitlistName] = useState("");
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
+
+  // Toasts
+  const [toasts, setToasts] = useState<{ id: number; msg: string; type: "info" | "error" | "success" }[]>([]);
+  const pushToast = useCallback((msg: string, type: "info" | "error" | "success" = "info") => {
+    const id = Date.now() + Math.random();
+    setToasts((t) => [...t.slice(-3), { id, msg, type }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3600);
+  }, []);
 
   // Form state
   const [firstName, setFirstName] = useState("");
@@ -209,10 +227,10 @@ export default function EventBookingPage({ slug }: { slug: string }) {
     if (holdDeadline && nowMs >= holdDeadline && totalSelected > 0) {
       setSelectedCells({ Saturday: new Set(), Sunday: new Set() });
       setHoldDeadline(null);
-      setError("Your 15-minute hold expired — please re-select your tables.");
+      pushToast("Your 15-minute hold expired — please re-select your tables.", "error");
       refreshAvailability();
     }
-  }, [nowMs, holdDeadline, totalSelected, refreshAvailability]);
+  }, [nowMs, holdDeadline, totalSelected, refreshAvailability, pushToast]);
 
   // Drop the countdown once the cart is empty
   useEffect(() => {
@@ -288,7 +306,7 @@ export default function EventBookingPage({ slug }: { slug: string }) {
           });
           const data = await res.json();
           if (!res.ok) {
-            setError(data.error || "That table is no longer available.");
+            pushToast(data.error || "That table is no longer available.", "error");
             refreshAvailability();
             return;
           }
@@ -297,13 +315,13 @@ export default function EventBookingPage({ slug }: { slug: string }) {
           setError("");
         }
       } catch {
-        setError("Network hiccup — please try that table again.");
+        pushToast("Network hiccup — please try that table again.", "error");
       } finally {
         setPendingCell(null);
         refreshAvailability();
       }
     },
-    [activeDay, selectedCells, slug, pendingCell, isPaidSold, isHeldByOther, refreshAvailability]
+    [activeDay, selectedCells, slug, pendingCell, isPaidSold, isHeldByOther, refreshAvailability, pushToast]
   );
 
   // ── Zoom & pan ─────────────────────────────────────────────────────────────
@@ -350,6 +368,38 @@ export default function EventBookingPage({ slug }: { slug: string }) {
       : null;
   const countdownPct = secondsLeft != null ? Math.max(0, Math.min(100, (secondsLeft / (15 * 60)) * 100)) : 0;
   const countdownLow = secondsLeft != null && secondsLeft <= 120;
+
+  // Types sold out for the active day → offer the waitlist
+  const soldOutTypes = (["standard", "corner", "premier_corner"] as TableTypeKey[]).filter((t) => {
+    const td = getTypeData(t);
+    return !!td && td[activeDay].available === 0;
+  });
+
+  const joinWaitlist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const type = (waitlistType || soldOutTypes[0]) as TableTypeKey | "";
+    if (!type || !waitlistName.trim() || !waitlistEmail.trim()) return;
+    setWaitlistSubmitting(true);
+    try {
+      const res = await fetch(`/api/events/${slug}/waitlist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day: activeDay, type_key: type, name: waitlistName.trim(), email: waitlistEmail.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        pushToast(data.message || "You're on the waitlist.", "success");
+        setWaitlistName("");
+        setWaitlistEmail("");
+      } else {
+        pushToast(data.error || "Could not join the waitlist.", "error");
+      }
+    } catch {
+      pushToast("Network error — please try again.", "error");
+    } finally {
+      setWaitlistSubmitting(false);
+    }
+  };
 
   // ── Cart derived state ─────────────────────────────────────────────────────
 
@@ -517,6 +567,58 @@ export default function EventBookingPage({ slug }: { slug: string }) {
         @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
         .slide-up { animation: slideUp 0.3s ease-out; }
       `}</style>
+
+      {/* Toasts */}
+      {toasts.length > 0 && (
+        <div className="fixed top-4 right-4 z-[60] flex flex-col gap-2 max-w-[92vw] pointer-events-none">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className={`slide-up flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm shadow-xl backdrop-blur-md ${
+                t.type === "error"
+                  ? "bg-danger/15 border-danger/40 text-danger"
+                  : t.type === "success"
+                  ? "bg-success/15 border-success/40 text-success"
+                  : "bg-surface/90 border-accent/30 text-text-primary"
+              }`}
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              {t.type === "error" ? (
+                <X className="w-4 h-4 shrink-0" />
+              ) : t.type === "success" ? (
+                <CheckCircle className="w-4 h-4 shrink-0" />
+              ) : (
+                <Clock className="w-4 h-4 shrink-0" />
+              )}
+              <span>{t.msg}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Sticky mobile action bar */}
+      {totalSelected > 0 && (
+        <div className="xl:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-accent/20 px-4 py-3 flex items-center justify-between gap-3 slide-up">
+          <div>
+            <p className="text-text-primary text-sm font-medium" style={{ fontFamily: "Inter, sans-serif" }}>
+              {totalSelected} table{totalSelected > 1 ? "s" : ""} · £{(totalPence / 100).toFixed(0)}
+            </p>
+            {countdown && (
+              <p className={`text-[11px] ${countdownLow ? "text-danger" : "text-accent"}`} style={{ fontFamily: "Inter, sans-serif" }}>
+                Held — {countdown}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="px-6 py-2.5 bg-accent text-background text-sm font-semibold rounded-lg hover:bg-accent-hover transition-colors"
+            style={{ fontFamily: "Inter, sans-serif" }}
+          >
+            Continue
+          </button>
+        </div>
+      )}
 
       {/* ── Navigation ─────────────────────────────────────────────────────── */}
       <nav
@@ -821,6 +923,39 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                 ))}
               </div>
 
+              {/* Type filter — highlight one type, dim the rest */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setHighlightType(null)}
+                  className={`px-3 py-1.5 rounded-full text-[11px] uppercase tracking-wider border transition-colors cursor-pointer ${
+                    highlightType === null
+                      ? "border-accent text-accent bg-accent/10"
+                      : "border-border text-text-muted hover:text-text-secondary"
+                  }`}
+                  style={{ fontFamily: "Inter, sans-serif" }}
+                >
+                  All
+                </button>
+                {(["standard", "corner", "premier_corner"] as TableTypeKey[]).map((type) => {
+                  const active = highlightType === type;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setHighlightType(active ? null : type)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] uppercase tracking-wider border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                        active ? "text-accent border-accent bg-accent/10" : "border-border text-text-muted hover:text-text-secondary"
+                      }`}
+                      style={{ fontFamily: "Inter, sans-serif" }}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: TYPE_COLORS[type].fill }} />
+                      {TYPE_COLORS[type].label}
+                    </button>
+                  );
+                })}
+              </div>
+
               {/* SVG floor plan with zoom & pan */}
               <div
                 ref={plotRef}
@@ -896,9 +1031,10 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                     const sold = !loadingAvail && isPaidSold(unit, activeDay);
                     const locked = !loadingAvail && isHeldByOther(unit, activeDay);
                     const colors = TYPE_COLORS[unit.type];
+                    const dim = highlightType !== null && unit.type !== highlightType;
                     const clickable = mine || (!sold && !locked);
                     const fill = mine ? "#D4AF37" : sold ? "#34343b" : locked ? "#6b5417" : colors.fill;
-                    const opacity = sold ? 0.4 : locked ? 0.75 : 1;
+                    const opacity = dim ? 0.12 : sold ? 0.4 : locked ? 0.75 : 1;
                     const stateLabel = sold ? " (sold)" : locked ? " (on hold)" : mine ? " (yours)" : "";
                     return (
                       <g
@@ -984,6 +1120,58 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                   <span className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>Your pick</span>
                 </div>
               </div>
+
+              {/* Waitlist — appears when a type is sold out for the active day */}
+              {soldOutTypes.length > 0 && (
+                <div className="mt-5 rounded-2xl border border-accent/20 bg-accent/5 p-5">
+                  <p className="text-accent text-xs uppercase tracking-[0.2em] mb-1" style={{ fontFamily: "Inter, sans-serif" }}>
+                    Sold out?
+                  </p>
+                  <p className="text-text-secondary text-sm mb-4" style={{ fontFamily: "Inter, sans-serif", fontWeight: 300 }}>
+                    Join the waitlist and we&apos;ll email you if a table frees up on {activeDay}.
+                  </p>
+                  <form onSubmit={joinWaitlist} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <select
+                      value={waitlistType || soldOutTypes[0]}
+                      onChange={(e) => setWaitlistType(e.target.value as TableTypeKey)}
+                      className="sm:col-span-2 px-3 py-2.5 bg-surface-hover border border-border rounded-xl text-text-primary text-sm focus:outline-none focus:border-accent/50"
+                      style={{ fontFamily: "Inter, sans-serif" }}
+                    >
+                      {soldOutTypes.map((t) => (
+                        <option key={t} value={t}>
+                          {TYPE_COLORS[t].label} — sold out
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      required
+                      value={waitlistName}
+                      onChange={(e) => setWaitlistName(e.target.value)}
+                      placeholder="Your name"
+                      className="px-3 py-2.5 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50"
+                      style={{ fontFamily: "Inter, sans-serif" }}
+                    />
+                    <input
+                      type="email"
+                      required
+                      value={waitlistEmail}
+                      onChange={(e) => setWaitlistEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="px-3 py-2.5 bg-surface-hover border border-border rounded-xl text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50"
+                      style={{ fontFamily: "Inter, sans-serif" }}
+                    />
+                    <button
+                      type="submit"
+                      disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim()}
+                      className="sm:col-span-2 mt-1 px-4 py-2.5 border border-accent/40 text-accent text-xs tracking-widest uppercase rounded-xl hover:bg-accent hover:text-background transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      style={{ fontFamily: "Inter, sans-serif", letterSpacing: "0.15em" }}
+                    >
+                      {waitlistSubmitting ? "Joining…" : "Notify me"}
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
 
             {/* ─ Cart + form ─────────────────────────────────────────── */}
@@ -1092,7 +1280,7 @@ export default function EventBookingPage({ slug }: { slug: string }) {
               </div>
 
               {/* Vendor form */}
-              <div className="bg-background border border-accent/15 rounded-2xl p-6">
+              <div ref={formRef} className="bg-background border border-accent/15 rounded-2xl p-6 scroll-mt-24">
                 <h3 className="text-xl font-light text-text-primary mb-2 text-center">
                   Your Details
                 </h3>

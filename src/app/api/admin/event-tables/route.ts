@@ -106,10 +106,26 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // People waiting on a sold-out type (not yet notified)
+  const { data: waitlist } = await supabase
+    .from("event_waitlist")
+    .select("event_day, table_type_key, name, email, created_at")
+    .eq("event_id", event.id)
+    .is("notified_at", null)
+    .order("created_at", { ascending: true });
+
   return NextResponse.json({
     event: { name: event.name, venue: event.venue, days },
     rows,
     summary,
     typeLabels: TYPE_LABELS,
+    waitlist: (waitlist ?? []).map((w) => ({
+      day: w.event_day,
+      type: w.table_type_key,
+      typeLabel: TYPE_LABELS[w.table_type_key as TableTypeKey] ?? w.table_type_key,
+      name: w.name,
+      email: w.email,
+      created_at: w.created_at,
+    })),
   });
 }

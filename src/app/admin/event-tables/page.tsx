@@ -23,11 +23,21 @@ interface Row {
   days: Record<string, Buyer | null>;
 }
 
+interface WaitlistEntry {
+  day: string;
+  type: string;
+  typeLabel: string;
+  name: string;
+  email: string;
+  created_at: string;
+}
+
 interface TablesData {
   event: { name: string; venue: string; days: string[] };
   rows: Row[];
   summary: Record<string, Record<string, { sold: number; total: number }>>;
   typeLabels: Record<string, string>;
+  waitlist?: WaitlistEntry[];
 }
 
 const TYPE_ORDER = ["standard", "corner", "premier_corner"];
@@ -260,6 +270,34 @@ export default function AdminEventTablesPage() {
               className="w-full pl-9 pr-3 py-2.5 bg-background border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50"
             />
           </div>
+
+          {/* Waitlist for the active day */}
+          {(() => {
+            const waiters = (data.waitlist ?? []).filter((w) => w.day === activeDay);
+            if (waiters.length === 0) return null;
+            return (
+              <div className="mb-6 rounded-xl border border-accent/25 bg-accent/5 p-4">
+                <h2 className="text-text-primary text-sm font-medium mb-1">
+                  Waitlist <span className="text-text-muted text-xs">({waiters.length})</span>
+                </h2>
+                <p className="text-text-muted text-xs mb-3">
+                  Notified automatically when you release a matching table on {activeDay}.
+                </p>
+                <div className="space-y-1.5">
+                  {waiters.map((w, i) => (
+                    <div key={`${w.email}-${i}`} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="text-text-primary truncate">
+                        {w.name} <span className="text-text-muted">· {w.email}</span>
+                      </span>
+                      <span className="shrink-0 text-[11px] px-2 py-0.5 rounded-full bg-background border border-border text-text-secondary">
+                        {w.typeLabel}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Tables grouped by type */}
           {TYPE_ORDER.map((type) => {

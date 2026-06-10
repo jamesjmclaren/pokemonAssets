@@ -8,6 +8,12 @@ import {
   TYPE_PRICE_PENCE,
   type TableTypeKey,
 } from "@/lib/event-floor-plan";
+import {
+  brandedEmailHtml,
+  summaryCard,
+  buildEventIcs,
+  googleCalendarUrl,
+} from "@/lib/event-emails";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -365,7 +371,7 @@ async function handleEventTableV2Booking(
   const supabase = getSupabaseAdmin();
   const { data: event } = await supabase
     .from("events")
-    .select("id, name, venue")
+    .select("id, name, venue, start_date, end_date")
     .eq("slug", eventSlug)
     .single();
   if (!event) {
@@ -479,40 +485,75 @@ async function handleEventTableV2Booking(
     console.error("handleEventTableV2Booking: failed to send admin email:", e);
   }
 
-  // Vendor confirmation
+  // Vendor confirmation — branded, with a calendar invite
   if (email) {
     try {
+      const tablesHtml = itemLines.map((l) => escapeHtml(l)).join("<br/>");
+      const startDate: string | null = event.start_date ?? null;
+      const endDate: string | null = event.end_date ?? startDate;
+      const calTitle = `${event.name} — Vendor`;
+      const calDetails = `Booking ref ${ref}. Tables: ${tables.map((t) => `${t.label} (${t.day})`).join(", ")}.`;
+
+      const card = summaryCard(ref, [
+        ["Event", `${eEventName}`],
+        ["Venue", `${eVenue}`],
+        ["Business", eBusinessName],
+        ["Tables", tablesHtml],
+        ["Total paid", amountFormatted],
+      ]);
+
+      const gcal =
+        startDate && endDate
+          ? googleCalendarUrl({
+              title: calTitle,
+              details: calDetails,
+              location: event.venue,
+              startDate,
+              endDate,
+            })
+          : null;
+
+      const html = brandedEmailHtml({
+        heading: "Booking confirmed",
+        intro: `Hi ${eVendorName}, thank you for booking at <strong style="color:#e9e3d6;">${eEventName}</strong>. Your payment of <strong style="color:#e9e3d6;">${amountFormatted}</strong> has been received and your tables are reserved.`,
+        bodyHtml: `${card}
+          ${gcal ? `<p style="margin:18px 0 0;"><a href="${gcal}" style="color:#D4AF37;text-decoration:none;font-size:13px;">＋ Add to Google Calendar</a></p>` : ""}
+          <p style="margin:20px 0 0;color:#8a8479;font-size:12px;line-height:1.7;">
+            This booking does not include internet or power — these can be purchased from the venue.
+            Table positions are communicated closer to the event. Display cases can be booked later.
+          </p>`,
+        footerNote: "A calendar invite is attached to this email.",
+      });
+
+      const payload: Record<string, unknown> = {
+        from: { address: `noreply@${domain}`, display_name: "West Investments" },
+        to: { address: email, display_name: vendorName },
+        reply_to: { address: "info@west.investments", display_name: "West Investments" },
+        subject: `Booking Confirmed — ${event.name} (Ref ${ref})`,
+        html,
+      };
+      if (startDate && endDate) {
+        const ics = buildEventIcs({
+          uid: `${session.id}@west.investments`,
+          title: calTitle,
+          description: calDetails,
+          location: event.venue,
+          startDate,
+          endDate,
+        });
+        payload.attachments = [
+          {
+            file_name: "collectors-exhibition.ics",
+            content_type: "text/calendar",
+            content: Buffer.from(ics).toString("base64"),
+          },
+        ];
+      }
+
       await fetch("https://smtp.maileroo.com/api/v2/emails", {
         method: "POST",
         headers: { "X-Api-Key": mailerooKey, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: { address: `noreply@${domain}`, display_name: "West Investments" },
-          to: { address: email, display_name: vendorName },
-          subject: `Booking Confirmed — ${event.name}`,
-          html: `
-            <h2>Booking Confirmed</h2>
-            <p>Hi ${eVendorName},</p>
-            <p>Thank you for booking at <strong>${eEventName}</strong> at ${eVenue}.
-            Your payment of <strong>${amountFormatted}</strong> has been received.</p>
-            <h3>Booking Summary</h3>
-            <p><strong>Business:</strong> ${eBusinessName}</p>
-            <p><strong>Card Types:</strong> ${eCardTypes}</p>
-            <h3>Tables</h3>
-            ${itemLines.map((l) => `<p>${escapeHtml(l)}</p>`).join("")}
-            <p><strong>Total Paid:</strong> ${amountFormatted}</p>
-            <p><strong>Booking Reference:</strong> ${ref}</p>
-            <hr />
-            <p><em>This booking does not include internet or power — these can be purchased
-            at a later date from the venue.</em></p>
-            <p><em>Table positions will be communicated closer to the event.
-            Display cases can be booked at a later date.</em></p>
-            <br />
-            <p>If you have any questions please contact us at
-            <a href="mailto:info@west.investments">info@west.investments</a>.</p>
-            <br />
-            <p>Best regards,<br /><strong>West Investments</strong></p>
-          `,
-        }),
+        body: JSON.stringify(payload),
       });
     } catch (e) {
       console.error("handleEventTableV2Booking: failed to send vendor email:", e);
