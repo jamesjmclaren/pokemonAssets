@@ -1,8 +1,8 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useState, useEffect, useMemo } from "react";
-import { Loader2, Shield, Search, Download, LayoutGrid } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Loader2, Shield, Search, Download, LayoutGrid, ExternalLink, Copy, Check, Unlock } from "lucide-react";
 
 interface Buyer {
   business_name: string;
@@ -11,6 +11,9 @@ interface Buyer {
   phone: string;
   instagram_handle: string | null;
   created_at: string;
+  ref: string;
+  sessionId: string;
+  amountPence: number | null;
 }
 
 interface Row {
@@ -43,6 +46,8 @@ export default function AdminEventTablesPage() {
   const [loading, setLoading] = useState(true);
   const [activeDay, setActiveDay] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [releasing, setReleasing] = useState<string | null>(null);
+  const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoaded && user) {
@@ -56,20 +61,49 @@ export default function AdminEventTablesPage() {
     }
   }, [isLoaded, user]);
 
-  useEffect(() => {
-    if (!isAdmin) return;
+  const loadData = useCallback(() => {
     setLoading(true);
     fetch("/api/admin/event-tables")
       .then((r) => r.json())
       .then((d: TablesData) => {
         if (d?.rows) {
           setData(d);
-          setActiveDay(d.event.days[0] ?? "");
+          setActiveDay((prev) => prev || d.event.days[0] || "");
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [isAdmin]);
+  }, []);
+
+  useEffect(() => {
+    if (isAdmin) loadData();
+  }, [isAdmin, loadData]);
+
+  const releaseTable = async (day: string, label: string) => {
+    if (
+      !confirm(
+        `Release table ${label} (${day})?\n\nDo this only AFTER you have refunded the payment in Stripe. The table will become available to book again.`
+      )
+    )
+      return;
+    setReleasing(`${day}|${label}`);
+    try {
+      const res = await fetch("/api/admin/event-tables/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day, label }),
+      });
+      if (res.ok) loadData();
+    } finally {
+      setReleasing(null);
+    }
+  };
+
+  const copySession = (sessionId: string) => {
+    navigator.clipboard.writeText(sessionId);
+    setCopiedRef(sessionId);
+    setTimeout(() => setCopiedRef(null), 1500);
+  };
 
   const filteredByType = useMemo(() => {
     if (!data || !activeDay) return {};
@@ -83,6 +117,8 @@ export default function AdminEventTablesPage() {
           buyer?.business_name,
           buyer?.name,
           buyer?.email,
+          buyer?.ref,
+          buyer?.sessionId,
         ]
           .filter(Boolean)
           .join(" ")
@@ -96,7 +132,7 @@ export default function AdminEventTablesPage() {
 
   const exportCsv = () => {
     if (!data || !activeDay) return;
-    const header = ["Table", "Type", "Status", "Business", "Name", "Email", "Phone"];
+    const header = ["Table", "Type", "Status", "Business", "Name", "Email", "Phone", "Ref", "Stripe Session", "Amount £"];
     const lines = [header.join(",")];
     for (const row of data.rows) {
       const b = row.days[activeDay];
@@ -108,6 +144,9 @@ export default function AdminEventTablesPage() {
         b?.name ?? "",
         b?.email ?? "",
         b?.phone ?? "",
+        b?.ref ?? "",
+        b?.sessionId ?? "",
+        b?.amountPence != null ? (b.amountPence / 100).toFixed(2) : "",
       ].map((c) => `"${String(c).replace(/"/g, '""')}"`);
       lines.push(cells.join(","));
     }
@@ -239,14 +278,12 @@ export default function AdminEventTablesPage() {
                     return (
                       <div
                         key={row.label}
-                        className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border ${
-                          buyer
-                            ? "bg-surface border-border"
-                            : "bg-background border-border/50"
+                        className={`flex items-start justify-between gap-3 px-3 py-2.5 rounded-lg border ${
+                          buyer ? "bg-surface border-border" : "bg-background border-border/50"
                         }`}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="inline-flex items-center justify-center min-w-[42px] h-7 px-2 rounded-md bg-background border border-border text-xs font-semibold text-text-primary">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <span className="mt-0.5 inline-flex items-center justify-center min-w-[42px] h-7 px-2 rounded-md bg-background border border-border text-xs font-semibold text-text-primary shrink-0">
                             {row.label}
                           </span>
                           {buyer ? (
@@ -257,20 +294,66 @@ export default function AdminEventTablesPage() {
                                 {buyer.email ? ` · ${buyer.email}` : ""}
                                 {buyer.phone ? ` · ${buyer.phone}` : ""}
                               </p>
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[11px]">
+                                <span className="font-mono text-accent/90">Ref {buyer.ref}</span>
+                                {buyer.amountPence != null && (
+                                  <span className="text-text-muted">£{(buyer.amountPence / 100).toFixed(0)}</span>
+                                )}
+                                {buyer.sessionId && (
+                                  <>
+                                    <button
+                                      onClick={() => copySession(buyer.sessionId)}
+                                      className="inline-flex items-center gap-1 text-text-muted hover:text-text-primary transition-colors"
+                                      title="Copy Stripe session id"
+                                    >
+                                      {copiedRef === buyer.sessionId ? (
+                                        <Check className="w-3 h-3 text-success" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                      <span className="font-mono">{buyer.sessionId.slice(0, 14)}…</span>
+                                    </button>
+                                    <a
+                                      href={`https://dashboard.stripe.com/search?query=${encodeURIComponent(buyer.sessionId)}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-accent/80 hover:text-accent transition-colors"
+                                      title="Find this payment in Stripe"
+                                    >
+                                      Stripe <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           ) : (
-                            <span className="text-sm text-text-muted">Available</span>
+                            <span className="text-sm text-text-muted mt-0.5">Available</span>
                           )}
                         </div>
-                        <span
-                          className={`shrink-0 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full ${
-                            buyer
-                              ? "bg-danger/10 text-danger"
-                              : "bg-success/10 text-success"
-                          }`}
-                        >
-                          {buyer ? "Sold" : "Open"}
-                        </span>
+                        <div className="shrink-0 flex flex-col items-end gap-1.5">
+                          <span
+                            className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full ${
+                              buyer ? "bg-danger/10 text-danger" : "bg-success/10 text-success"
+                            }`}
+                          >
+                            {buyer ? "Sold" : "Open"}
+                          </span>
+                          {buyer && (
+                            <button
+                              onClick={() => releaseTable(activeDay, row.label)}
+                              disabled={releasing === `${activeDay}|${row.label}`}
+                              className="inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-danger transition-colors disabled:opacity-50 cursor-pointer"
+                              title="Release this table (do it after refunding in Stripe)"
+                            >
+                              {releasing === `${activeDay}|${row.label}` ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Unlock className="w-3 h-3" />
+                              )}
+                              Release
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

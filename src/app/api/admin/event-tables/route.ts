@@ -20,6 +20,9 @@ interface Buyer {
   phone: string;
   instagram_handle: string | null;
   created_at: string;
+  ref: string;            // short booking reference (matches the customer's email)
+  sessionId: string;      // full Stripe checkout session id, for the dashboard
+  amountPence: number | null;
 }
 
 /** Admin-only: full table list for an event annotated with who has bought each. */
@@ -47,7 +50,7 @@ export async function GET(req: NextRequest) {
   const { data: bookings, error: bookingsError } = await supabase
     .from("event_bookings_v2")
     .select(
-      "table_label, table_type_key, event_day, first_name, last_name, business_name, email, phone, instagram_handle, created_at, amount_paid_pence"
+      "table_label, table_type_key, event_day, first_name, last_name, business_name, email, phone, instagram_handle, created_at, amount_paid_pence, stripe_session_id"
     )
     .eq("event_id", event.id)
     .eq("payment_status", "paid");
@@ -60,6 +63,8 @@ export async function GET(req: NextRequest) {
   for (const day of days) byDayLabel[day] = {};
   for (const b of bookings ?? []) {
     if (!b.table_label || !byDayLabel[b.event_day]) continue;
+    // Stored as `${session.id}_${idx}` — strip the row suffix back to the session id.
+    const sessionId = (b.stripe_session_id ?? "").replace(/_\d+$/, "");
     byDayLabel[b.event_day][b.table_label] = {
       business_name: b.business_name,
       name: `${b.first_name} ${b.last_name}`.trim(),
@@ -67,6 +72,9 @@ export async function GET(req: NextRequest) {
       phone: b.phone,
       instagram_handle: b.instagram_handle ?? null,
       created_at: b.created_at,
+      ref: sessionId ? sessionId.slice(-8).toUpperCase() : "—",
+      sessionId,
+      amountPence: b.amount_paid_pence ?? null,
     };
   }
 
