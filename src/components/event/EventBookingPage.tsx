@@ -75,11 +75,44 @@ const SPONSOR_AREAS: { x: number; y: number; w: number; h: number; label: string
 
 const CARD_TYPES: CardType[] = ["TCG", "Sports", "Collectibles", "Memorabilia", "Other"];
 
-// Colours mirror the spreadsheet: standard = green, end corner = blue, premier = red.
+// Town-map districts — the hall's tables grouped into seven booth-column
+// bands. Powers the Region Key navigator + the map's wayfinding highlight.
+const DISTRICT_NAMES = ["Aurora Bluff", "Tidewell Cove", "Verdant Hollow", "Quartz Junction", "Emberfall Ridge", "Glacier Gate", "Summit Plateau"];
+const BAND_EDGES = [116, 226, 336, 446, 556, 657];
+function unitCenterX(u: { rects: { x: number; w: number }[] }): number {
+  const xs = u.rects.map((r) => r.x);
+  const xe = u.rects.map((r) => r.x + r.w);
+  return (Math.min(...xs) + Math.max(...xe)) / 2;
+}
+function bandOf(cx: number): number {
+  let b = 0;
+  while (b < BAND_EDGES.length && cx >= BAND_EDGES[b]) b++;
+  return b;
+}
+type District = { n: number; name: string; cx: number; ids: Set<string>; total: number; byType: Record<TableTypeKey, number> };
+const MAP_DISTRICTS: District[] = (() => {
+  const base = DISTRICT_NAMES.map((name, n) => ({
+    n: n + 1, name, cx: 0, sx: 0, ids: new Set<string>(), total: 0,
+    byType: { standard: 0, corner: 0, premier_corner: 0 } as Record<TableTypeKey, number>,
+  }));
+  for (const u of TABLE_LAYOUT) {
+    const cx = unitCenterX(u);
+    const D = base[bandOf(cx)];
+    D.ids.add(u.id); D.total++; D.sx += cx; D.byType[u.type]++;
+  }
+  base.forEach((D) => { D.cx = D.total ? D.sx / D.total : 0; });
+  return base.filter((D) => D.total > 0).map((D, i) => ({ n: i + 1, name: D.name, cx: D.cx, ids: D.ids, total: D.total, byType: D.byType }));
+})();
+const MAP_LANDMARKS: { x: number; y: number }[] = [
+  { x: 700, y: 128 },
+  { x: 383, y: 150 },
+];
+
+// Town-map palette: standard = tide blue, corner = leaf green, premier = legendary gold.
 const TYPE_COLORS: Record<TableTypeKey, { fill: string; selected: string; sold: string; label: string }> = {
-  standard:       { fill: "#3b82f6", selected: "#93c5fd", sold: "#374151", label: "Standard" },
-  corner:         { fill: "#22c55e", selected: "#86efac", sold: "#374151", label: "End Corner" },
-  premier_corner: { fill: "#ef4444", selected: "#fca5a5", sold: "#374151", label: "Premier Corner" },
+  standard:       { fill: "#5fb0c9", selected: "#a7dcec", sold: "#374151", label: "Standard" },
+  corner:         { fill: "#7cc36b", selected: "#b6e6aa", sold: "#374151", label: "End Corner" },
+  premier_corner: { fill: "#e8c45a", selected: "#f3dd96", sold: "#374151", label: "Premier Corner" },
 };
 
 // Fallback pricing/inventory so the floor plan and cart work even before the
@@ -123,6 +156,8 @@ export default function EventBookingPage({ slug }: { slug: string }) {
 
   // Highlight a single table type (dim the rest)
   const [highlightType, setHighlightType] = useState<TableTypeKey | null>(null);
+  // Region Key wayfinding — highlight one district (dim the rest)
+  const [highlightDistrict, setHighlightDistrict] = useState<number | null>(null);
 
   // Waitlist (shown when a type is sold out for the active day)
   const [waitlistType, setWaitlistType] = useState<TableTypeKey | "">("");
@@ -886,6 +921,13 @@ export default function EventBookingPage({ slug }: { slug: string }) {
       <section id="floor-plan" className="py-16 px-4 md:px-12 bg-surface/20">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-10">
+            {/* CTE crest — transparency-keyed PNG, lives in /public */}
+            <img
+              src="/cte-crest.png"
+              alt="The Collectors Exhibition crest"
+              className="h-14 md:h-16 w-auto mx-auto mb-4 object-contain"
+              style={{ filter: "drop-shadow(0 2px 10px rgba(212,175,55,0.28))" }}
+            />
             <p className="text-accent text-xs uppercase tracking-[0.3em] mb-3" style={{ fontFamily: "Inter, sans-serif" }}>
               Interactive Floor Plan
             </p>
@@ -961,7 +1003,7 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                 ref={plotRef}
                 className="relative rounded-2xl overflow-hidden border border-accent/15"
                 style={{
-                  background: "radial-gradient(130% 120% at 50% -10%, #17171d 0%, #0c0c0f 72%)",
+                  background: "radial-gradient(120% 130% at 50% 0%, #14323d 0%, #0a1a20 68%, #081519 100%)",
                   touchAction: "none",
                 }}
                 onPointerDown={onPointerDown}
@@ -1012,29 +1054,58 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                 >
                   <defs>
                     <filter id="tableGlow" x="-60%" y="-60%" width="220%" height="220%">
-                      <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#D4AF37" floodOpacity="0.95" />
+                      <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#ff5a47" floodOpacity="0.95" />
+                    </filter>
+                    <filter id="legendaryGlow" x="-80%" y="-80%" width="260%" height="260%">
+                      <feDropShadow dx="0" dy="0" stdDeviation="2.4" floodColor="#e8c45a" floodOpacity="0.85" />
                     </filter>
                   </defs>
 
-                  {/* Hall outline */}
-                  <rect x="4" y="4" width={VIEWBOX_W - 8} height={VIEWBOX_H - 8} rx="8"
-                    fill="none" stroke="rgba(212,175,55,0.12)" strokeWidth="1.5" />
+                  {/* ── Trainer's Town Map skin ─────────────────────────── */}
+                  {/* Hall outline + soft "coastline" rings */}
+                  <rect x="4" y="4" width={VIEWBOX_W - 8} height={VIEWBOX_H - 8} rx="12"
+                    fill="none" stroke="#e8c45a" strokeOpacity={0.4} strokeWidth="1.4" />
+                  {[10, 17, 24].map((p) => (
+                    <rect key={`coast-${p}`} x={4 + p} y={4 + p} width={VIEWBOX_W - 8 - p * 2} height={VIEWBOX_H - 8 - p * 2}
+                      rx={14} fill="none" stroke="rgba(232,196,90,0.06)" strokeWidth="0.8" pointerEvents="none" />
+                  ))}
 
-                  {/* Centre aisle */}
-                  <line x1="14" y1="254" x2={VIEWBOX_W - 14} y2="254" stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="6 5" />
-                  <text x={VIEWBOX_W / 2} y="251" textAnchor="middle" fill="#4b5563" fontSize="8.5"
-                    fontFamily="Inter, sans-serif" letterSpacing="3">CENTRE AISLE</text>
+                  {/* Graticule edge ticks */}
+                  {Array.from({ length: 16 }).map((_, k) => {
+                    const x = 40 + k * 44;
+                    if (x > VIEWBOX_W - 20) return null;
+                    return (
+                      <g key={`grat-${k}`} pointerEvents="none" stroke="rgba(232,196,90,0.4)" strokeWidth="0.6">
+                        <line x1={x} y1={8} x2={x} y2={13} />
+                        <line x1={x} y1={VIEWBOX_H - 13} x2={x} y2={VIEWBOX_H - 8} />
+                      </g>
+                    );
+                  })}
 
-                  {/* Tables — yours (gold) · sold (grey) · on hold by others (amber) */}
+                  {/* Topo contours + dashed travel route along the road */}
+                  <g pointerEvents="none">
+                    {[34, 50, 66].map((r) => (
+                      <ellipse key={`c-${r}`} cx={383} cy={199} rx={r + 44} ry={r * 0.46} fill="none" stroke="rgba(232,196,90,0.09)" strokeWidth="0.7" />
+                    ))}
+                    <path d="M54 240 L164 240 L274 240 L498 240 L608 240 L706 240" fill="none" stroke="rgba(232,196,90,0.22)" strokeWidth="0.8" strokeDasharray="1 4" />
+                  </g>
+
+                  {/* Victory Road (centre aisle) */}
+                  <line x1="20" y1="254" x2={VIEWBOX_W - 20} y2="254" stroke="rgba(232,196,90,0.45)" strokeWidth="1.2" strokeDasharray="2 6" />
+                  <text x={VIEWBOX_W / 2} y="246" textAnchor="middle" fill="#e8c45a" fontSize="9"
+                    fontFamily="Inter, sans-serif" letterSpacing="4">VICTORY ROAD</text>
+
+                  {/* Tables — yours (red pin) · sold (grey) · on hold (amber) · premier = legendary gold */}
                   {TABLE_LAYOUT.map((unit, idx) => {
                     const mine = selectedCells[activeDay].has(unit.id);
                     const sold = !loadingAvail && isPaidSold(unit, activeDay);
                     const locked = !loadingAvail && isHeldByOther(unit, activeDay);
                     const colors = TYPE_COLORS[unit.type];
-                    const dim = highlightType !== null && unit.type !== highlightType;
+                    const dim = (highlightType !== null && unit.type !== highlightType) || (highlightDistrict !== null && !MAP_DISTRICTS[highlightDistrict].ids.has(unit.id));
                     const clickable = mine || (!sold && !locked);
-                    const fill = mine ? "#D4AF37" : sold ? "#34343b" : locked ? "#6b5417" : colors.fill;
-                    const opacity = dim ? 0.12 : sold ? 0.4 : locked ? 0.75 : 1;
+                    const legendary = unit.type === "premier_corner" && !mine && !sold && !locked && !dim;
+                    const fill = mine ? "#ff5a47" : sold ? "#34343b" : locked ? "#caa64a" : colors.fill;
+                    const opacity = dim ? 0.12 : sold ? 0.4 : locked ? 0.78 : 1;
                     const stateLabel = sold ? " (sold)" : locked ? " (on hold)" : mine ? " (yours)" : "";
                     return (
                       <g
@@ -1042,7 +1113,7 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                         className={`table-cell ${clickable ? "" : "sold"} fade-table`}
                         style={{ animationDelay: `${Math.min(idx * 3, 420)}ms` }}
                         onClick={() => clickable && handleCellClick(unit)}
-                        filter={mine ? "url(#tableGlow)" : undefined}
+                        filter={mine ? "url(#tableGlow)" : legendary ? "url(#legendaryGlow)" : undefined}
                       >
                         <title>{`Table ${unit.label} — ${colors.label}${stateLabel}`}</title>
                         {unit.rects.map((rc, i) => (
@@ -1052,11 +1123,11 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                             y={rc.y + 0.6}
                             width={rc.w - 1.2}
                             height={rc.h - 1.2}
-                            rx={3}
+                            rx={2.4}
                             fill={fill}
                             opacity={opacity}
-                            stroke={mine ? "#fffbe6" : "rgba(255,255,255,0.16)"}
-                            strokeWidth={mine ? 1.6 : 0.5}
+                            stroke={mine ? "#fffbe6" : legendary ? "rgba(255,250,230,0.55)" : "rgba(255,255,255,0.16)"}
+                            strokeWidth={mine ? 1.6 : legendary ? 0.8 : 0.5}
                           />
                         ))}
                         <text
@@ -1065,8 +1136,8 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                           textAnchor="middle"
                           fontSize={mine ? 7 : 5.5}
                           fontWeight={mine ? 800 : 600}
-                          fill={mine ? "#1a1a1a" : "#ffffff"}
-                          fillOpacity={sold || locked ? 0.5 : mine ? 1 : 0.9}
+                          fill={mine ? "#fffbe6" : legendary ? "#0c2029" : "#f2ead3"}
+                          fillOpacity={dim ? 0.12 : sold || locked ? 0.5 : mine ? 1 : 0.92}
                           fontFamily="Inter, sans-serif"
                           pointerEvents="none"
                         >
@@ -1080,12 +1151,48 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                   {SPONSOR_AREAS.map((s, i) => (
                     <g key={`sponsor-${i}`} pointerEvents="none">
                       <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={6}
-                        fill="rgba(212,175,55,0.06)" stroke="#D4AF37" strokeOpacity={0.45} strokeWidth={1} strokeDasharray="6 5" />
-                      <text x={s.x + s.w / 2} y={s.y + s.h / 2 + 3} textAnchor="middle"
-                        fontSize="9" fontWeight={700} fill="#D4AF37" fillOpacity={0.8}
-                        fontFamily="Inter, sans-serif" letterSpacing="2">{s.label}</text>
+                        fill="rgba(232,196,90,0.07)" stroke="#e8c45a" strokeOpacity={0.45} strokeWidth={1} strokeDasharray="5 5" />
+                      <path d={`M${s.x + s.w / 2 - 10} ${s.y + 16} l10 -9 l10 9`} fill="none" stroke="#e8c45a" strokeOpacity={0.5} strokeWidth={0.8} />
+                      <text x={s.x + s.w / 2} y={s.y + s.h / 2 + 7} textAnchor="middle"
+                        fontSize="8.5" fontWeight={700} fill="#e8c45a" fillOpacity={0.85}
+                        fontFamily="Inter, sans-serif" letterSpacing="1">Sponsors Area</text>
                     </g>
                   ))}
+
+                  {/* District markers (region-key wayfinding) */}
+                  {MAP_DISTRICTS.map((d, di) => {
+                    const active = highlightDistrict === di;
+                    return (
+                      <g key={`dist-${d.n}`} pointerEvents="none" transform={`translate(${d.cx}, 254)`}
+                        opacity={highlightDistrict === null || active ? 1 : 0.4}>
+                        <circle r={active ? 11 : 8.5} fill={active ? "#e8c45a" : "#0a1a20"} stroke="#e8c45a" strokeWidth={active ? 1.4 : 1.1} />
+                        <text x="0" y={active ? 3.4 : 2.8} textAnchor="middle" fontSize={active ? 11 : 9} fontWeight={700}
+                          fill={active ? "#0a1a20" : "#e8c45a"} fontFamily="Inter, sans-serif">{d.n}</text>
+                      </g>
+                    );
+                  })}
+                  {MAP_LANDMARKS.map((l, i) => (
+                    <path key={`lm-${i}`} pointerEvents="none" transform={`translate(${l.x}, ${l.y})`}
+                      d="M0,-6 l1.8,3.8 4.2.4 -3.1,2.8 .9,4.1 -3.8,-2.1 -3.8,2.1 .9,-4.1 -3.1,-2.8 4.2,-.4Z"
+                      fill="#e8c45a" stroke="#fffbe6" strokeWidth="0.4" />
+                  ))}
+
+                  {/* Compass rose + scale bar */}
+                  <g pointerEvents="none" transform={`translate(${VIEWBOX_W - 36}, ${VIEWBOX_H - 44})`}>
+                    <circle r="15" fill="rgba(8,21,25,0.7)" stroke="rgba(232,196,90,0.4)" strokeWidth="0.8" />
+                    <path d="M0,-13 L3,0 L0,13 L-3,0 Z" fill="#e8c45a" opacity="0.9" />
+                    <path d="M-13,0 L0,3 L13,0 L0,-3 Z" fill="rgba(232,196,90,0.35)" />
+                    <circle r="2" fill="#0a1a20" stroke="#e8c45a" strokeWidth="0.6" />
+                    <text x="0" y="-17" textAnchor="middle" fontSize="6.5" fill="#e8c45a" fontFamily="Inter, sans-serif">N</text>
+                  </g>
+                  <g pointerEvents="none" transform={`translate(26, ${VIEWBOX_H - 26})`}>
+                    <text x="0" y="-5" fontSize="6.5" fill="#9fb6ad" fontFamily="Inter, sans-serif" letterSpacing="1">SCALE · TABLES</text>
+                    {[0, 1, 2, 3].map((i) => (
+                      <rect key={`sc-${i}`} x={i * 16} y="0" width="16" height="4" fill={i % 2 ? "transparent" : "#e8c45a"} stroke="#e8c45a" strokeWidth="0.5" />
+                    ))}
+                    <text x="0" y="12" fontSize="6" fill="#9fb6ad" fontFamily="Inter, sans-serif">0</text>
+                    <text x="64" y="12" textAnchor="end" fontSize="6" fill="#9fb6ad" fontFamily="Inter, sans-serif">~50</text>
+                  </g>
                 </svg>
               </div>
 
@@ -1108,7 +1215,7 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                   );
                 })}
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-3 rounded-sm" style={{ backgroundColor: "#6b5417" }} />
+                  <div className="w-4 h-3 rounded-sm" style={{ backgroundColor: "#caa64a" }} />
                   <span className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>On hold</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1116,8 +1223,52 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                   <span className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>Sold</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-3 rounded-sm" style={{ backgroundColor: "#D4AF37" }} />
+                  <div className="w-4 h-3 rounded-sm" style={{ backgroundColor: "#ff5a47" }} />
                   <span className="text-text-muted text-xs" style={{ fontFamily: "Inter, sans-serif" }}>Your pick</span>
+                </div>
+              </div>
+
+              {/* Region Key — interactive district navigator */}
+              <div className="mt-5">
+                <p className="text-accent text-xs uppercase tracking-[0.2em] mb-1" style={{ fontFamily: "Inter, sans-serif" }}>Region Key</p>
+                <p className="text-text-muted text-xs mb-3" style={{ fontFamily: "Inter, sans-serif" }}>Hover a district to find it on the map · tap to lock the view.</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
+                  {MAP_DISTRICTS.map((d, di) => {
+                    const open = TABLE_LAYOUT.reduce(
+                      (acc, u) =>
+                        acc +
+                        (d.ids.has(u.id) &&
+                        !(!loadingAvail && isPaidSold(u, activeDay)) &&
+                        !(!loadingAvail && isHeldByOther(u, activeDay))
+                          ? 1
+                          : 0),
+                      0
+                    );
+                    const on = highlightDistrict === di;
+                    return (
+                      <button
+                        key={d.n}
+                        type="button"
+                        onMouseEnter={() => setHighlightDistrict(di)}
+                        onMouseLeave={() => setHighlightDistrict((cur) => (cur === di ? null : cur))}
+                        onClick={() => setHighlightDistrict((cur) => (cur === di ? null : di))}
+                        className={`text-left px-3 py-2 rounded-xl border transition-colors cursor-pointer ${on ? "border-accent bg-accent/10" : "border-border/50 hover:border-accent/40"}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`grid place-items-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0 ${on ? "bg-accent text-background" : "bg-surface-hover text-accent border border-accent/50"}`}
+                            style={{ fontFamily: "Inter, sans-serif" }}
+                          >
+                            {d.n}
+                          </span>
+                          <span className="text-text-primary text-xs font-medium truncate" style={{ fontFamily: "Inter, sans-serif" }}>{d.name}</span>
+                        </div>
+                        <div className="text-text-muted text-[11px] mt-1" style={{ fontFamily: "Inter, sans-serif" }}>
+                          {d.total} tables · <span className="text-text-secondary font-medium">{open}</span> open
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
