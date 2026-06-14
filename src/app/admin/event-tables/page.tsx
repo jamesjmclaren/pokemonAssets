@@ -13,6 +13,7 @@ interface Buyer {
   created_at: string;
   ref: string;
   sessionId: string;
+  paymentIntent: string | null;
   amountPence: number | null;
 }
 
@@ -37,6 +38,7 @@ interface TablesData {
   rows: Row[];
   summary: Record<string, Record<string, { sold: number; total: number }>>;
   typeLabels: Record<string, string>;
+  stripeMode?: "test" | "live";
   waitlist?: WaitlistEntry[];
 }
 
@@ -352,11 +354,15 @@ export default function AdminEventTablesPage() {
                                       <span className="font-mono">{buyer.sessionId.slice(0, 14)}…</span>
                                     </button>
                                     <a
-                                      href={`https://dashboard.stripe.com/search?query=${encodeURIComponent(buyer.sessionId)}`}
+                                      href={
+                                        buyer.paymentIntent
+                                          ? `https://dashboard.stripe.com/${data?.stripeMode === "live" ? "" : "test/"}payments/${buyer.paymentIntent}`
+                                          : `https://dashboard.stripe.com/${data?.stripeMode === "live" ? "" : "test/"}search?query=${encodeURIComponent(buyer.sessionId)}`
+                                      }
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="inline-flex items-center gap-1 text-accent/80 hover:text-accent transition-colors"
-                                      title="Find this payment in Stripe"
+                                      title={buyer.paymentIntent ? "Open this payment in Stripe" : "Search this booking in Stripe"}
                                     >
                                       Stripe <ExternalLink className="w-3 h-3" />
                                     </a>

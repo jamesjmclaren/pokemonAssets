@@ -381,6 +381,9 @@ async function handleEventTableV2Booking(
 
   // The reservation id IS the browser's hold token.
   const reservationId = metadata.reservation_id || "";
+  // The PaymentIntent — lets the admin deep-link straight to the payment.
+  const paymentIntentId =
+    typeof session.payment_intent === "string" ? session.payment_intent : null;
 
   // Insert one paid booking row per table. The unique index blocks any table
   // that was already taken — log those for manual review/refund.
@@ -410,6 +413,20 @@ async function handleEventTableV2Booking(
       } else {
         console.error(`handleEventTableV2Booking: insert failed for ${t.label}:`, error);
       }
+    }
+  }
+
+  // Best-effort: store the PaymentIntent so the admin can deep-link to the
+  // payment. Safely ignored if migration v23 (stripe_payment_intent column)
+  // hasn't run yet — the paid rows above are already saved either way.
+  if (paymentIntentId) {
+    const sessionIds = tables.map((_, i) => `${session.id}_${i}`);
+    const { error: piErr } = await supabase
+      .from("event_bookings_v2")
+      .update({ stripe_payment_intent: paymentIntentId })
+      .in("stripe_session_id", sessionIds);
+    if (piErr) {
+      console.error("handleEventTableV2Booking: payment_intent not stored (run migration v23?):", piErr.message);
     }
   }
 

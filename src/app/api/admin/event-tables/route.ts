@@ -22,6 +22,7 @@ interface Buyer {
   created_at: string;
   ref: string;            // short booking reference (matches the customer's email)
   sessionId: string;      // full Stripe checkout session id, for the dashboard
+  paymentIntent: string | null; // Stripe PaymentIntent, for a direct dashboard link
   amountPence: number | null;
 }
 
@@ -58,6 +59,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Failed to load bookings." }, { status: 500 });
   }
 
+  // PaymentIntents for deep-linking to the actual payment (best-effort: the
+  // stripe_payment_intent column is added in migration v23; if it isn't there
+  // yet this query just returns nothing and links fall back to a search).
+  const piByKey: Record<string, string> = {};
+  {
+    const { data: piRows } = await supabase
+      .from("event_bookings_v2")
+      .select("event_day, table_label, stripe_payment_intent")
+      .eq("event_id", event.id)
+      .eq("payment_status", "paid");
+    for (const r of (piRows ?? []) as { event_day: string; table_label: string | null; stripe_payment_intent: string | null }[]) {
+      if (r.table_label && r.stripe_payment_intent) piByKey[`${r.event_day}|${r.table_label}`] = r.stripe_payment_intent;
+    }
+  }
+
   // Index bookings by day → label
   const byDayLabel: Record<string, Record<string, Buyer>> = {};
   for (const day of days) byDayLabel[day] = {};
@@ -74,6 +90,7 @@ export async function GET(req: NextRequest) {
       created_at: b.created_at,
       ref: sessionId ? sessionId.slice(-8).toUpperCase() : "—",
       sessionId,
+      paymentIntent: piByKey[`${b.event_day}|${b.table_label}`] ?? null,
       amountPence: b.amount_paid_pence ?? null,
     };
   }
@@ -119,6 +136,7 @@ export async function GET(req: NextRequest) {
     rows,
     summary,
     typeLabels: TYPE_LABELS,
+    stripeMode: process.env.STRIPE_SECRET_KEY?.startsWith("sk_live") ? "live" : "test",
     waitlist: (waitlist ?? []).map((w) => ({
       day: w.event_day,
       type: w.table_type_key,
