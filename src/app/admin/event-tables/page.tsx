@@ -357,12 +357,12 @@ export default function AdminEventTablesPage() {
                                       href={
                                         buyer.paymentIntent
                                           ? `https://dashboard.stripe.com/${data?.stripeMode === "live" ? "" : "test/"}payments/${buyer.paymentIntent}`
-                                          : `https://dashboard.stripe.com/${data?.stripeMode === "live" ? "" : "test/"}search?query=${encodeURIComponent(buyer.sessionId)}`
+                                          : `https://dashboard.stripe.com/${data?.stripeMode === "live" ? "" : "test/"}search?query=${encodeURIComponent(buyer.email)}`
                                       }
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="inline-flex items-center gap-1 text-accent/80 hover:text-accent transition-colors"
-                                      title={buyer.paymentIntent ? "Open this payment in Stripe" : "Search this booking in Stripe"}
+                                      title={buyer.paymentIntent ? "Open this payment in Stripe" : "Find this customer's payment in Stripe (by email)"}
                                     >
                                       Stripe <ExternalLink className="w-3 h-3" />
                                     </a>
