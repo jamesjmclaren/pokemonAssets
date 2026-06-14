@@ -5,6 +5,7 @@ import { isCurrentUserAdmin } from "@/lib/admin";
 import { TABLE_TYPE_BY_LABEL, TYPE_LABELS, type TableTypeKey } from "@/lib/event-floor-plan";
 import { brandedEmailHtml } from "@/lib/event-emails";
 import { escapeHtml } from "@/lib/escape-html";
+import { getEventSlug } from "@/lib/event-config";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -13,7 +14,8 @@ function getSupabaseAdmin() {
   );
 }
 
-const DEFAULT_SLUG = "collectors-exhibition-june-2027";
+// Production → real event; preview/dev → test event (shared DB). See event-config.
+const DEFAULT_SLUG = getEventSlug();
 
 // Admin-only: free a booked table (use after refunding the payment in Stripe).
 // Deletes the paid booking row + any leftover hold so the table opens back up.

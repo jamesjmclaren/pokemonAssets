@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 import { isCurrentUserAdmin } from "@/lib/admin";
 import { EVENT_TABLES, TYPE_LABELS, type TableTypeKey } from "@/lib/event-floor-plan";
+import { getEventSlug } from "@/lib/event-config";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -11,7 +12,8 @@ function getSupabaseAdmin() {
   );
 }
 
-const DEFAULT_SLUG = "collectors-exhibition-june-2027";
+// Production → real event; preview/dev → test event (shared DB). See event-config.
+const DEFAULT_SLUG = getEventSlug();
 
 interface Buyer {
   business_name: string;
