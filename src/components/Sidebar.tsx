@@ -38,7 +38,6 @@ const navItems = [
   { href: "/dashboard/tracking", label: "Tracking", icon: Bell, adminOnly: false },
   { href: "/report", label: "Report", icon: FileText, adminOnly: false },
   { href: "/team", label: "Team", icon: Users, adminOnly: false },
-  { href: "/settings/api-keys", label: "Settings", icon: Settings, adminOnly: false },
 ];
 
 export default function Sidebar() {
@@ -103,7 +102,7 @@ export default function Sidebar() {
         )}
       >
         {/* Logo */}
-        <div className="p-6 border-b border-border flex items-center justify-between">
+        <div className="shrink-0 p-6 border-b border-border flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3">
             <img src="/logo.png" alt="West Investments Ltd" className="h-14 object-contain" />
           </Link>
@@ -116,8 +115,8 @@ export default function Sidebar() {
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1">
+        {/* Navigation (scrolls internally if it can't all fit) */}
+        <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
           {navItems
             .filter((item) => !item.adminOnly || !isReadOnly)
             .map((item) => {
@@ -142,28 +141,11 @@ export default function Sidebar() {
               );
             })}
 
-          {isPlatformAdmin && (
-            <>
-              <div className="my-3 mx-4 border-t border-border" />
-              <Link
-                href="/admin"
-                className={clsx(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium",
-                  pathname === "/admin"
-                    ? "bg-accent-muted text-accent-hover"
-                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-                )}
-              >
-                <Shield className="w-5 h-5" />
-                Admin
-              </Link>
-            </>
-          )}
         </nav>
 
         {/* Portfolio Switcher */}
         {isSignedIn && (
-          <div className="px-4 pb-4">
+          <div className="shrink-0 px-4 pb-4">
             <p className="text-xs text-text-muted mb-2 px-4">Portfolio</p>
             {portfolios.length > 0 ? (
               <div className="relative">
@@ -245,12 +227,27 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="p-4 border-t border-border space-y-3">
+        {/* Footer — always pinned to the bottom (profile / logout) */}
+        <div className="shrink-0 p-4 border-t border-border space-y-3">
           <CurrencySelector />
           {isSignedIn ? (
             <div className="flex items-center gap-3 px-4 py-3">
-              <UserButton afterSignOutUrl="/" />
+              <UserButton afterSignOutUrl="/">
+                <UserButton.MenuItems>
+                  <UserButton.Link
+                    label="Settings"
+                    labelIcon={<Settings className="w-4 h-4" />}
+                    href="/settings/api-keys"
+                  />
+                  {isPlatformAdmin && (
+                    <UserButton.Link
+                      label="Admin"
+                      labelIcon={<Shield className="w-4 h-4" />}
+                      href="/admin"
+                    />
+                  )}
+                </UserButton.MenuItems>
+              </UserButton>
               <span className="text-sm text-text-secondary">Account</span>
             </div>
           ) : (
