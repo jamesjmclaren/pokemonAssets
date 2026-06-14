@@ -210,7 +210,11 @@ export default function EventBookingPage({ slug }: { slug: string }) {
   // Availability fetch + polling (so others' holds/sales appear live)
   const refreshAvailability = useCallback(() => {
     if (!slug) return;
-    fetch(`/api/events/${slug}/availability`)
+    // Send our hold token so the API excludes our own holds from `held` (only
+    // others' holds lock a table). no-store keeps it fresh after a hold/release.
+    const token = holdTokenRef.current;
+    const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+    fetch(`/api/events/${slug}/availability${qs}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => { if (d.tableTypes) setAvailability(d as AvailabilityData); })
       .catch(() => {})
@@ -324,11 +328,17 @@ export default function EventBookingPage({ slug }: { slug: string }) {
       setPendingCell(cell.id);
       try {
         if (isSelected) {
-          await fetch(`/api/events/${slug}/release`, {
+          const res = await fetch(`/api/events/${slug}/release`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ label: cell.id, day, holdToken: token }),
           });
+          // Only drop it from the cart if the server actually released it —
+          // otherwise the hold lingers and the table would look stuck.
+          if (!res.ok) {
+            pushToast("Could not release that table — please try again.", "error");
+            return;
+          }
           setSelectedCells((prev) => ({
             ...prev,
             [day]: new Set([...prev[day]].filter((id) => id !== cell.id)),

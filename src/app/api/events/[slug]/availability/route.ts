@@ -10,11 +10,14 @@ function getSupabaseAdmin() {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ slug: string }> }
 ) {
   try {
     const { slug } = await context.params;
+    // The caller's hold token (if any) — used to exclude their own holds from
+    // the `held` list so a vendor never sees their own table as locked.
+    const token = req.nextUrl.searchParams.get("token");
     const supabase = getSupabaseAdmin();
 
     const { data: event, error: eventError } = await supabase
@@ -45,7 +48,7 @@ export async function GET(
         .eq("payment_status", "paid"),
       supabase
         .from("event_table_holds")
-        .select("event_day, table_label")
+        .select("event_day, table_label, hold_token")
         .eq("event_id", event.id)
         .gt("expires_at", nowIso),
     ]);
@@ -84,7 +87,14 @@ export async function GET(
       heldLabels[day] = [];
     }
     for (const r of paid) if (r.table_label && bookedLabels[r.event_day]) bookedLabels[r.event_day].push(r.table_label);
-    for (const r of holds) if (r.table_label && heldLabels[r.event_day]) heldLabels[r.event_day].push(r.table_label);
+    // `held` is "held by someone else" from this caller's perspective: skip the
+    // caller's own holds (matched by token) so deselecting never strands a table
+    // as locked. Per-type counts above still subtract ALL holds (incl. own).
+    for (const r of holds) {
+      if (!r.table_label || !heldLabels[r.event_day]) continue;
+      if (token && r.hold_token === token) continue;
+      heldLabels[r.event_day].push(r.table_label);
+    }
 
     return NextResponse.json(
       {
@@ -100,8 +110,9 @@ export async function GET(
         booked: bookedLabels,
         held: heldLabels,
       },
-      // Short cache so holds by others show up quickly
-      { headers: { "Cache-Control": "public, s-maxage=5, stale-while-revalidate=15" } }
+      // No caching: the response varies by token (own holds excluded from
+      // `held`) and must reflect a just-made hold/release immediately.
+      { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
     console.error("Event availability error:", error);
