@@ -77,7 +77,7 @@ const CARD_TYPES: CardType[] = ["TCG", "Sports", "Collectibles", "Memorabilia", 
 
 // Town-map districts — the hall's tables grouped into seven booth-column
 // bands. Powers the Region Key navigator + the map's wayfinding highlight.
-const DISTRICT_NAMES = ["Aurora Bluff", "Tidewell Cove", "Verdant Hollow", "Quartz Junction", "Emberfall Ridge", "Glacier Gate", "Summit Plateau"];
+const DISTRICT_NAMES = ["Zone 1", "Zone 2", "Zone 3", "Zone 4", "Zone 5", "Zone 6", "Zone 7"];
 const BAND_EDGES = [116, 226, 336, 446, 556, 657];
 function unitCenterX(u: { rects: { x: number; w: number }[] }): number {
   const xs = u.rects.map((r) => r.x);
@@ -770,7 +770,7 @@ export default function EventBookingPage({ slug }: { slug: string }) {
             >
               {[
                 { icon: Calendar, label: "4th–5th June 2027" },
-                { icon: MapPin, label: "Copper Box Arena" },
+                { icon: MapPin, label: availability?.venue || "TBC" },
                 { icon: Users, label: "3,500+ Capacity (Standing)" },
               ].map(({ icon: Icon, label }) => (
                 <div
@@ -1238,10 +1238,10 @@ export default function EventBookingPage({ slug }: { slug: string }) {
                 </div>
               </div>
 
-              {/* Region Key — interactive district navigator */}
+              {/* Zones — interactive zone navigator */}
               <div className="mt-5">
-                <p className="text-accent text-xs uppercase tracking-[0.2em] mb-1" style={{ fontFamily: "Inter, sans-serif" }}>Region Key</p>
-                <p className="text-text-muted text-xs mb-3" style={{ fontFamily: "Inter, sans-serif" }}>Hover a district to find it on the map · tap to lock the view.</p>
+                <p className="text-accent text-xs uppercase tracking-[0.2em] mb-1" style={{ fontFamily: "Inter, sans-serif" }}>Zones</p>
+                <p className="text-text-muted text-xs mb-3" style={{ fontFamily: "Inter, sans-serif" }}>Hover a zone to find it on the map · tap to lock the view.</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
                   {MAP_DISTRICTS.map((d, di) => {
                     const open = TABLE_LAYOUT.reduce(
