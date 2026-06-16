@@ -13,7 +13,7 @@ INSERT INTO events (slug, name, venue, event_days, start_date, end_date, is_acti
 VALUES (
   'collectors-exhibition-june-2027-test',
   'The Collectors Exhibition (TEST)',
-  'Copper Box Arena',
+  'TBC',
   ARRAY['Saturday', 'Sunday'],
   '2027-06-04',
   '2027-06-05',
