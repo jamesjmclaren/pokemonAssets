@@ -769,7 +769,7 @@ export default function EventBookingPage({ slug }: { slug: string }) {
               style={{ animationDelay: "0.8s" }}
             >
               {[
-                { icon: Calendar, label: "4th–5th June 2027" },
+                { icon: Calendar, label: "5th–6th June 2027" },
                 { icon: MapPin, label: availability?.venue || "TBC" },
                 { icon: Users, label: "3,500+ Capacity (Standing)" },
               ].map(({ icon: Icon, label }) => (
