@@ -19,8 +19,8 @@ const TOTAL_TABLES = parseInt(process.env.EVENT_TOTAL_TABLES || "176", 10);
 const VALID_CARD_TYPES = ["TCG", "Sports", "Collectibles", "Other"];
 
 const DAY_LABELS: Record<string, string> = {
-  Saturday: "Saturday 4th June",
-  Sunday: "Sunday 5th June",
+  Saturday: "Saturday 5th June",
+  Sunday: "Sunday 6th June",
 };
 
 export async function POST(req: NextRequest) {

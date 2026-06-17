@@ -164,8 +164,8 @@ export async function POST(req: NextRequest) {
 }
 
 const DAY_LABELS: Record<string, string> = {
-  Saturday: "Saturday 4th June",
-  Sunday: "Sunday 5th June",
+  Saturday: "Saturday 5th June",
+  Sunday: "Sunday 6th June",
 };
 
 async function handleEventTableBooking(
@@ -276,8 +276,8 @@ async function handleEventTableBooking(
           <p><strong>Booked At:</strong> ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</p>
           <hr />
           <h3>Tables Remaining</h3>
-          <p><strong>Saturday 4th June:</strong> ${satRemaining !== null ? `${satRemaining} of ${totalTables}` : "—"}</p>
-          <p><strong>Sunday 5th June:</strong> ${sunRemaining !== null ? `${sunRemaining} of ${totalTables}` : "—"}</p>
+          <p><strong>Saturday 5th June:</strong> ${satRemaining !== null ? `${satRemaining} of ${totalTables}` : "—"}</p>
+          <p><strong>Sunday 6th June:</strong> ${sunRemaining !== null ? `${sunRemaining} of ${totalTables}` : "—"}</p>
         `,
       }),
     });

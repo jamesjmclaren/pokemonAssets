@@ -15,8 +15,8 @@ VALUES (
   'The Collectors Exhibition (TEST)',
   'TBC',
   ARRAY['Saturday', 'Sunday'],
-  '2027-06-04',
   '2027-06-05',
+  '2027-06-06',
   true
 )
 ON CONFLICT (slug) DO UPDATE
