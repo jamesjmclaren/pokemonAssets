@@ -109,7 +109,7 @@ export default function SearchModal({
           <input
             ref={inputRef}
             type="text"
-            placeholder="e.g. mega charizard x ex 125"
+            placeholder="e.g. charizard, 294 or charizard, ascended heroes"
             value={query}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
