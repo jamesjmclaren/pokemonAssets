@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { fixStorageUrl } from "@/lib/format";
 
 type PublicAsset = {
@@ -45,7 +45,7 @@ function formatTotalValue(assets: PublicAsset[]): string {
 }
 
 async function getPublicPortfolio(token: string) {
-  const { data: portfolio } = await supabase
+  const { data: portfolio } = await supabaseAdmin
     .from("portfolios")
     .select("id, name")
     .eq("public_token", token)
@@ -54,7 +54,7 @@ async function getPublicPortfolio(token: string) {
 
   if (!portfolio) return null;
 
-  const { data: assets } = await supabase
+  const { data: assets } = await supabaseAdmin
     .from("assets")
     .select(
       `id, name, set_name, image_url, custom_image_url,
