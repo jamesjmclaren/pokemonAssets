@@ -3,6 +3,12 @@ import { NextResponse } from "next/server";
 import { isAdminEmail } from "@/lib/admin";
 import { escapeHtml } from "@/lib/escape-html";
 
+function extractClerkErrorMessage(err: unknown): string | null {
+  const errors = (err as { errors?: Array<{ message?: string; longMessage?: string }> })?.errors;
+  const first = errors?.[0];
+  return first?.longMessage || first?.message || null;
+}
+
 export async function POST(request: Request) {
   const { userId } = await auth();
   const user = await currentUser();
@@ -60,11 +66,29 @@ export async function POST(request: Request) {
         { status: 502 }
       );
     }
-    signUpLink = invitation.url;
+
+    // invitation.url is Clerk's hosted Frontend API ticket-accept endpoint
+    // (clerk.<domain>/v1/tickets/accept), which renders Clerk's generic
+    // Account Portal sign-in screen — not this app's own /sign-up page.
+    // The app mounts a custom <SignUp>, so hand the ticket to that page
+    // via the __clerk_ticket query param instead; ClerkJS picks it up on
+    // mount and runs the invitation-accept (sign-up) flow itself.
+    const ticket = new URL(invitation.url).searchParams.get("ticket");
+    if (!ticket) {
+      return NextResponse.json(
+        { error: "Clerk invitation link was missing a ticket" },
+        { status: 502 }
+      );
+    }
+    signUpLink = `${protocol}${baseUrl}/sign-up?__clerk_ticket=${encodeURIComponent(ticket)}&__clerk_status=sign_up`;
   } catch (err) {
-    console.error("Failed to create Clerk invitation:", err);
+    const clerkDetail = extractClerkErrorMessage(err);
+    console.error(
+      "Failed to create Clerk invitation:",
+      JSON.stringify(err, Object.getOwnPropertyNames(err as object))
+    );
     return NextResponse.json(
-      { error: "Failed to create invitation" },
+      { error: clerkDetail ? `Failed to create invitation: ${clerkDetail}` : "Failed to create invitation" },
       { status: 502 }
     );
   }
