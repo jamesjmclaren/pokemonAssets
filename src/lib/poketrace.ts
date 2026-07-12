@@ -491,6 +491,54 @@ export function pcGradeFieldToPoketraceTier(pcField: string): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * Parse a user search query into name, optional card number, and optional set filter.
+ * Supports comma-separated syntax: "charizard, 294" or "charizard, ascended heroes, 294".
+ */
+function parseSearchQuery(raw: string): {
+  name: string;
+  cardNumber?: string;
+  setFilter?: string;
+} {
+  if (!raw.includes(",")) {
+    return { name: raw.trim() };
+  }
+
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+  const name = parts[0];
+  let cardNumber: string | undefined;
+  let setFilter: string | undefined;
+
+  for (const part of parts.slice(1)) {
+    // Match pure numbers or "#294" or "294/217" formats
+    if (/^#?\d+(?:\/\d+)?$/.test(part)) {
+      cardNumber = part.replace("#", "").split("/")[0];
+    } else if (part) {
+      setFilter = part.toLowerCase();
+    }
+  }
+
+  return { name, cardNumber, setFilter };
+}
+
+/**
+ * Score a result by how well it matches the user's filters.
+ * Higher score = better match.
+ */
+function relevanceScore(card: NormalizedCard, cardNumber?: string, setFilter?: string): number {
+  let score = 0;
+  if (cardNumber) {
+    const num = (card.number || "").split("/")[0];
+    if (num === cardNumber) score += 100;
+  }
+  if (setFilter) {
+    const cardSet = (card.setName || "").toLowerCase();
+    if (cardSet === setFilter) score += 50;
+    else if (cardSet.includes(setFilter) || setFilter.includes(cardSet)) score += 20;
+  }
+  return score;
+}
+
+/**
  * Sanitize a user search query.
  * - Replaces smart quotes with straight ones
  * - Strips trailing card-number suffixes
@@ -626,16 +674,23 @@ export interface SearchOptions {
 
 /**
  * Search for cards/products on Poketrace.
+ * Supports comma-separated name/number/set syntax: "charizard, 294" or "charizard, ascended heroes".
  */
 export async function searchPoketrace(
   query: string,
   opts: SearchOptions = {}
 ): Promise<NormalizedCard[]> {
-  const cleaned = sanitizeQuery(query);
+  const { name, cardNumber, setFilter } = parseSearchQuery(query);
+  const cleaned = sanitizeQuery(name);
+
+  const baseLimit = opts.limit || 20;
+  // Fetch more when filtering so we have a better chance of finding the specific card
+  const fetchLimit = cardNumber || setFilter ? Math.max(baseLimit * 2, 40) : baseLimit;
+
   const params: Record<string, string> = {
     search: cleaned,
     market: opts.market || "US",
-    limit: String(opts.limit || 20),
+    limit: String(fetchLimit),
   };
   if (opts.cursor) params.cursor = opts.cursor;
   if (opts.setSlug) params.set = opts.setSlug;
@@ -645,7 +700,15 @@ export async function searchPoketrace(
 
   // Normalize all cards, converting EUR if needed
   const results = await Promise.all(cards.map(normalizeWithConversion));
-  return results;
+
+  if (!cardNumber && !setFilter) return results;
+
+  // Sort by relevance (number match > set match > original order), then trim to baseLimit
+  return results
+    .map((r) => ({ r, score: relevanceScore(r, cardNumber, setFilter) }))
+    .sort((a, b) => b.score - a.score)
+    .map(({ r }) => r)
+    .slice(0, baseLimit);
 }
 
 /**

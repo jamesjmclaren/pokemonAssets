@@ -295,7 +295,7 @@ export default function SearchAssetPage() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search cards or sealed products…"
+            placeholder="e.g. charizard, 294 or charizard, ascended heroes"
             className="w-full pl-12 pr-10 py-4 bg-surface border border-border rounded-2xl text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors shadow-sm"
           />
           {query && (
