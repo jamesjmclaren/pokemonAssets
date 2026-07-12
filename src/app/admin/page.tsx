@@ -349,8 +349,8 @@ export default function AdminPage() {
       {tab === "invites" && (
         <>
           <p className="text-text-secondary text-sm mb-6">
-            Generate invite links for new members. They can sign up using any method (Google, email, etc.).
-            Optionally provide their email to also send the link automatically.
+            Generate an invite for a new member. Sign-ups are invite-only, so the link is a Clerk
+            invitation tied to their email address — it won&apos;t work for anyone else.
           </p>
 
           <div className="bg-surface border border-border rounded-xl p-6 mb-8">
@@ -360,7 +360,7 @@ export default function AdminPage() {
               </div>
               <div>
                 <h2 className="text-text-primary font-medium">Generate Invite Link</h2>
-                <p className="text-text-muted text-xs">Enter their name and optionally their email to send the link</p>
+                <p className="text-text-muted text-xs">Enter their name and email to create and send the invite</p>
               </div>
             </div>
 
@@ -376,14 +376,15 @@ export default function AdminPage() {
               <div className="flex gap-3">
                 <input
                   type="email"
+                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email (optional — to send link via email)"
+                  placeholder="Email"
                   className="flex-1 px-4 py-3 bg-background border border-border rounded-lg text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
                 />
                 <button
                   type="submit"
-                  disabled={sending || !name.trim()}
+                  disabled={sending || !name.trim() || !email.trim()}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-background text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}

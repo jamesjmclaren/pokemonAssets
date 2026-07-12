@@ -1,4 +1,4 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { isAdminEmail } from "@/lib/admin";
 import { escapeHtml } from "@/lib/escape-html";
@@ -27,59 +27,92 @@ export async function POST(request: Request) {
     );
   }
 
-  // Build the sign-up link
+  if (!email) {
+    return NextResponse.json(
+      { error: "Email is required — sign-ups are invite-only, so a Clerk invitation must be tied to an email address" },
+      { status: 400 }
+    );
+  }
+
+  // Sign-ups are disabled at the Clerk instance level, so a plain /sign-up
+  // link is rejected. Clerk's invitation API mints a ticket tied to this
+  // email that bypasses that restriction — request the url ourselves
+  // (notify: false) instead of letting Clerk send its own email, so we can
+  // keep the branded Maileroo email below.
   const baseUrl =
     request.headers.get("origin") || request.headers.get("host");
   const protocol = baseUrl?.startsWith("http") ? "" : "https://";
-  const signUpLink = `${protocol}${baseUrl}/sign-up`;
+  const redirectUrl = `${protocol}${baseUrl}/onboarding`;
+
+  const clerk = await clerkClient();
+  let signUpLink: string;
+  try {
+    const invitation = await clerk.invitations.createInvitation({
+      emailAddress: email,
+      redirectUrl,
+      ignoreExisting: true,
+      notify: false,
+    });
+
+    if (!invitation.url) {
+      return NextResponse.json(
+        { error: "Clerk did not return an invitation link" },
+        { status: 502 }
+      );
+    }
+    signUpLink = invitation.url;
+  } catch (err) {
+    console.error("Failed to create Clerk invitation:", err);
+    return NextResponse.json(
+      { error: "Failed to create invitation" },
+      { status: 502 }
+    );
+  }
 
   let emailSent = false;
 
-  // If email provided, send the invite link via Maileroo
-  if (email) {
-    try {
-      const res = await fetch("https://smtp.maileroo.com/api/v2/emails", {
-        method: "POST",
-        headers: {
-          "X-Api-Key": process.env.MAILEROO_API_KEY!,
-          "Content-Type": "application/json",
+  try {
+    const res = await fetch("https://smtp.maileroo.com/api/v2/emails", {
+      method: "POST",
+      headers: {
+        "X-Api-Key": process.env.MAILEROO_API_KEY!,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: {
+          address: `noreply@${process.env.MAILEROO_DOMAIN || "west.investments"}`,
+          display_name: "West Investments",
         },
-        body: JSON.stringify({
-          from: {
-            address: `noreply@${process.env.MAILEROO_DOMAIN || "west.investments"}`,
-            display_name: "West Investments",
-          },
-          to: {
-            address: email,
-            display_name: name,
-          },
-          subject: "You're Invited to West Investments",
-          html: `
-            <h2>You're Invited</h2>
-            <p>Hi ${escapeHtml(name)},</p>
-            <p>You've been invited to join the West Investments platform — a private community for serious collectibles investors, traders, and collectors.</p>
-            <p>Click the link below to create your account. You can sign up using your email, Google, or any available method:</p>
-            <p style="margin: 24px 0;">
-              <a href="${signUpLink}" style="display: inline-block; padding: 12px 28px; background-color: #c9a84c; color: #000; text-decoration: none; font-weight: 600; letter-spacing: 0.05em;">
-                Create Your Account
-              </a>
-            </p>
-            <p>Or copy this link: <a href="${signUpLink}">${signUpLink}</a></p>
-            <br />
-            <p>Best regards,</p>
-            <p><strong>West Investments</strong></p>
-          `,
-        }),
-      });
+        to: {
+          address: email,
+          display_name: name,
+        },
+        subject: "You're Invited to West Investments",
+        html: `
+          <h2>You're Invited</h2>
+          <p>Hi ${escapeHtml(name)},</p>
+          <p>You've been invited to join the West Investments platform — a private community for serious collectibles investors, traders, and collectors.</p>
+          <p>Click the link below to create your account. You can sign up using your email, Google, or any available method:</p>
+          <p style="margin: 24px 0;">
+            <a href="${signUpLink}" style="display: inline-block; padding: 12px 28px; background-color: #c9a84c; color: #000; text-decoration: none; font-weight: 600; letter-spacing: 0.05em;">
+              Create Your Account
+            </a>
+          </p>
+          <p>Or copy this link: <a href="${signUpLink}">${signUpLink}</a></p>
+          <br />
+          <p>Best regards,</p>
+          <p><strong>West Investments</strong></p>
+        `,
+      }),
+    });
 
-      if (res.ok) {
-        emailSent = true;
-      } else {
-        console.error("Maileroo send failed:", await res.text());
-      }
-    } catch (err) {
-      console.error("Failed to send invite email:", err);
+    if (res.ok) {
+      emailSent = true;
+    } else {
+      console.error("Maileroo send failed:", await res.text());
     }
+  } catch (err) {
+    console.error("Failed to send invite email:", err);
   }
 
   return NextResponse.json({
