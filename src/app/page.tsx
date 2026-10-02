@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 // Minimal holding page. The full homepage is paused (not deleted) in
 // src/components/landing/FullLandingPage.tsx — see the note at the top of
@@ -29,13 +30,23 @@ export default async function HoldingPage() {
         />
       </div>
 
-      <h1 className="relative z-10 px-6 landing-fade-in">
-        <img
-          src="/logo.png"
-          alt="West Investments"
-          className="w-64 md:w-96 max-w-full h-auto object-contain"
-        />
-      </h1>
+      <div className="relative z-10 px-6 flex flex-col items-center">
+        <h1 className="landing-fade-in">
+          <img
+            src="/logo.png"
+            alt="West Investments"
+            className="w-64 md:w-96 max-w-full h-auto object-contain"
+          />
+        </h1>
+
+        <Link
+          href="/sign-in"
+          className="mt-12 border border-accent/50 text-accent px-10 py-4 hover:bg-accent hover:text-background transition-all landing-fade-up"
+          style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.25em", textTransform: "uppercase", animationDelay: "0.6s" }}
+        >
+          Client Login
+        </Link>
+      </div>
     </section>
   );
 }
