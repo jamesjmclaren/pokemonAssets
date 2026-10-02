@@ -8,7 +8,7 @@ const NO_SIDEBAR_ROUTES = ["/sign-in", "/sign-up", "/invite", "/terms", "/privac
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  const isLandingPage = pathname === "/";
+  const isLandingPage = pathname === "/" || pathname === "/legacy";
   const isNoSidebarRoute = NO_SIDEBAR_ROUTES.some((r) => pathname.startsWith(r));
   const hideSidebar = isLandingPage || isNoSidebarRoute;
 
