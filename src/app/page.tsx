@@ -1,10 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 
-// Minimal holding page. The full homepage is paused (not deleted) in
-// src/components/landing/FullLandingPage.tsx — see the note at the top of
-// that file for how to restore it.
+// Minimal holding page. The previous full homepage now lives at /legacy
+// (src/app/legacy/page.tsx → src/components/landing/FullLandingPage.tsx).
 export default async function HoldingPage() {
   const { userId } = await auth();
   if (userId) {
@@ -39,13 +37,13 @@ export default async function HoldingPage() {
           />
         </h1>
 
-        <Link
-          href="/sign-in"
-          className="mt-12 border border-accent/50 text-accent px-10 py-4 hover:bg-accent hover:text-background transition-all landing-fade-up"
-          style={{ fontFamily: "Inter, sans-serif", fontSize: "11px", letterSpacing: "0.25em", textTransform: "uppercase", animationDelay: "0.6s" }}
+        <a
+          href="mailto:info@west.investments"
+          className="mt-12 text-text-secondary hover:text-accent transition-colors landing-fade-up"
+          style={{ fontFamily: "Inter, sans-serif", fontSize: "13px", letterSpacing: "0.15em", animationDelay: "0.6s" }}
         >
-          Client Login
-        </Link>
+          info@west.investments
+        </a>
       </div>
     </section>
   );

@@ -1,8 +1,8 @@
 "use client";
 
-// PAUSED: This is the full West Investments homepage. It has been temporarily
-// replaced by a minimal holding page in src/app/page.tsx. To restore it, set
-// src/app/page.tsx to:
+// LEGACY: The previous full West Investments homepage, now served at /legacy
+// while src/app/page.tsx shows a minimal holding page. To restore it as the
+// homepage, set src/app/page.tsx to:
 //   export { default } from "@/components/landing/FullLandingPage";
 
 import { useUser } from "@clerk/nextjs";
